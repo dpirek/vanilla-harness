@@ -6,7 +6,7 @@ async function loadUiState() {
 }
 
 async function saveUiState(state) {
-  return requestJson("/api/ui-state", jsonOptions("PUT", { state }, { keepalive: true }), "Unable to save UI state.");
+  return requestJson("/api/ui-state", jsonOptions("PUT", { state }), "Unable to save UI state.");
 }
 
 export { loadUiState, saveUiState };
