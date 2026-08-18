@@ -1,5 +1,52 @@
 import { jsonOptions, requestJson } from "./api-client.js";
 
+const WORKSPACE_IMAGE_EXTENSIONS = new Set([
+  ".avif", ".bmp", ".gif", ".ico", ".jpeg", ".jpg", ".png", ".svg", ".webp",
+]);
+
+function normalizeWorkspaceLinkPath(value) {
+  let decoded;
+  try {
+    decoded = decodeURIComponent(String(value || ""));
+  } catch {
+    return "";
+  }
+  const parts = [];
+  for (const part of decoded.replace(/^\/+/, "").split("/")) {
+    if (!part || part === ".") continue;
+    if (part === "..") {
+      if (parts.length === 0) return "";
+      parts.pop();
+    } else {
+      parts.push(part);
+    }
+  }
+  return parts.join("/");
+}
+
+function workspaceFileAssetUrl(workspace, path) {
+  return `/api/workspace-file-asset?workspace=${encodeURIComponent(workspace)}&path=${encodeURIComponent(path)}`;
+}
+
+function resolveWorkspaceMarkdownLink(workspace, href) {
+  const value = String(href || "").trim();
+  if (!value || /^(?:https?:|mailto:)/i.test(value) || value.startsWith("#") || value.startsWith("?")) {
+    return { href: value, previewImage: false };
+  }
+  const hashIndex = value.indexOf("#");
+  const hash = hashIndex >= 0 ? value.slice(hashIndex) : "";
+  const withoutHash = hashIndex >= 0 ? value.slice(0, hashIndex) : value;
+  const fileReference = withoutHash.split("?", 1)[0];
+  const path = normalizeWorkspaceLinkPath(fileReference);
+  if (!path) return { href: "", previewImage: false };
+  const extensionIndex = path.lastIndexOf(".");
+  const extension = extensionIndex >= 0 ? path.slice(extensionIndex).toLowerCase() : "";
+  return {
+    href: `${workspaceFileAssetUrl(workspace, path)}${hash}`,
+    previewImage: WORKSPACE_IMAGE_EXTENSIONS.has(extension),
+  };
+}
+
 function loadWorkspaceTree(workspace) {
   return requestJson(`/api/workspace-tree?workspace=${encodeURIComponent(workspace)}`, {}, "Unable to load files.");
 }
@@ -25,4 +72,6 @@ export {
   createWorkspaceFolder,
   loadWorkspaceFile,
   loadWorkspaceTree,
+  resolveWorkspaceMarkdownLink,
+  workspaceFileAssetUrl,
 };

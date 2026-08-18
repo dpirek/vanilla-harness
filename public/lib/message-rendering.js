@@ -149,7 +149,10 @@ function markdownBlocks(markdown) {
 
 function safeLinkHref(value = "") {
   const href = String(value).trim();
-  return /^(?:https?:|mailto:)/i.test(href) ? href : "";
+  if (!href) return "";
+  if (/^(?:https?:|mailto:)/i.test(href)) return href;
+  if (/^[a-z][a-z\d+.-]*:/i.test(href) || href.startsWith("//") || href.startsWith("\\")) return "";
+  return href;
 }
 
 function nextInlineToken(value, cursor) {
@@ -171,7 +174,7 @@ function nextInlineToken(value, cursor) {
   return next;
 }
 
-function appendInlineMarkdown(container, text) {
+function appendInlineMarkdown(container, text, options = {}) {
   const value = String(text).replace(/ {2,}\n/g, "\u0000").replace(/\n/g, " ");
   let cursor = 0;
   while (cursor < value.length) {
@@ -192,8 +195,12 @@ function appendInlineMarkdown(container, text) {
       code.textContent = match[1];
       container.append(code);
     } else if (type === "link") {
-      const href = safeLinkHref(match[2]);
-      if (!href) {
+      const sourceHref = safeLinkHref(match[2]);
+      const resolution = sourceHref && options.resolveLink
+        ? options.resolveLink(sourceHref)
+        : { href: sourceHref, previewImage: false };
+      const href = safeLinkHref(typeof resolution === "string" ? resolution : resolution?.href);
+      if (!sourceHref || !href) {
         container.append(document.createTextNode(match[0]));
       } else {
         const link = document.createElement("a");
@@ -201,12 +208,24 @@ function appendInlineMarkdown(container, text) {
         link.target = "_blank";
         link.rel = "noopener noreferrer";
         if (match[3]) link.title = match[3];
-        appendInlineMarkdown(link, match[1]);
+        if (resolution?.previewImage) {
+          link.className = "workspaceImageLink";
+          const image = document.createElement("img");
+          image.src = href;
+          image.alt = match[1].replace(/[`*_~]/g, "").trim() || "Workspace image";
+          image.loading = "lazy";
+          const caption = document.createElement("span");
+          caption.className = "workspaceImageCaption";
+          appendInlineMarkdown(caption, match[1], options);
+          link.append(image, caption);
+        } else {
+          appendInlineMarkdown(link, match[1], options);
+        }
         container.append(link);
       }
     } else if (["strong", "strike", "emphasis"].includes(type)) {
       const element = document.createElement(type === "strong" ? "strong" : type === "strike" ? "del" : "em");
-      appendInlineMarkdown(element, match[1] || match[2]);
+      appendInlineMarkdown(element, match[1] || match[2], options);
       container.append(element);
     } else {
       container.append(document.createElement("br"));
@@ -215,7 +234,7 @@ function appendInlineMarkdown(container, text) {
   }
 }
 
-function appendMarkdown(container, markdown) {
+function appendMarkdown(container, markdown, options = {}) {
   for (const block of markdownBlocks(markdown)) {
     if (block.type === "code") {
       container.append(createCodeBlock(block.text, block.language));
@@ -227,7 +246,7 @@ function appendMarkdown(container, markdown) {
     }
     if (block.type === "quote") {
       const quote = document.createElement("blockquote");
-      appendMarkdown(quote, block.text);
+      appendMarkdown(quote, block.text, options);
       container.append(quote);
       continue;
     }
@@ -236,7 +255,7 @@ function appendMarkdown(container, markdown) {
       if (block.ordered && block.start !== 1) list.start = block.start;
       for (const text of block.items) {
         const item = document.createElement("li");
-        appendInlineMarkdown(item, text);
+        appendInlineMarkdown(item, text, options);
         list.append(item);
       }
       container.append(list);
@@ -251,7 +270,7 @@ function appendMarkdown(container, markdown) {
       block.headers.forEach((text, index) => {
         const cell = document.createElement("th");
         cell.style.textAlign = block.alignments[index] || "left";
-        appendInlineMarkdown(cell, text);
+        appendInlineMarkdown(cell, text, options);
         headRow.append(cell);
       });
       head.append(headRow);
@@ -261,7 +280,7 @@ function appendMarkdown(container, markdown) {
         block.headers.forEach((_, index) => {
           const cell = document.createElement("td");
           cell.style.textAlign = block.alignments[index] || "left";
-          appendInlineMarkdown(cell, row[index] || "");
+          appendInlineMarkdown(cell, row[index] || "", options);
           tableRow.append(cell);
         });
         body.append(tableRow);
@@ -272,7 +291,7 @@ function appendMarkdown(container, markdown) {
       continue;
     }
     const element = document.createElement(block.type === "heading" ? `h${block.level}` : "p");
-    appendInlineMarkdown(element, block.text);
+    appendInlineMarkdown(element, block.text, options);
     container.append(element);
   }
 }

@@ -858,6 +858,35 @@ code {
 
 .message-agent .messageBody a:hover { text-decoration-color: currentColor; }
 
+.message-agent .messageBody .workspaceImageLink {
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  text-decoration: none;
+  vertical-align: top;
+}
+
+.workspaceImageLink img {
+  display: block;
+  width: auto;
+  max-width: min(100%, 720px);
+  max-height: 520px;
+  background: #111;
+  object-fit: contain;
+}
+
+.workspaceImageCaption {
+  border-top: 1px solid var(--line);
+  padding: 7px 10px;
+  color: var(--muted);
+  font-size: .75rem;
+}
+
 .message-agent .messageBody .inlineCode {
   border: 1px solid #343942;
   border-radius: 5px;

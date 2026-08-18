@@ -34,6 +34,11 @@ const ready = true;
 test("markdown links allow web destinations and reject executable URLs", () => {
   assert.equal(safeLinkHref("https://example.com/docs"), "https://example.com/docs");
   assert.equal(safeLinkHref("mailto:team@example.com"), "mailto:team@example.com");
+  assert.equal(safeLinkHref("./trump-news-latest.png"), "./trump-news-latest.png");
+  assert.equal(safeLinkHref("./trump-news-latest.html"), "./trump-news-latest.html");
+  assert.equal(safeLinkHref("../reports/latest.html"), "../reports/latest.html");
+  assert.equal(safeLinkHref("#sources"), "#sources");
   assert.equal(safeLinkHref("javascript:alert(1)"), "");
   assert.equal(safeLinkHref("data:text/html,unsafe"), "");
+  assert.equal(safeLinkHref("//example.com/unsafe"), "");
 });

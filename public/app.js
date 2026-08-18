@@ -23,6 +23,7 @@ import {
   createWorkspaceFolder,
   loadWorkspaceFile,
   loadWorkspaceTree as fetchWorkspaceTree,
+  resolveWorkspaceMarkdownLink,
 } from "./services/workspace-api.js";
 import {
   loadConfig as fetchConfig,
@@ -1120,7 +1121,7 @@ function scrollToEnd(element) {
   element.scrollTop = element.scrollHeight;
 }
 
-function renderMessage(role, text, images = []) {
+function renderMessage(role, text, images = [], workspace = defaultWorkspace) {
   emptyState?.remove();
   const article = document.createElement("article");
   article.className = `message message-${role}`;
@@ -1139,7 +1140,11 @@ function renderMessage(role, text, images = []) {
 
   const body = document.createElement("div");
   body.className = "messageBody";
-  if (["agent", "assistant"].includes(role)) appendMarkdown(body, text);
+  if (["agent", "assistant"].includes(role)) {
+    appendMarkdown(body, text, {
+      resolveLink: (href) => resolveWorkspaceMarkdownLink(workspace, href),
+    });
+  }
   else appendMessageText(body, text);
 
   article.append(body);
@@ -1199,7 +1204,7 @@ function renderMessages() {
       }
       agentIndex += 1;
     }
-    renderMessage(message.role, message.text, message.images || []);
+    renderMessage(message.role, message.text, message.images || [], session.workspace || defaultWorkspace);
   }
   while (activityIndex < activities.length) {
     const isLatest = activityIndex === activities.length - 1;
