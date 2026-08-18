@@ -17,7 +17,8 @@ class SocketService {
     this.socket.addEventListener("error", () => this.handlers.onError?.());
     this.socket.addEventListener("message", (event) => {
       try {
-        this.handlers.onMessage?.(JSON.parse(event.data));
+        Promise.resolve(this.handlers.onMessage?.(JSON.parse(event.data)))
+          .catch((error) => this.handlers.onError?.(error));
       } catch (error) {
         this.handlers.onError?.(error);
       }

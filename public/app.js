@@ -5,7 +5,7 @@ import StreamPanel from "./components/stream-panel.js";
 import ColumnResizeHandle from "./components/column-resize-handle.js";
 import { mountAppShell } from "./components/app-shell.js";
 import { codeLanguageLabel, renderFilePreview } from "./lib/file-utils.js";
-import { appendMessageText } from "./lib/message-rendering.js";
+import { appendMarkdown, appendMessageText } from "./lib/message-rendering.js";
 import {
   defaultProviderSettings,
   normalizeToolPermissions,
@@ -14,8 +14,9 @@ import { normalizeRigComponentState } from "./lib/rig-presets.js";
 import { CONFIG_TEMPLATES, mcpBlocks, quoteToml, replaceToolBlock, setToolBlockEnabled, updateToolBlock } from "./lib/mcp-config.js";
 import { appendEvent, describeAgentEvent, renderEventList } from "./lib/event-rendering.js";
 import { readFileAsDataUrl, renderImagePreviews as renderImagePreviewList } from "./lib/image-attachments.js";
-import { createSession, promptHistoryFromSessions, titleFromPrompt } from "./lib/sessions.js";
-import { sessionActivityRuns } from "./lib/session-activity.js";
+import { clearSessionHistory, createSession, promptHistoryFromSessions, titleFromPrompt } from "./lib/sessions.js";
+import { formatStepDuration, formatTokenCount, sessionActivityRuns } from "./lib/session-activity.js";
+import { createStateSaveQueue } from "./lib/state-save-queue.js";
 import { renderWorkspaceNodes, renderWorkspacePicker } from "./lib/workspace-rendering.js";
 import { loadUiState, saveUiState } from "./services/ui-state-api.js";
 import {
@@ -329,7 +330,10 @@ let presetMutationPending = false;
 let sidebarWidth = 344;
 let streamWidth = 360;
 let filesWidth = 300;
-let uiStateSaveQueue = Promise.resolve();
+const persistUiState = createStateSaveQueue(
+  saveUiState,
+  (error) => addEvent("UI state save failed", error.message, { persist: false }),
+);
 
 function setPresetsStatus(message, state = "") {
   presetsStatus.textContent = message;
@@ -742,12 +746,6 @@ async function deletePreset(configurationId) {
   if (saved) addEvent("Preset deleted", deleted.name);
 }
 
-function persistUiState(state) {
-  uiStateSaveQueue = uiStateSaveQueue
-    .then(() => saveUiState(state))
-    .catch((error) => addEvent("UI state save failed", error.message, { persist: false }));
-}
-
 function applySidebarState(collapsed) {
   appShell.classList.toggle("sidebar-collapsed", collapsed);
   sidebarToggleButton.setAttribute("aria-pressed", String(collapsed));
@@ -992,7 +990,7 @@ async function createAndSelectWorkspace() {
 }
 
 function saveSessions() {
-  persistUiState({ sessions });
+  return persistUiState({ sessions });
 }
 
 function activeSession() {
@@ -1059,7 +1057,7 @@ function navigatePromptHistory(direction) {
 
 function addMessageToSession(sessionId, role, text, images = []) {
   const session = sessions.find((candidate) => candidate.id === sessionId);
-  if (!session) return;
+  if (!session) return Promise.resolve();
   session.messages.push({ role, text, images });
   if (role === "user" && session.messages.length === 1) {
     session.title = titleFromPrompt(text);
@@ -1069,8 +1067,9 @@ function addMessageToSession(sessionId, role, text, images = []) {
     session,
     ...sessions.filter((candidate) => candidate.id !== sessionId),
   ];
-  saveSessions();
+  const saved = saveSessions();
   renderRecents();
+  return saved;
 }
 
 function renderImagePreviews() {
@@ -1140,7 +1139,8 @@ function renderMessage(role, text, images = []) {
 
   const body = document.createElement("div");
   body.className = "messageBody";
-  appendMessageText(body, text);
+  if (["agent", "assistant"].includes(role)) appendMarkdown(body, text);
+  else appendMessageText(body, text);
 
   article.append(body);
   messages.append(article);
@@ -1247,7 +1247,13 @@ function updateSessionActivityCard(card, activity, { active = false } = {}) {
   eyebrow.textContent = isRunning ? "Current step" : "Step summary";
   current.textContent = isRunning ? activity.current?.label || "Working…" : failed ? "Run completed with errors" : "Run completed";
   current.dataset.state = isRunning ? "running" : failed ? "failed" : "idle";
-  count.textContent = `${activity.items.length} task${activity.items.length === 1 ? "" : "s"}`;
+  const taskCount = `${activity.items.length} task${activity.items.length === 1 ? "" : "s"}`;
+  count.textContent = activity.usage
+    ? `${taskCount} · ${formatTokenCount(activity.usage.totalTokens)} tokens`
+    : taskCount;
+  count.title = activity.usage
+    ? `${formatTokenCount(activity.usage.inputTokens)} input · ${formatTokenCount(activity.usage.outputTokens)} output · ${formatTokenCount(activity.usage.totalTokens)} total tokens`
+    : "";
   list.replaceChildren(...activity.items.map((task) => {
     const item = document.createElement("li");
     item.className = `sessionTask sessionTask-${task.status}`;
@@ -1258,17 +1264,36 @@ function updateSessionActivityCard(card, activity, { active = false } = {}) {
     const label = document.createElement("span");
     label.className = "sessionTaskLabel";
     label.textContent = task.label;
-    const time = document.createElement("time");
-    const date = new Date(task.timestamp);
-    time.dateTime = date.toISOString();
-    time.textContent = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-    item.append(marker, label, time);
+    const content = document.createElement("span");
+    content.className = "sessionTaskContent";
+    content.append(label);
+    if (task.usage) {
+      const tokens = document.createElement("span");
+      tokens.className = "sessionTaskTokens";
+      tokens.textContent = `${formatTokenCount(task.usage.inputTokens)} input · ${formatTokenCount(task.usage.outputTokens)} output`;
+      tokens.title = `${formatTokenCount(task.usage.totalTokens)} total tokens`;
+      content.append(tokens);
+    }
+    const duration = document.createElement("span");
+    duration.className = "sessionTaskDuration";
+    duration.textContent = formatStepDuration(task.durationMs);
+    if (task.status === "running") {
+      duration.dataset.running = "true";
+      duration.dataset.startedAt = String(task.startedAt);
+    }
+    item.append(marker, content, duration);
     return item;
   }));
   card.dataset.running = String(isRunning);
   card.dataset.complete = String(activity.complete);
   if (isRunning) card.open = true;
   else if (activity.complete && !wasComplete) card.open = false;
+}
+
+function refreshRunningStepDurations() {
+  messages.querySelectorAll('.sessionTaskDuration[data-running="true"]').forEach((duration) => {
+    duration.textContent = formatStepDuration(Date.now() - Number(duration.dataset.startedAt));
+  });
 }
 
 function renderSessionActivity() {
@@ -1886,7 +1911,7 @@ async function loadHealth() {
   }
 }
 
-function handleSocketMessage(payload) {
+async function handleSocketMessage(payload) {
     if (payload.type === "ready") {
       addEvent("Server defaults", {
         provider: payload.provider,
@@ -1939,9 +1964,10 @@ function handleSocketMessage(payload) {
     if (payload.type === "done") {
       const targetSessionId = payload.sessionId || pendingSessionId || activeSessionId;
       addEvent("Response completed", { type: "response_complete" });
-      addMessageToSession(targetSessionId, "agent", payload.text);
+      const saved = addMessageToSession(targetSessionId, "agent", payload.text);
       if (targetSessionId === activeSessionId) renderMessages();
       finishStreamingAnswer();
+      await saved;
       pendingSessionId = null;
       setBusy(false);
       return;
@@ -2146,14 +2172,13 @@ mcpModal.addEventListener("append-mcp-template", (event) => {
 chatComponent.addEventListener("reset-chat", () => {
   const session = activeSession();
   if (session) {
-    session.messages = [];
-    session.title = "New chat";
-    session.updatedAt = Date.now();
+    clearSessionHistory(session);
     saveSessions();
     renderRecents();
   }
   messages.replaceChildren();
   messages.append(emptyState);
+  renderEvents();
   send({ type: "reset", sessionId: activeSessionId });
 });
 
@@ -2222,3 +2247,4 @@ async function initialize() {
 }
 
 initialize();
+setInterval(refreshRunningStepDurations, 1000);

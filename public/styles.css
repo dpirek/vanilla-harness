@@ -691,6 +691,7 @@ code {
 }
 
 .sessionTaskLabel {
+  display: block;
   min-width: 0;
   overflow: hidden;
   font-size: .8rem;
@@ -698,9 +699,23 @@ code {
   white-space: nowrap;
 }
 
-.sessionTask time {
+.sessionTaskContent {
+  display: grid;
+  min-width: 0;
+  padding: 5px 0;
+}
+
+.sessionTaskTokens {
+  color: var(--faint);
+  font-size: .68rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.sessionTaskDuration {
   color: var(--faint);
   font-size: .7rem;
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
@@ -806,6 +821,91 @@ code {
 .message-agent p {
   max-width: 78ch;
 }
+
+.message-agent .messageBody :is(h1, h2, h3, h4, h5, h6) {
+  max-width: 78ch;
+  margin-bottom: 0;
+  line-height: 1.25;
+}
+
+.message-agent .messageBody h1 { font-size: 1.55rem; }
+.message-agent .messageBody h2 { font-size: 1.3rem; }
+.message-agent .messageBody h3 { font-size: 1.12rem; }
+.message-agent .messageBody :is(h4, h5, h6) { font-size: 1rem; }
+
+.message-agent .messageBody :is(ul, ol) {
+  max-width: 78ch;
+  margin-bottom: 0;
+  padding-left: 1.5rem;
+  font-size: 1.05rem;
+  line-height: 1.55;
+}
+
+.message-agent .messageBody li + li { margin-top: 5px; }
+
+.message-agent .messageBody blockquote {
+  max-width: 78ch;
+  margin-right: 0;
+  margin-left: 0;
+  border-left: 3px solid var(--strong-line);
+  padding-left: 14px;
+  color: var(--muted);
+}
+
+.message-agent .messageBody a {
+  color: #8ecbff;
+  text-decoration-color: rgba(142, 203, 255, .45);
+  text-underline-offset: 3px;
+}
+
+.message-agent .messageBody a:hover { text-decoration-color: currentColor; }
+
+.message-agent .messageBody .inlineCode {
+  border: 1px solid #343942;
+  border-radius: 5px;
+  background: #171a1f;
+  padding: .08em .34em;
+  color: #e3e6eb;
+  font-size: .88em;
+}
+
+.message-agent .messageBody hr {
+  max-width: 78ch;
+  margin-right: auto;
+  margin-left: 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+
+.markdownTable {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.markdownTable table {
+  min-width: min(100%, 520px);
+  border-spacing: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: .9rem;
+  line-height: 1.45;
+}
+
+.markdownTable :is(th, td) {
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  padding: 9px 11px;
+  vertical-align: top;
+}
+
+.markdownTable th {
+  background: var(--raised);
+  color: var(--text);
+  font-weight: 700;
+}
+
+.markdownTable :is(th, td):last-child { border-right: 0; }
+.markdownTable tbody tr:last-child td { border-bottom: 0; }
 
 .message-streaming p::after {
   content: "";

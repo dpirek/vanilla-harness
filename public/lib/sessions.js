@@ -10,6 +10,16 @@ function createSession(title = "New chat", workspace = ".") {
   };
 }
 
+function clearSessionHistory(session, updatedAt = Date.now()) {
+  if (!session) return null;
+  session.title = "New chat";
+  session.messages = [];
+  session.events = [];
+  session.tokenHistory = [];
+  session.updatedAt = updatedAt;
+  return session;
+}
+
 function titleFromPrompt(prompt) {
   const compact = prompt.replace(/\s+/g, " ").trim();
   if (!compact) return "New chat";
@@ -29,4 +39,4 @@ function promptHistoryFromSessions(sessions) {
   return prompts.reverse();
 }
 
-export { createSession, promptHistoryFromSessions, titleFromPrompt };
+export { clearSessionHistory, createSession, promptHistoryFromSessions, titleFromPrompt };

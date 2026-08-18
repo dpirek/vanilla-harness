@@ -6,7 +6,7 @@ import http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createModelClient } from "./lib/openai.js";
-import { CodingAgent } from "./lib/agent.js";
+import { CodingAgent, resolveDisabledSteps } from "./lib/agent.js";
 import { createSkillOnDisk, loadSkillsFromDisk } from "./lib/skills.js";
 import { createTools } from "./lib/tools.js";
 import { loadMcpTools } from "./lib/mcp.js";
@@ -917,10 +917,14 @@ function handleWebSocket(socket, req) {
         };
         try {
           const root = await resolveWorkspace(payload.workspace);
-          const allowedSteps = new Set(["composer", "tools", "mcp", "validation", "response"]);
-          const disabledSteps = Array.isArray(payload.disabledSteps)
-            ? [...new Set(payload.disabledSteps.filter((step) => allowedSteps.has(step)))]
-            : [];
+          const rigConfigurations = uiStateStore.getRigConfigurations();
+          const activeConfiguration = rigConfigurations.configurations.find(
+            (configuration) => configuration.id === rigConfigurations.activeConfigurationId,
+          );
+          const disabledSteps = resolveDisabledSteps(
+            payload.disabledSteps,
+            activeConfiguration?.componentState?.effects,
+          );
           const stepsKey = disabledSteps.slice().sort().join(",");
           let entry = agentSessions.get(sessionId);
           const hasExistingAgent = entry?.root === root && entry?.stepsKey === stepsKey;
