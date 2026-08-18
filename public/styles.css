@@ -1566,6 +1566,20 @@ textarea:disabled {
   min-height: 40px;
 }
 
+.mcpEditorActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.mcpEditorActions button {
+  min-height: 40px;
+  border: 1px solid #333;
+  border-radius: 999px;
+  background: #1f1f1f;
+  padding: 0 14px;
+}
+
 .toolsListPanel {
   display: grid;
   overflow: hidden;
@@ -1576,7 +1590,7 @@ textarea:disabled {
 .mcpListHeader,
 .toolRow {
   display: grid;
-  grid-template-columns: minmax(120px, 1fr) minmax(80px, .65fr) minmax(200px, 2fr) 76px;
+  grid-template-columns: minmax(100px, 1fr) 70px minmax(160px, 2fr) 58px 124px;
   align-items: center;
   gap: 12px;
 }
@@ -1644,12 +1658,15 @@ textarea:disabled {
 }
 
 .toggleButton {
-  min-width: 58px;
-  min-height: 34px;
+  width: 58px;
+  height: 34px;
   border: 1px solid #444;
   border-radius: 999px;
   background: #191919;
+  margin: 0;
+  padding: 0;
   color: #c7c7c7;
+  font-size: .78rem;
   font-weight: 750;
 }
 
@@ -1657,6 +1674,35 @@ textarea:disabled {
   border-color: rgba(136, 216, 198, 0.45);
   background: rgba(136, 216, 198, 0.12);
   color: #88d8c6;
+}
+
+.mcpRowActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.mcpRowActions button {
+  width: 58px;
+  height: 34px;
+  border: 1px solid #333;
+  border-radius: 999px;
+  background: #1f1f1f;
+  margin: 0;
+  padding: 0;
+  color: var(--text);
+  font-size: .78rem;
+  font-weight: 750;
+}
+
+.mcpRowActions .mcpDeleteButton {
+  border-color: #55302d;
+  color: #ff9a92;
+}
+
+.mcpRowActions .mcpDeleteButton:hover {
+  background: #2b1715;
+  border-color: #78413c;
 }
 
 .emptyTools {

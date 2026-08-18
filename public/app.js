@@ -11,7 +11,7 @@ import {
   normalizeToolPermissions,
 } from "./lib/settings.js";
 import { normalizeRigComponentState } from "./lib/rig-presets.js";
-import { CONFIG_TEMPLATES, mcpBlocks, quoteToml, setToolBlockEnabled } from "./lib/mcp-config.js";
+import { CONFIG_TEMPLATES, mcpBlocks, quoteToml, replaceToolBlock, setToolBlockEnabled, updateToolBlock } from "./lib/mcp-config.js";
 import { appendEvent, describeAgentEvent, renderEventList } from "./lib/event-rendering.js";
 import { readFileAsDataUrl, renderImagePreviews as renderImagePreviewList } from "./lib/image-attachments.js";
 import { createSession, promptHistoryFromSessions, titleFromPrompt } from "./lib/sessions.js";
@@ -116,8 +116,10 @@ const toolCwdInput = document.querySelector("#toolCwdInput");
 const addToolButton = document.querySelector("#addToolButton");
 const mcpTableToolbar = document.querySelector("#mcpTableToolbar");
 const mcpEditor = document.querySelector("#mcpEditor");
+const mcpEditorTitle = document.querySelector("#mcpEditorTitle");
 const reloadToolsButton = document.querySelector("#reloadToolsButton");
 const toolsList = document.querySelector("#toolsList");
+const toolsListPanel = document.querySelector(".toolsListPanel");
 const toolsStatus = document.querySelector("#toolsStatus");
 const providerSelect = document.querySelector("#providerSelect");
 const providerSettingsSection = document.querySelector("#providerSettings");
@@ -175,6 +177,7 @@ let workspacePickerRoot = null;
 let workspacePickerParent = null;
 let pendingWorkspaceParent = null;
 let previewingFilePath = null;
+let editingMcpBlock = null;
 
 function updateFileEditorPreview(filePath, content) {
   const language = renderFilePreview(fileEditorPreviewCode, content, { filePath });
@@ -1568,6 +1571,50 @@ function renderToolTypeFields() {
   });
 }
 
+function clearMcpEditor() {
+  editingMcpBlock = null;
+  toolTypeSelect.value = "remote";
+  toolTypeSelect.disabled = false;
+  toolLabelInput.value = "";
+  toolUrlInput.value = "";
+  toolCommandInput.value = "";
+  toolArgsInput.value = "";
+  toolCwdInput.value = "";
+  mcpEditorTitle.textContent = "Add MCP server";
+  mcpEditor.setAttribute("aria-label", "Add MCP server");
+  addToolButton.textContent = "Add server";
+  renderToolTypeFields();
+}
+
+function openMcpEditor(block = null) {
+  clearMcpEditor();
+  editingMcpBlock = block;
+  if (block) {
+    toolTypeSelect.value = block.type;
+    toolTypeSelect.disabled = true;
+    toolLabelInput.value = block.label;
+    toolUrlInput.value = block.url;
+    toolCommandInput.value = block.command;
+    toolArgsInput.value = block.args.join(" ");
+    toolCwdInput.value = block.cwd;
+    mcpEditorTitle.textContent = `Edit ${block.label}`;
+    mcpEditor.setAttribute("aria-label", `Edit ${block.label}`);
+    addToolButton.textContent = "Save changes";
+  }
+  mcpEditor.hidden = false;
+  mcpTableToolbar.hidden = true;
+  toolsListPanel.hidden = true;
+  renderToolTypeFields();
+  toolLabelInput.focus();
+}
+
+function closeMcpEditor() {
+  clearMcpEditor();
+  mcpEditor.hidden = true;
+  mcpTableToolbar.hidden = false;
+  toolsListPanel.hidden = false;
+}
+
 function renderTools() {
   const blocks = mcpBlocks(toolsConfigContent);
   toolsList.replaceChildren();
@@ -1606,7 +1653,37 @@ function renderTools() {
       }
     });
 
-    row.append(title, type, detail, toggle);
+    const actions = document.createElement("div");
+    actions.className = "mcpRowActions";
+    const editButton = document.createElement("button");
+    editButton.type = "button";
+    editButton.className = "mcpEditButton";
+    editButton.textContent = "Edit";
+    editButton.setAttribute("aria-label", `Edit ${block.label}`);
+    editButton.addEventListener("click", () => openMcpEditor(block));
+    const deleteButton = document.createElement("button");
+    deleteButton.type = "button";
+    deleteButton.className = "mcpDeleteButton";
+    deleteButton.textContent = "Delete";
+    deleteButton.setAttribute("aria-label", `Delete ${block.label}`);
+    deleteButton.addEventListener("click", async () => {
+      if (!window.confirm(`Delete MCP server “${block.label}”?`)) return;
+      deleteButton.disabled = true;
+      setToolsStatus(`Deleting ${block.label}...`);
+      try {
+        const nextContent = replaceToolBlock(toolsConfigContent, block);
+        await saveConfigContent(nextContent);
+        toolsConfigContent = nextContent;
+        renderTools();
+        setToolsStatus(`${block.label} deleted`, "success");
+      } catch (error) {
+        deleteButton.disabled = false;
+        setToolsStatus(error.message, "error");
+      }
+    });
+    actions.append(editButton, deleteButton);
+
+    row.append(title, type, detail, toggle, actions);
     toolsList.append(row);
   }
 }
@@ -1626,24 +1703,26 @@ async function loadTools() {
   }
 }
 
-async function addTool() {
-  setToolsStatus("Adding server...");
+async function saveTool() {
+  const action = editingMcpBlock ? "Saving changes..." : "Adding server...";
+  setToolsStatus(action);
   addToolButton.disabled = true;
   try {
+    const duplicate = mcpBlocks(toolsConfigContent).find((block) =>
+      block.label === toolLabelInput.value.trim() && block.index !== editingMcpBlock?.index
+    );
+    if (duplicate) throw new Error(`An MCP server named ${duplicate.label} already exists.`);
     const snippet = toolSnippet();
-    const prefix = toolsConfigContent.trimEnd();
-    toolsConfigContent = `${prefix}${prefix ? "\n\n" : ""}${snippet}\n`;
-    await saveConfigContent(toolsConfigContent);
-    toolLabelInput.value = "";
-    toolUrlInput.value = "";
-    toolCommandInput.value = "";
-    toolArgsInput.value = "";
-    toolCwdInput.value = "";
+    const nextContent = editingMcpBlock
+      ? updateToolBlock(toolsConfigContent, editingMcpBlock, snippet)
+      : `${toolsConfigContent.trimEnd()}${toolsConfigContent.trim() ? "\n\n" : ""}${snippet}\n`;
+    const savedLabel = toolLabelInput.value.trim();
+    const edited = Boolean(editingMcpBlock);
+    await saveConfigContent(nextContent);
+    toolsConfigContent = nextContent;
     renderTools();
-    setToolsStatus("Server added", "success");
-    mcpEditor.hidden = true;
-    mcpTableToolbar.hidden = false;
-    document.querySelector(".toolsListPanel").hidden = false;
+    closeMcpEditor();
+    setToolsStatus(`${savedLabel} ${edited ? "updated" : "added"}`, "success");
   } catch (error) {
     setToolsStatus(error.message, "error");
   } finally {
@@ -1894,8 +1973,7 @@ sidebarComponent.addEventListener("open-modal", async (event) => {
     toolPermissionsStatus.textContent = "Tool permissions are stored in SQLite."; toolPermissionsStatus.dataset.state = "";
   }
   if (event.detail.modal === "mcp") {
-    mcpDialog.showModal(); mcpEditor.hidden = true; mcpTableToolbar.hidden = false;
-    document.querySelector(".toolsListPanel").hidden = false; renderToolTypeFields(); await loadTools();
+    mcpDialog.showModal(); closeMcpEditor(); await loadTools();
   }
 });
 
@@ -1910,13 +1988,8 @@ providersModal.addEventListener("add-provider", addProvider);
 mcpModal.addEventListener("reload-mcp-config", loadConfig);
 mcpModal.addEventListener("save-mcp-config", saveConfig);
 mcpModal.addEventListener("reload-mcp-tools", loadTools);
-mcpModal.addEventListener("show-mcp-editor", () => {
-  mcpEditor.hidden = false;
-  mcpTableToolbar.hidden = true;
-  document.querySelector(".toolsListPanel").hidden = true;
-  renderToolTypeFields();
-  toolLabelInput.focus();
-});
+mcpModal.addEventListener("show-mcp-editor", () => openMcpEditor());
+mcpModal.addEventListener("cancel-mcp-editor", closeMcpEditor);
 providersModal.addEventListener("save-provider-settings", saveProviderSettings);
 toolsModal.addEventListener("save-tool-permissions", saveToolPermissions);
 presetsModal.addEventListener("create-preset", duplicateActivePreset);
@@ -1924,7 +1997,7 @@ presetsModal.addEventListener("cancel-preset-edit", closePresetEditor);
 presetsModal.addEventListener("save-preset-edit", savePresetEdit);
 presetsModal.addEventListener("preset-mcp-type-change", renderPresetMcpTypeFields);
 presetsModal.addEventListener("add-preset-mcp-server", addPresetMcpServer);
-mcpModal.addEventListener("add-mcp-tool", addTool);
+mcpModal.addEventListener("add-mcp-tool", saveTool);
 mcpModal.addEventListener("mcp-type-change", renderToolTypeFields);
 providersModal.addEventListener("provider-type-change", async () => {
   const nextProvider = providerSelect.value;
