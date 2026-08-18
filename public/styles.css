@@ -645,9 +645,7 @@ code {
 
 .sessionTaskList {
   display: grid;
-  max-height: 260px;
   margin: 0;
-  overflow: auto;
   padding: 4px 14px 8px;
   list-style: none;
 }
