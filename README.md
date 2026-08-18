@@ -44,7 +44,6 @@ The application can be configured through the UI or with environment variables:
 | `PORT` | Web server port | `3000` |
 | `AI_HARNESS_WORKSPACE` | Initial workspace available to the agent | Current directory |
 | `AI_HARNESS_DATA_DIR` | Directory containing the local `db/` data directory | Current directory |
-| `AI_HARNESS_WEB_APPROVE` | Set to `true` to automatically approve protected tool actions | `false` |
 | `AI_PROVIDER` | Default provider: `openai`, `ollama`, or `custom` | `openai` |
 | `AI_MODEL` | Default model override | Provider default |
 | `OPENAI_API_KEY` | OpenAI API key fallback | — |
@@ -85,7 +84,7 @@ db/                Local runtime state (ignored by Git)
 
 ## Security notes
 
-The agent can read files, write files, make HTTP requests, and run commands within the selected workspace. Review tool permissions in the UI and approve protected actions carefully. Only set `AI_HARNESS_WEB_APPROVE=true` in an environment where automatic approval is acceptable.
+The agent can read files, write files, make HTTP requests, run commands, and call MCP servers within the selected workspace. Enabled tools and MCP servers are automatically approved, so only enable capabilities and connect servers you trust.
 
 ## License
 

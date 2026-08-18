@@ -15,6 +15,7 @@ import { CONFIG_TEMPLATES, mcpBlocks, quoteToml, replaceToolBlock, setToolBlockE
 import { appendEvent, describeAgentEvent, renderEventList } from "./lib/event-rendering.js";
 import { readFileAsDataUrl, renderImagePreviews as renderImagePreviewList } from "./lib/image-attachments.js";
 import { createSession, promptHistoryFromSessions, titleFromPrompt } from "./lib/sessions.js";
+import { sessionActivityRuns } from "./lib/session-activity.js";
 import { renderWorkspaceNodes, renderWorkspacePicker } from "./lib/workspace-rendering.js";
 import { loadUiState, saveUiState } from "./services/ui-state-api.js";
 import {
@@ -98,6 +99,7 @@ const systemPromptContent = document.querySelector("#systemPromptContent");
 const systemPromptsStatus = document.querySelector("#systemPromptsStatus");
 const saveSystemPromptButton = document.querySelector("#saveSystemPromptButton");
 const skillsTableBody = document.querySelector("#skillsTableBody");
+const skillsSearchInput = document.querySelector("#skillsSearchInput");
 const skillsStatus = document.querySelector("#skillsStatus");
 const configInput = document.querySelector("#configInput");
 const configStatus = document.querySelector("#configStatus");
@@ -231,6 +233,10 @@ function summarizeSkillSource(sourcePath = "") {
   return parts.slice(-4).join("/");
 }
 
+function summarizeSkillContent(content = "") {
+  return String(content).split(/\r?\n/).find((line) => line.trim() && !line.trim().startsWith("#")) || "SKILL.md";
+}
+
 function renderSkills() {
   skillsTableBody.replaceChildren();
   if (skills.length === 0) {
@@ -244,7 +250,23 @@ function renderSkills() {
     return;
   }
 
-  for (const skill of skills) {
+  const query = skillsSearchInput.value.trim().toLocaleLowerCase();
+  const visibleSkills = query
+    ? skills.filter((skill) => [skill.name, skill.sourcePath, summarizeSkillContent(skill.content)]
+      .some((value) => String(value || "").toLocaleLowerCase().includes(query)))
+    : skills;
+  if (visibleSkills.length === 0) {
+    const row = document.createElement("tr");
+    const cell = document.createElement("td");
+    cell.colSpan = 3;
+    cell.className = "skillEmptyState";
+    cell.textContent = `No skills match “${skillsSearchInput.value.trim()}”.`;
+    row.append(cell);
+    skillsTableBody.append(row);
+    return;
+  }
+
+  for (const skill of visibleSkills) {
     const row = document.createElement("tr");
     const nameCell = document.createElement("th");
     nameCell.scope = "row";
@@ -253,7 +275,7 @@ function renderSkills() {
     name.textContent = skill.name;
     const summary = document.createElement("div");
     summary.className = "skillSummary";
-    summary.textContent = skill.content.split(/\r?\n/).find((line) => line.trim() && !line.trim().startsWith("#")) || "SKILL.md";
+    summary.textContent = summarizeSkillContent(skill.content);
     nameCell.append(name, summary);
 
     const sourceCell = document.createElement("td");
@@ -266,6 +288,7 @@ function renderSkills() {
     checkbox.checked = skill.selected === true;
     checkbox.dataset.skillId = skill.id;
     checkbox.setAttribute("aria-label", `Enable skill ${skill.name}`);
+    checkbox.addEventListener("change", () => { skill.selected = checkbox.checked; });
     toggleCell.append(checkbox);
 
     row.append(nameCell, sourceCell, toggleCell);
@@ -279,8 +302,7 @@ async function loadSkills() {
 }
 
 function currentSelectedSkillIds() {
-  return [...skillsTableBody.querySelectorAll("input[data-skill-id]:checked")]
-    .map((input) => input.dataset.skillId);
+  return skills.filter((skill) => skill.selected === true).map((skill) => skill.id);
 }
 
 async function saveSkills() {
@@ -433,7 +455,7 @@ function addPresetMcpServer() {
       presetMcpUrl.focus();
       return;
     }
-    snippet = `[[mcp.servers]]\nserver_label = "${quoteToml(label)}"\nserver_url = "${quoteToml(url)}"\nrequire_approval = "always"`;
+    snippet = `[[mcp.servers]]\nserver_label = "${quoteToml(label)}"\nserver_url = "${quoteToml(url)}"\nrequire_approval = "never"`;
   } else {
     const command = presetMcpCommand.value.trim();
     if (!command) {
@@ -443,7 +465,7 @@ function addPresetMcpServer() {
     }
     const args = presetMcpArgs.value.split(/\s+/).filter(Boolean).map((arg) => `"${quoteToml(arg)}"`).join(", ");
     const cwd = presetMcpCwd.value.trim();
-    snippet = `[mcp_servers.${label}]\ncommand = "${quoteToml(command)}"\nargs = [${args}]${cwd ? `\ncwd = "${quoteToml(cwd)}"` : ""}\nmessage_format = "content-length"`;
+    snippet = `[mcp_servers.${label}]\ncommand = "${quoteToml(command)}"\nargs = [${args}]${cwd ? `\ncwd = "${quoteToml(cwd)}"` : ""}\nmessage_format = "content-length"\nrequire_approval = "never"`;
   }
   const prefix = editingPresetMcpConfig.trimEnd();
   editingPresetMcpConfig = `${prefix}${prefix ? "\n\n" : ""}${snippet}\n`;
@@ -1092,6 +1114,7 @@ function setBusy(value) {
   sendButton.disabled = value || !socketService?.isOpen;
   promptInput.disabled = value;
   workspaceInput.disabled = value;
+  renderSessionActivity();
 }
 
 function scrollToEnd(element) {
@@ -1158,11 +1181,121 @@ function renderMessages() {
   const session = activeSession();
   if (!session || session.messages.length === 0) {
     messages.append(emptyState);
+    renderSessionActivity();
     return;
   }
+  const activities = sessionActivityRuns(session.events || []);
+  const isAgentMessage = (message) => ["agent", "assistant"].includes(message.role);
+  const agentMessageCount = session.messages.filter(isAgentMessage).length;
+  const unmatchedAgentCount = Math.max(0, agentMessageCount - activities.length);
+  let agentIndex = 0;
+  let activityIndex = 0;
   for (const message of session.messages) {
+    if (isAgentMessage(message)) {
+      if (agentIndex >= unmatchedAgentCount && activityIndex < activities.length) {
+        const isLatest = activityIndex === activities.length - 1;
+        messages.append(createSessionActivityCard(activities[activityIndex], { active: isLatest && runActive }));
+        activityIndex += 1;
+      }
+      agentIndex += 1;
+    }
     renderMessage(message.role, message.text, message.images || []);
   }
+  while (activityIndex < activities.length) {
+    const isLatest = activityIndex === activities.length - 1;
+    messages.append(createSessionActivityCard(activities[activityIndex], { active: isLatest && runActive }));
+    activityIndex += 1;
+  }
+}
+
+function createSessionActivityCard(activity, { active = false } = {}) {
+  const card = document.createElement("details");
+  card.className = "sessionActivity";
+  card.setAttribute("aria-label", "Session step summary");
+  card.setAttribute("aria-live", "polite");
+  const summary = document.createElement("summary");
+  const eyebrow = document.createElement("span");
+  eyebrow.className = "sessionActivityEyebrow";
+  const current = document.createElement("strong");
+  current.className = "currentSessionStep";
+  const count = document.createElement("span");
+  count.className = "sessionTaskCount";
+  const chevron = document.createElement("span");
+  chevron.className = "sessionActivityChevron";
+  chevron.textContent = "›";
+  chevron.setAttribute("aria-hidden", "true");
+  summary.append(eyebrow, current, count, chevron);
+  summary.addEventListener("click", (event) => {
+    if (card.dataset.running === "true") event.preventDefault();
+  });
+  const list = document.createElement("ol");
+  list.className = "sessionTaskList";
+  card.append(summary, list);
+  card.open = active && !activity.complete;
+  updateSessionActivityCard(card, activity, { active });
+  return card;
+}
+
+function updateSessionActivityCard(card, activity, { active = false } = {}) {
+  const wasComplete = card.dataset.complete === "true";
+  const isRunning = active && !activity.complete;
+  const failed = activity.items.some((item) => item.status === "failed");
+  const eyebrow = card.querySelector(".sessionActivityEyebrow");
+  const current = card.querySelector(".currentSessionStep");
+  const count = card.querySelector(".sessionTaskCount");
+  const list = card.querySelector(".sessionTaskList");
+  eyebrow.textContent = isRunning ? "Current step" : "Step summary";
+  current.textContent = isRunning ? activity.current?.label || "Working…" : failed ? "Run completed with errors" : "Run completed";
+  current.dataset.state = isRunning ? "running" : failed ? "failed" : "idle";
+  count.textContent = `${activity.items.length} task${activity.items.length === 1 ? "" : "s"}`;
+  list.replaceChildren(...activity.items.map((task) => {
+    const item = document.createElement("li");
+    item.className = `sessionTask sessionTask-${task.status}`;
+    const marker = document.createElement("span");
+    marker.className = "sessionTaskMarker";
+    marker.setAttribute("aria-hidden", "true");
+    marker.textContent = task.status === "running" ? "•" : task.status === "failed" ? "!" : "✓";
+    const label = document.createElement("span");
+    label.className = "sessionTaskLabel";
+    label.textContent = task.label;
+    const time = document.createElement("time");
+    const date = new Date(task.timestamp);
+    time.dateTime = date.toISOString();
+    time.textContent = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    item.append(marker, label, time);
+    return item;
+  }));
+  card.dataset.running = String(isRunning);
+  card.dataset.complete = String(activity.complete);
+  if (isRunning) card.open = true;
+  else if (activity.complete && !wasComplete) card.open = false;
+}
+
+function renderSessionActivity() {
+  const activities = sessionActivityRuns(activeSession()?.events || []);
+  const cards = [...messages.querySelectorAll(".sessionActivity")];
+  if (activities.length === 0) {
+    cards.forEach((card) => card.remove());
+    return;
+  }
+  let card = cards.at(-1);
+  if (cards.length < activities.length) {
+    card = createSessionActivityCard(activities.at(-1), { active: runActive });
+    const streamingMessage = messages.querySelector(".message-streaming");
+    if (streamingMessage) messages.insertBefore(card, streamingMessage);
+    else messages.append(card);
+  } else {
+    updateSessionActivityCard(card, activities.at(-1), { active: runActive });
+  }
+  const streamingResponse = messages.querySelector(".message-streaming");
+  if (streamingResponse) {
+    messages.insertBefore(card, streamingResponse);
+  } else if (activities.at(-1).complete) {
+    const responses = [...messages.querySelectorAll(".message-agent, .message-assistant")];
+    const finalResponse = responses.at(-1);
+    if (finalResponse) messages.insertBefore(card, finalResponse);
+  }
+  if (runActive) scrollToEnd(messages);
 }
 
 function renderRecents() {
@@ -1243,6 +1376,7 @@ function renderEvent({ title, detail, timestamp }) {
 
 function renderEvents() {
   renderEventList(eventList, activeSession()?.events || []);
+  renderSessionActivity();
 }
 
 function addEvent(title, detail, { persist = true } = {}) {
@@ -1255,6 +1389,7 @@ function addEvent(title, detail, { persist = true } = {}) {
   session.events = session.events.slice(-500);
   session.updatedAt = Date.now();
   saveSessions();
+  renderSessionActivity();
 }
 
 function send(payload) {
@@ -1538,7 +1673,7 @@ function toolSnippet() {
     return `[[mcp.servers]]
 server_label = "${quoteToml(label)}"
 server_url = "${quoteToml(url)}"
-require_approval = "always"`;
+require_approval = "never"`;
   }
 
   const command = toolCommandInput.value.trim();
@@ -1553,7 +1688,8 @@ require_approval = "always"`;
   return `[mcp_servers.${label}]
 command = "${quoteToml(command)}"
 args = [${args}]${cwd ? `\ncwd = "${quoteToml(cwd)}"` : ""}
-message_format = "content-length"`;
+message_format = "content-length"
+require_approval = "never"`;
 }
 
 function setToolsStatus(message, state = "") {
@@ -1787,27 +1923,13 @@ function handleSocketMessage(payload) {
       addEvent(`Tool call: ${payload.name}`, payload.args);
       return;
     }
-    if (payload.type === "approval_request") {
-      addEvent("Approval requested", payload.description);
-      const approved = window.confirm(`Allow this tool action?\n\n${payload.description}`);
-      send({
-        type: "approval_response",
-        requestId: payload.requestId,
-        description: payload.description,
-        approved,
-      });
-      return;
-    }
-    if (payload.type === "approval") {
-      addEvent(`Approval ${payload.approved ? "accepted" : "denied"}`, payload.description);
-      return;
-    }
     if (payload.type === "agent_event") {
       addEvent(describeAgentEvent(payload.event), payload.event);
       return;
     }
     if (payload.type === "answer_start") {
       startStreamingAnswer(payload.sessionId || pendingSessionId || activeSessionId);
+      addEvent("Writing response", { type: "response_stream" });
       return;
     }
     if (payload.type === "answer_delta") {
@@ -1816,6 +1938,7 @@ function handleSocketMessage(payload) {
     }
     if (payload.type === "done") {
       const targetSessionId = payload.sessionId || pendingSessionId || activeSessionId;
+      addEvent("Response completed", { type: "response_complete" });
       addMessageToSession(targetSessionId, "agent", payload.text);
       if (targetSessionId === activeSessionId) renderMessages();
       finishStreamingAnswer();
@@ -1964,6 +2087,7 @@ sidebarComponent.addEventListener("open-modal", async (event) => {
     try { await loadSystemPrompts(); } catch (error) { systemPromptsStatus.textContent = error.message; systemPromptsStatus.dataset.state = "error"; }
   }
   if (event.detail.modal === "skills") {
+    skillsSearchInput.value = "";
     skillsDialog.showModal();
     skillsStatus.textContent = "Loading skills from local SKILL.md files..."; skillsStatus.dataset.state = "";
     try { await loadSkills(); skillsStatus.textContent = "Skill selections are stored in SQLite."; skillsStatus.dataset.state = ""; } catch (error) { skillsStatus.textContent = error.message; skillsStatus.dataset.state = "error"; }
@@ -1983,6 +2107,7 @@ systemPromptsModal.addEventListener("save-system-prompt", async () => {
 skillsModal.addEventListener("save-skills", async () => {
   try { await saveSkills(); } catch (error) { skillsStatus.textContent = error.message; skillsStatus.dataset.state = "error"; }
 });
+skillsModal.addEventListener("search-skills", renderSkills);
 providersModal.addEventListener("refresh-provider-models", loadProviderModels);
 providersModal.addEventListener("add-provider", addProvider);
 mcpModal.addEventListener("reload-mcp-config", loadConfig);

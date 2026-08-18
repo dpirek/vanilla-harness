@@ -68,7 +68,7 @@ class PresetsModal extends BaseComponent {
                 this.toggle("presetToolWriteFile", "Write files", "Create and edit files"),
                 this.toggle("presetToolSearchFiles", "Search files", "Search workspace content"),
                 this.toggle("presetToolCurl", "HTTP requests", "Request HTTP and HTTPS URLs"),
-                this.toggle("presetToolRunCommand", "Run commands", "Execute approved shell commands"),
+                this.toggle("presetToolRunCommand", "Run commands", "Execute shell commands"),
               ] }),
             ] }),
             this.createElement("section", { class: "presetEditorSection", children: [

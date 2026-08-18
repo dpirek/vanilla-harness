@@ -677,37 +677,14 @@ async function resolveWorkspace(requested) {
   return fs.realpath(root);
 }
 
-async function createAgentSession(socket, sessionId, streamStates, root, pendingApprovals, disabledSteps = []) {
+async function createAgentSession(socket, sessionId, streamStates, root, disabledSteps = []) {
   const storedSettings = uiStateStore.getAll().providerSettings || {};
   const settings = { ...storedSettings, ...(providerSettings.get(socket) || {}) };
   const provider = normalizeProvider(settings.provider || process.env.AI_PROVIDER);
   const model = settings.model ||
     process.env.AI_MODEL ||
     defaultModelForProvider(provider);
-  const approveAll = process.env.AI_HARNESS_WEB_APPROVE === "true";
-  const approveMcp = async (description) => {
-    if (approveAll) {
-      sendJson(socket, { type: "approval", description, approved: true });
-      return true;
-    }
-
-    const requestId = crypto.randomUUID();
-    sendJson(socket, { type: "approval_request", requestId, description });
-    return new Promise((resolve) => {
-      const timeout = setTimeout(() => {
-        pendingApprovals.delete(requestId);
-        sendJson(socket, { type: "approval", description, approved: false, reason: "timed out" });
-        resolve(false);
-      }, 120_000);
-      pendingApprovals.set(requestId, {
-        description,
-        resolve(approved) {
-          clearTimeout(timeout);
-          resolve(approved);
-        },
-      });
-    });
-  };
+  const approveMcp = async () => true;
   const onInfo = (message) => sendJson(socket, { type: "info", message });
   const onTool = ({ name, args }) => sendJson(socket, { type: "tool", name, args });
   const onEvent = (event) => sendJson(socket, { type: "agent_event", event });
@@ -742,6 +719,7 @@ async function createAgentSession(socket, sessionId, streamStates, root, pending
       configContent: uiStateStore.getMcpConfig() || "",
       approve: approveMcp,
       onInfo,
+      autoApprove: true,
     });
   return new CodingAgent({
     client,
@@ -813,7 +791,6 @@ function handleWebSocket(socket, req) {
   let textFragments = [];
   const agentSessions = new Map();
   const streamStates = new Map();
-  const pendingApprovals = new Map();
   let running = false;
   let currentRun = null;
 
@@ -856,20 +833,6 @@ function handleWebSocket(socket, req) {
         const sessionId = typeof payload.sessionId === "string" && payload.sessionId
           ? payload.sessionId.slice(0, 120)
           : "default";
-        if (payload.type === "approval_response") {
-          const pending = pendingApprovals.get(payload.requestId);
-          if (pending) {
-            pendingApprovals.delete(payload.requestId);
-            const approved = payload.approved === true;
-            pending.resolve(approved);
-            sendJson(socket, {
-              type: "approval",
-              description: pending.description,
-              approved,
-            });
-          }
-          continue;
-        }
         if (payload.type === "pause") {
           if (!running || !currentRun || currentRun.sessionId !== sessionId) continue;
           if (currentRun.controller.requestPause()) {
@@ -965,7 +928,7 @@ function handleWebSocket(socket, req) {
             entry = {
               root,
               stepsKey,
-              promise: createAgentSession(socket, sessionId, streamStates, root, pendingApprovals, disabledSteps),
+              promise: createAgentSession(socket, sessionId, streamStates, root, disabledSteps),
             };
             agentSessions.set(sessionId, entry);
           }
@@ -997,12 +960,6 @@ function handleWebSocket(socket, req) {
     }
   });
 
-  const denyPendingApprovals = () => {
-    for (const pending of pendingApprovals.values()) pending.resolve(false);
-    pendingApprovals.clear();
-  };
-  socket.on("error", denyPendingApprovals);
-  socket.on("close", denyPendingApprovals);
   const envProvider = normalizeProvider(process.env.AI_PROVIDER);
   sendJson(socket, {
     type: "ready",
@@ -1010,7 +967,7 @@ function handleWebSocket(socket, req) {
     model: process.env.AI_MODEL || defaultModelForProvider(envProvider),
     ollamaBaseUrl: process.env.OLLAMA_BASE_URL || "http://localhost:11434",
     customBaseUrl: process.env.CUSTOM_AI_BASE_URL || "http://localhost:8000/v1",
-    approveAll: process.env.AI_HARNESS_WEB_APPROVE === "true",
+    approveAll: true,
   });
   socket.on("close", () => {
     providerSettings.delete(socket);
@@ -1032,7 +989,7 @@ const server = http.createServer(async (req, res) => {
       customModel: process.env.CUSTOM_AI_MODEL || "custom-model",
       customBaseUrl: process.env.CUSTOM_AI_BASE_URL || "http://localhost:8000/v1",
       hasApiKey: Boolean(storedSettings.apiKey),
-      approveAll: process.env.AI_HARNESS_WEB_APPROVE === "true",
+      approveAll: true,
       workspace: defaultWorkspace,
     });
     return;
@@ -1102,6 +1059,13 @@ let storeClosed = false;
 
 server.on("connection", (socket) => {
   connections.add(socket);
+  socket.on("error", (error) => {
+    // Browser refreshes and closed WebSockets commonly reset the TCP stream.
+    // Keep those disconnects from becoming unhandled process-level errors.
+    if (!["ECONNRESET", "EPIPE"].includes(error.code)) {
+      console.error("Client socket error:", error);
+    }
+  });
   socket.on("close", () => connections.delete(socket));
 });
 

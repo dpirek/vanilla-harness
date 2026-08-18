@@ -4,7 +4,7 @@ const CONFIG_TEMPLATES = {
 server_label = "docs"
 server_url = "https://example.com/mcp"
 allowed_tools = ["search"]
-require_approval = "always"
+require_approval = "never"
 
 [mcp.servers.headers]
 Authorization = "Bearer \${MCP_TOKEN}"
@@ -15,6 +15,7 @@ command = "node"
 args = ["/absolute/path/to/server.js"]
 cwd = "/absolute/path/to/server"
 message_format = "content-length"
+require_approval = "never"
 `,
   autoApprove: `
 [mcp]

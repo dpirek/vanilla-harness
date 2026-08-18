@@ -8,9 +8,50 @@ class SkillsModal extends BaseComponent {
   }
 
   render() {
+    const element = (tag, props = {}) => this.createElement(tag, props);
+    const text = (value) => document.createTextNode(value);
     this.appendChildren(this, [
-      this.createElement("dialog", { "id": "skillsDialog", "class": "settingsDialog", children: [this.createElement("form", { "id": "skillsForm", "class": "settingsPanel", "method": "dialog", children: [this.createElement("header", { "class": "settingsHeader", children: [this.createElement("div", { children: [this.createElement("h2", { children: [document.createTextNode("Skills")] }), this.createElement("p", { children: [document.createTextNode("Choose which SKILL.md guides are injected into new agent sessions")] })] }), this.createElement("div", { "class": "settingsHeaderActions", children: [this.createElement("button", { "id": "toggleSkillColumnButton", "class": "iconButton", "type": "button", "aria-label": "Hide skill column", "aria-pressed": "true", "title": "Hide skill column", children: [document.createTextNode("☷")] }), this.createElement("button", { "id": "closeSkillsButton", "class": "iconButton", "type": "button", "aria-label": "Close skills", children: [document.createTextNode("×")] })] })] }), this.createElement("section", { "class": "skillLibrary", "aria-label": "Skill library", children: [this.createElement("div", { "class": "skillLibraryHeader", children: [this.createElement("h3", { children: [document.createTextNode("Installed Skills")] }), this.createElement("p", { children: [document.createTextNode("Imported from local SKILL.md files and stored in SQLite.")] })] }), this.createElement("div", { "class": "skillTableWrap", children: [this.createElement("table", { "class": "skillTable", children: [this.createElement("thead", { children: [this.createElement("tr", { children: [this.createElement("th", { "scope": "col", children: [document.createTextNode("Name")] }), this.createElement("th", { "scope": "col", children: [document.createTextNode("Source")] }), this.createElement("th", { "scope": "col", children: [document.createTextNode("Skills")] })] })] }), this.createElement("tbody", { "id": "skillsTableBody" })] })] })] }), this.createElement("footer", { "class": "settingsFooter", children: [this.createElement("span", { "id": "skillsStatus", "class": "configStatus", children: [document.createTextNode("Skill selections are stored in SQLite.")] }), this.createElement("div", { children: [this.createElement("button", { "id": "saveSkillsButton", "class": "primaryButton", "type": "submit", children: [document.createTextNode("Save skills")] })] })] })] })] })
+      element("dialog", { id: "skillsDialog", class: "settingsDialog", children: [
+        element("form", { id: "skillsForm", class: "settingsPanel", method: "dialog", children: [
+          element("header", { class: "settingsHeader", children: [
+            element("div", { children: [
+              element("h2", { children: [text("Skills")] }),
+              element("p", { children: [text("Choose which SKILL.md guides are injected into new agent sessions")] }),
+            ] }),
+            element("div", { class: "settingsHeaderActions", children: [
+              element("button", { id: "toggleSkillColumnButton", class: "iconButton", type: "button", "aria-label": "Hide skill column", "aria-pressed": "true", title: "Hide skill column", children: [text("☷")] }),
+              element("button", { id: "closeSkillsButton", class: "iconButton", type: "button", "aria-label": "Close skills", children: [text("×")] }),
+            ] }),
+          ] }),
+          element("section", { class: "skillLibrary", "aria-label": "Skill library", children: [
+            element("div", { class: "skillLibraryHeader", children: [
+              element("div", { children: [
+                element("h3", { children: [text("Installed Skills")] }),
+                element("p", { children: [text("Imported from local SKILL.md files and stored in SQLite.")] }),
+              ] }),
+              element("label", { class: "skillSearch", children: [
+                element("input", { id: "skillsSearchInput", type: "search", placeholder: "Search skills", autocomplete: "off", "aria-label": "Search skills" }),
+              ] }),
+            ] }),
+            element("div", { class: "skillTableWrap", children: [
+              element("table", { class: "skillTable", children: [
+                element("thead", { children: [element("tr", { children: [
+                  element("th", { scope: "col", children: [text("Name")] }),
+                  element("th", { scope: "col", children: [text("Source")] }),
+                  element("th", { scope: "col", children: [text("Skills")] }),
+                ] })] }),
+                element("tbody", { id: "skillsTableBody" }),
+              ] }),
+            ] }),
+          ] }),
+          element("footer", { class: "settingsFooter", children: [
+            element("span", { id: "skillsStatus", class: "configStatus", children: [text("Skill selections are stored in SQLite.")] }),
+            element("div", { children: [element("button", { id: "saveSkillsButton", class: "primaryButton", type: "submit", children: [text("Save skills")] })] }),
+          ] }),
+        ] }),
+      ] }),
     ]);
+
     const dialog = this.querySelector("dialog");
     const toggleSkillColumnButton = this.querySelector("#toggleSkillColumnButton");
     const updateSkillColumnButton = () => {
@@ -20,6 +61,7 @@ class SkillsModal extends BaseComponent {
       toggleSkillColumnButton.title = `${visible ? "Hide" : "Show"} skill column`;
     };
     this.querySelector("#closeSkillsButton").addEventListener("click", () => dialog.close());
+    this.querySelector("#skillsSearchInput").addEventListener("input", () => this.emit("search-skills"));
     toggleSkillColumnButton.addEventListener("click", () => {
       dialog.classList.toggle("skill-column-hidden");
       updateSkillColumnButton();
