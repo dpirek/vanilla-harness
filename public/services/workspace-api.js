@@ -21,46 +21,8 @@ async function loadWorkspaceFile(workspace, path) {
   return payload.content;
 }
 
-function saveWorkspaceFile(workspace, path, content) {
-  return requestJson(
-    "/api/workspace-file",
-    jsonOptions("PUT", { workspace, path, content }),
-    "Unable to save file.",
-  );
-}
-
-function workspaceFileAssetUrl(workspace, path) {
-  return `/api/workspace-file-asset?workspace=${encodeURIComponent(workspace)}&path=${encodeURIComponent(path)}`;
-}
-
-async function saveWorkspaceRecording(workspace, blob) {
-  const bytes = new Uint8Array(await blob.arrayBuffer());
-  const chunkSize = 0x8000;
-  let binary = "";
-  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
-    binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
-  }
-  return requestJson(
-    "/api/workspace-recording",
-    jsonOptions("POST", { workspace, mimeType: blob.type, data: btoa(binary) }),
-    "Unable to save microphone recording.",
-  );
-}
-
-function transcribeWorkspaceRecording(workspace, path) {
-  return requestJson(
-    "/api/workspace-transcription",
-    jsonOptions("POST", { workspace, path }),
-    "Unable to transcribe microphone recording.",
-  );
-}
-
 export {
   createWorkspaceFolder,
   loadWorkspaceFile,
   loadWorkspaceTree,
-  saveWorkspaceFile,
-  saveWorkspaceRecording,
-  transcribeWorkspaceRecording,
-  workspaceFileAssetUrl,
 };

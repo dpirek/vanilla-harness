@@ -32,4 +32,4 @@ function appendMessageText(container, text) {
   }
 }
 
-export { appendMessageText, highlightCode };
+export { appendMessageText };

@@ -198,4 +198,4 @@ function renderEventList(element, events) {
   for (const event of events) appendEvent(element, event);
 }
 
-export { appendEvent, describeAgentEvent, eventIcon, formatJson, renderEventList };
+export { appendEvent, describeAgentEvent, renderEventList };

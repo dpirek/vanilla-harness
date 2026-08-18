@@ -13,18 +13,6 @@ const FILE_LANGUAGE_MAP = {
   cjs: "javascript",
 };
 
-const IMAGE_FILE_EXTENSIONS = new Set([
-  "png",
-  "jpg",
-  "jpeg",
-  "gif",
-  "webp",
-  "svg",
-  "bmp",
-  "ico",
-  "avif",
-]);
-
 const HIGHLIGHT_PATTERNS = {
   html: /<!--[\s\S]*?-->|<!DOCTYPE[^>]*>|<\/?[^>]+>/gi,
   css: /\/\*[\s\S]*?\*\/|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|#[\da-f]{3,8}\b|@[\w-]+|--[\w-]+|[\w-]+(?=\s*:)|\b\d+(?:\.\d+)?(?:px|rem|em|vh|vw|%|s|ms)?\b|[{}()[\].,;:]|[>+~*=/!-]/gi,
@@ -42,11 +30,6 @@ function normalizeCodeLanguage(language = "") {
 function detectCodeLanguageFromPath(filePath = "") {
   const extension = String(filePath || "").split(".").pop()?.toLowerCase();
   return FILE_LANGUAGE_MAP[extension] || "";
-}
-
-function isPreviewableImagePath(filePath = "") {
-  const extension = String(filePath || "").split(".").pop()?.toLowerCase();
-  return IMAGE_FILE_EXTENSIONS.has(extension);
 }
 
 function codeLanguageLabel(language = "") {
@@ -99,9 +82,7 @@ function renderFilePreview(codeElement, content, { filePath = "", language = "" 
 
 export {
   codeLanguageLabel,
-  detectCodeLanguageFromPath,
   highlightCode,
-  isPreviewableImagePath,
   normalizeCodeLanguage,
   renderFilePreview,
 };

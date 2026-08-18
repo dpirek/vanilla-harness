@@ -113,4 +113,4 @@ function sessionActivityRuns(events = []) {
   ).filter((activity) => activity.items.length > 0);
 }
 
-export { humanizeToolName, sessionActivities, sessionActivityRuns };
+export { sessionActivities, sessionActivityRuns };
