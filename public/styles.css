@@ -13,6 +13,7 @@
   --accent: #ffffff;
   --danger: #ff7066;
   --sidebar-width: 344px;
+  --sidebar-collapsed-width: 60px;
   --stream-width: 360px;
   --files-width: 300px;
   --chat-content-width: 1080px;
@@ -79,15 +80,15 @@ code {
 .streamColumn { grid-column: 7; }
 
 .app.sidebar-collapsed {
-  grid-template-columns: 76px 8px minmax(360px, 1fr) 8px var(--files-width) 8px var(--stream-width);
+  grid-template-columns: var(--sidebar-collapsed-width) 8px minmax(360px, 1fr) 8px var(--files-width) 8px var(--stream-width);
 }
 
 .app.files-collapsed { grid-template-columns: var(--sidebar-width) 8px minmax(360px, 1fr) 0 0 8px var(--stream-width); }
-.app.sidebar-collapsed.files-collapsed { grid-template-columns: 76px 8px minmax(360px, 1fr) 0 0 8px var(--stream-width); }
+.app.sidebar-collapsed.files-collapsed { grid-template-columns: var(--sidebar-collapsed-width) 8px minmax(360px, 1fr) 0 0 8px var(--stream-width); }
 .app.stream-collapsed { grid-template-columns: var(--sidebar-width) 8px minmax(360px, 1fr) 8px var(--files-width) 0 0; }
-.app.sidebar-collapsed.stream-collapsed { grid-template-columns: 76px 8px minmax(360px, 1fr) 8px var(--files-width) 0 0; }
+.app.sidebar-collapsed.stream-collapsed { grid-template-columns: var(--sidebar-collapsed-width) 8px minmax(360px, 1fr) 8px var(--files-width) 0 0; }
 .app.files-collapsed.stream-collapsed { grid-template-columns: var(--sidebar-width) 8px minmax(360px, 1fr) 0 0 0 0; }
-.app.sidebar-collapsed.files-collapsed.stream-collapsed { grid-template-columns: 76px 8px minmax(360px, 1fr) 0 0 0 0; }
+.app.sidebar-collapsed.files-collapsed.stream-collapsed { grid-template-columns: var(--sidebar-collapsed-width) 8px minmax(360px, 1fr) 0 0 0 0; }
 .app.files-collapsed .filesColumn, .app.files-collapsed .filesResizeHandle,
 .app.stream-collapsed .streamColumn, .app.stream-collapsed .streamResizeHandle { display: none; }
 
@@ -351,7 +352,7 @@ code {
   flex-direction: row;
   justify-content: space-between;
   gap: 14px;
-  padding: 18px 20px 12px;
+  padding: 18px 12px 12px;
 }
 
 .app.sidebar-collapsed .brand {
@@ -359,7 +360,7 @@ code {
 }
 
 .app.sidebar-collapsed .sidebarToggle {
-  margin-left: -1px;
+  margin-left: 0;
 }
 
 .app.sidebar-collapsed .sidebarToggleLogo {
@@ -388,7 +389,7 @@ code {
 .app.sidebar-collapsed .navList,
 .app.sidebar-collapsed .sidebarSection {
   gap: 9px;
-  padding: 8px 25px 0 15px;
+  padding: 8px 12px 0;
   justify-items: start;
 }
 
@@ -920,22 +921,14 @@ textarea:disabled {
 .fileEditorPanel header h2 { margin: 0; font-size: 1.05rem; }
 .fileEditorPanel header p { max-width: 760px; margin: 4px 0 0; overflow: hidden; color: var(--muted); font-size: .78rem; text-overflow: ellipsis; white-space: nowrap; }
 .fileEditorPanel header button { min-width: 34px; min-height: 34px; }
-.fileEditorBody { display: grid; min-width: 0; min-height: 0; flex: 1 1 0; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
-.fileEditorPanel textarea { display: block; width: 100%; min-height: 0; flex: 1 1 0; overflow: auto; resize: none; border: 1px solid #333; border-radius: 8px; background: #0e0e0e; color: var(--text); padding: 14px; font: .85rem/1.55 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; tab-size: 2; }
-.fileEditorPreview { display: flex; min-width: 0; min-height: 0; flex-direction: column; overflow: hidden; border: 1px solid #333; border-radius: 8px; background: #0e0e0e; }
+.fileEditorBody { display: flex; min-width: 0; min-height: 0; flex: 1 1 0; }
+.fileEditorPreview { display: flex; min-width: 0; min-height: 0; flex: 1 1 0; flex-direction: column; overflow: hidden; border: 1px solid #333; border-radius: 8px; background: #0e0e0e; }
 .fileEditorPreviewHeader { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid #292d34; background: #191c22; padding: 10px 12px; }
 .fileEditorPreviewHeader strong { font-size: .76rem; letter-spacing: .06em; text-transform: uppercase; }
 .fileEditorPreviewHeader span { color: var(--muted); font-size: .76rem; }
 .fileEditorPreviewContent { min-height: 0; flex: 1 1 0; margin: 0; overflow: auto; padding: 14px; color: #d7dae0; font: .85rem/1.55 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
 .fileEditorPreviewContent code { display: block; white-space: pre; }
-.fileEditorPanel footer > div { display: flex; gap: 8px; }
-.fileEditorPanel footer button { min-height: 34px; padding: 0 14px; }
 #fileEditorStatus { color: var(--muted); font-size: .8rem; }
-
-@media (max-width: 900px) {
-  .fileEditorBody { grid-template-columns: 1fr; }
-  .fileEditorPreview { min-height: 240px; }
-}
 
 .columnResizeHandle {
   position: relative;
@@ -2124,7 +2117,6 @@ textarea,
 }
 
 .createWorkspacePanel input,
-.fileEditorPanel textarea,
 .fileEditorPreview,
 .providerSettings input,
 .providerSettings select,

@@ -21,7 +21,6 @@ import {
   createWorkspaceFolder,
   loadWorkspaceFile,
   loadWorkspaceTree as fetchWorkspaceTree,
-  saveWorkspaceFile,
 } from "./services/workspace-api.js";
 import {
   loadConfig as fetchConfig,
@@ -44,7 +43,6 @@ const workspaceComponent = document.querySelector("workspace-panel");
 const streamComponent = document.querySelector("stream-panel");
 const workspacePickerModal = document.querySelector("workspace-picker-modal");
 const createWorkspaceModal = document.querySelector("create-workspace-modal");
-const fileEditorModal = document.querySelector("file-editor-modal");
 const providersModal = document.querySelector("providers-modal");
 const presetsModal = document.querySelector("presets-modal");
 const systemPromptsModal = document.querySelector("system-prompts-modal");
@@ -157,11 +155,9 @@ const confirmWorkspacePickerButton = document.querySelector("#confirmWorkspacePi
 const fileEditorDialog = document.querySelector("#fileEditorDialog");
 const fileEditorTitle = document.querySelector("#fileEditorTitle");
 const fileEditorPath = document.querySelector("#fileEditorPath");
-const fileEditorContent = document.querySelector("#fileEditorContent");
 const fileEditorLanguage = document.querySelector("#fileEditorLanguage");
 const fileEditorPreviewCode = document.querySelector("#fileEditorPreviewCode");
 const fileEditorStatus = document.querySelector("#fileEditorStatus");
-const saveFileEditorButton = document.querySelector("#saveFileEditorButton");
 
 let socketService;
 let runActive = false;
@@ -178,7 +174,7 @@ let pendingWorkspacePath = null;
 let workspacePickerRoot = null;
 let workspacePickerParent = null;
 let pendingWorkspaceParent = null;
-let editingFilePath = null;
+let previewingFilePath = null;
 
 function updateFileEditorPreview(filePath, content) {
   const language = renderFilePreview(fileEditorPreviewCode, content, { filePath });
@@ -858,53 +854,23 @@ function startFilesResize(event) {
   filesResizeHandle.addEventListener("pointercancel", stop);
 }
 
-async function openFileEditor(node) {
+async function openFilePreview(node) {
   const workspace = activeSession()?.workspace || defaultWorkspace;
-  editingFilePath = node.path;
+  previewingFilePath = node.path;
   fileEditorTitle.textContent = node.name;
   fileEditorPath.textContent = node.path;
-  fileEditorContent.value = "";
   updateFileEditorPreview(node.path, "");
-  fileEditorContent.disabled = true;
-  saveFileEditorButton.disabled = true;
   fileEditorStatus.textContent = "Loading…";
   fileEditorDialog.showModal();
   try {
     const content = await loadWorkspaceFile(workspace, node.path);
-    if (editingFilePath !== node.path || !fileEditorDialog.open) return;
-    fileEditorContent.value = content;
+    if (previewingFilePath !== node.path || !fileEditorDialog.open) return;
     updateFileEditorPreview(node.path, content);
-    fileEditorContent.disabled = false;
-    saveFileEditorButton.disabled = false;
     fileEditorStatus.textContent = "";
-    fileEditorContent.focus();
   } catch (error) {
     fileEditorStatus.textContent = error.message;
   }
 }
-
-async function saveEditedFile() {
-  if (!editingFilePath) return;
-  saveFileEditorButton.disabled = true;
-  fileEditorStatus.textContent = "Saving…";
-  try {
-    await saveWorkspaceFile(
-      activeSession()?.workspace || defaultWorkspace,
-      editingFilePath,
-      fileEditorContent.value,
-    );
-    fileEditorStatus.textContent = "Saved";
-    addEvent("File saved", editingFilePath);
-  } catch (error) {
-    fileEditorStatus.textContent = error.message;
-  } finally {
-    saveFileEditorButton.disabled = false;
-  }
-}
-
-fileEditorContent.addEventListener("input", () => {
-  updateFileEditorPreview(editingFilePath, fileEditorContent.value);
-});
 
 async function loadWorkspaceTree() {
   const selectedWorkspace = activeSession()?.workspace || defaultWorkspace;
@@ -919,7 +885,7 @@ async function loadWorkspaceTree() {
     selectWorkspaceRootButton.title = "Choose workspace folder";
     workspaceTreeElement.replaceChildren();
     renderWorkspaceNodes(workspaceBrowserNodes, workspaceTreeElement, {
-      onOpenFile: openFileEditor,
+      onOpenFile: openFilePreview,
       onSelectFolder(path) { workspaceInput.value = path; saveActiveWorkspace(); },
     });
   } catch (error) {
@@ -1892,7 +1858,6 @@ workspacePickerModal.addEventListener("workspace-picker-confirm", () => {
   workspacePickerDialog.close();
   saveActiveWorkspace();
 });
-fileEditorModal.addEventListener("save-workspace-file", saveEditedFile);
 window.addEventListener("resize", () => {
   setStreamWidth(streamWidth);
   setFilesWidth(filesWidth);
