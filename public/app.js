@@ -1241,6 +1241,40 @@ function createSessionActivityCard(activity, { active = false } = {}) {
   return card;
 }
 
+function formatCommandResponse(response) {
+  if (response === undefined) return "Waiting for command response…";
+  if (!response || typeof response !== "object") return String(response ?? "");
+  const metadata = [];
+  if (typeof response.ok === "boolean") metadata.push(`Status: ${response.ok ? "succeeded" : "failed"}`);
+  if (response.exit_code !== undefined && response.exit_code !== null) metadata.push(`Exit code: ${response.exit_code}`);
+  if (response.signal) metadata.push(`Signal: ${response.signal}`);
+  const sections = [];
+  if (response.stdout) sections.push(`stdout\n${String(response.stdout).replace(/\s+$/, "")}`);
+  if (response.stderr) sections.push(`stderr\n${String(response.stderr).replace(/\s+$/, "")}`);
+  if (response.error && !response.stderr) sections.push(`error\n${response.error}`);
+  const knownKeys = new Set(["ok", "exit_code", "signal", "stdout", "stderr", "error"]);
+  const additional = Object.fromEntries(Object.entries(response).filter(([key]) => !knownKeys.has(key)));
+  if (Object.keys(additional).length) sections.push(`details\n${JSON.stringify(additional, null, 2)}`);
+  if (sections.length === 0) sections.push("(no command output)");
+  return [...metadata, ...sections].join("\n\n");
+}
+
+function createCommandDetails(task) {
+  const details = document.createElement("details");
+  details.className = "sessionCommandDetails";
+  details.open = task.response?.ok === false;
+  const summary = document.createElement("summary");
+  const command = document.createElement("code");
+  command.textContent = `$ ${task.command || "(command unavailable)"}`;
+  const hint = document.createElement("span");
+  hint.textContent = task.response === undefined ? "Running…" : "Command response";
+  summary.append(command, hint);
+  const response = document.createElement("pre");
+  response.textContent = formatCommandResponse(task.response);
+  details.append(summary, response);
+  return details;
+}
+
 function updateSessionActivityCard(card, activity, { active = false } = {}) {
   const wasComplete = card.dataset.complete === "true";
   const isRunning = active && !activity.complete;
@@ -1287,6 +1321,7 @@ function updateSessionActivityCard(card, activity, { active = false } = {}) {
       duration.dataset.startedAt = String(task.startedAt);
     }
     item.append(marker, content, duration);
+    if (task.key === "tool:run_command") item.append(createCommandDetails(task));
     return item;
   }));
   card.dataset.running = String(isRunning);

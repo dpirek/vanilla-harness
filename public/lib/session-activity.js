@@ -104,12 +104,20 @@ function sessionActivities(events = [], now = Date.now()) {
         detail.serverResponse?.usage || detail.usage,
       );
     } else if (type === "tool_start") {
-      add(`Run ${humanizeToolName(detail.name)}`, "running", event, `tool:${detail.name}`);
+      const item = add(`Run ${humanizeToolName(detail.name)}`, "running", event, `tool:${detail.name}`);
+      if (detail.name === "run_command") item.command = String(detail.args?.command || "");
     } else if (type === "tool_result") {
       const failed = detail.output?.ok === false;
       const label = `${humanizeToolName(detail.name)} ${failed ? "failed" : "completed"}`;
-      if (!finish((item) => item.key === `tool:${detail.name}`, event, failed ? "failed" : "completed", label)) {
-        add(label, failed ? "failed" : "completed", event, `tool:${detail.name}`);
+      const item = finish(
+        (candidate) => candidate.key === `tool:${detail.name}`,
+        event,
+        failed ? "failed" : "completed",
+        label,
+      ) || add(label, failed ? "failed" : "completed", event, `tool:${detail.name}`);
+      if (detail.name === "run_command") {
+        item.command ||= String(detail.args?.command || "");
+        item.response = detail.output;
       }
     } else if (type === "tool_blocked") {
       add(`${humanizeToolName(detail.name)} blocked`, "failed", event, `tool:${detail.name}`);

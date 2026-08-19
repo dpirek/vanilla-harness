@@ -118,3 +118,32 @@ test("session activity separates tasks into chronological runs", () => {
   assert.equal(runs[0].items.at(-1).label, "read file completed");
   assert.equal(runs[1].current.label, "Run run command");
 });
+
+test("run command steps retain the command and structured response", () => {
+  const activity = sessionActivities([
+    {
+      detail: {
+        type: "tool_start",
+        name: "run_command",
+        args: { command: "npm test", timeout_ms: 120_000 },
+      },
+      timestamp: 1,
+    },
+    {
+      detail: {
+        type: "tool_result",
+        name: "run_command",
+        output: { ok: true, stdout: "24 tests passed\n", stderr: "" },
+      },
+      timestamp: 2,
+    },
+  ]);
+
+  const command = activity.items.find((item) => item.key === "tool:run_command");
+  assert.equal(command.command, "npm test");
+  assert.deepEqual(command.response, {
+    ok: true,
+    stdout: "24 tests passed\n",
+    stderr: "",
+  });
+});

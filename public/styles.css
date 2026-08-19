@@ -717,6 +717,56 @@ code {
   white-space: nowrap;
 }
 
+.sessionCommandDetails {
+  min-width: 0;
+  grid-column: 2 / -1;
+  margin: 0 0 8px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--field) 78%, transparent);
+}
+
+.sessionCommandDetails > summary {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+  padding: 7px 9px;
+  list-style: none;
+}
+
+.sessionCommandDetails > summary::-webkit-details-marker { display: none; }
+
+.sessionCommandDetails > summary code {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: .72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sessionCommandDetails > summary span {
+  flex: 0 0 auto;
+  color: var(--faint);
+  font-size: .66rem;
+  white-space: nowrap;
+}
+
+.sessionCommandDetails > pre {
+  margin: 0;
+  border-top: 1px solid var(--line);
+  padding: 9px;
+  color: var(--muted);
+  font-size: .7rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
 .message {
   width: min(var(--chat-content-width), 100%);
   margin: 0 auto 26px;
