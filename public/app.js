@@ -8,7 +8,9 @@ import { codeLanguageLabel, renderFilePreview } from "./lib/file-utils.js";
 import { appendMarkdown, appendMessageText } from "./lib/message-rendering.js";
 import {
   defaultProviderSettings,
+  matchingProviderId,
   normalizeToolPermissions,
+  providerSettingsFromRecord,
 } from "./lib/settings.js";
 import { normalizeRigComponentState } from "./lib/rig-presets.js";
 import { CONFIG_TEMPLATES, mcpBlocks, quoteToml, replaceToolBlock, setToolBlockEnabled, updateToolBlock } from "./lib/mcp-config.js";
@@ -79,9 +81,6 @@ const presetsDialogDescription = document.querySelector("#presetsDialogDescripti
 const backToPresetsButton = document.querySelector("#backToPresetsButton");
 const presetEditorName = document.querySelector("#presetEditorName");
 const presetEditorProvider = document.querySelector("#presetEditorProvider");
-const presetEditorModel = document.querySelector("#presetEditorModel");
-const presetEditorBaseUrl = document.querySelector("#presetEditorBaseUrl");
-const presetEditorApiKey = document.querySelector("#presetEditorApiKey");
 const presetEditorInputSource = document.querySelector("#presetEditorInputSource");
 const presetSystemPrompts = document.querySelector("#presetSystemPrompts");
 const presetMcpServerList = document.querySelector("#presetMcpServerList");
@@ -439,6 +438,7 @@ let storedToolPermissions = normalizeToolPermissions();
 let presetConfigurations = [];
 let activePresetId = null;
 let editingPresetId = null;
+let editingPresetProviderSettings = null;
 let editingPresetMcpConfig = "";
 let presetMutationPending = false;
 let sidebarWidth = 344;
@@ -460,6 +460,37 @@ function presetMeta(configuration) {
   const model = settings.model || "default model";
   const toolCount = Object.values(configuration.toolPermissions || {}).filter(Boolean).length;
   return `${provider} · ${model} · ${toolCount} tools enabled`;
+}
+
+function renderPresetProviderOptions(settings = {}) {
+  const snapshot = providerSettingsFromRecord(settings);
+  const matchedId = matchingProviderId(providers, snapshot);
+  presetEditorProvider.replaceChildren();
+
+  if (!matchedId) {
+    const snapshotOption = document.createElement("option");
+    snapshotOption.value = "__preset_snapshot__";
+    snapshotOption.textContent = `Current preset · ${snapshot.provider} · ${snapshot.model}`;
+    presetEditorProvider.append(snapshotOption);
+  }
+
+  for (const provider of providers) {
+    const option = document.createElement("option");
+    option.value = String(provider.id);
+    option.textContent = `${provider.name} · ${provider.type} · ${provider.model || "default model"}`;
+    presetEditorProvider.append(option);
+  }
+
+  presetEditorProvider.value = matchedId || "__preset_snapshot__";
+  const matchedProvider = providers.find((provider) => String(provider.id) === matchedId);
+  editingPresetProviderSettings = matchedProvider
+    ? providerSettingsFromRecord(matchedProvider)
+    : snapshot;
+}
+
+function selectPresetProvider() {
+  const selected = providers.find((provider) => String(provider.id) === presetEditorProvider.value);
+  if (selected) editingPresetProviderSettings = providerSettingsFromRecord(selected);
 }
 
 const PRESET_EFFECT_INPUTS = {
@@ -604,10 +635,7 @@ function openPresetEditor(configurationId) {
   const permissions = normalizeToolPermissions(configuration.toolPermissions);
   editingPresetId = configuration.id;
   presetEditorName.value = configuration.name;
-  presetEditorProvider.value = provider.provider;
-  presetEditorModel.value = provider.model;
-  presetEditorBaseUrl.value = provider.baseUrl;
-  presetEditorApiKey.value = provider.apiKey;
+  renderPresetProviderOptions(provider);
   presetEditorInputSource.value = component.inputSource;
   for (const [key, id] of Object.entries(PRESET_EFFECT_INPUTS)) {
     document.querySelector(`#${id}`).checked = component.effects[key] !== false;
@@ -635,6 +663,7 @@ function openPresetEditor(configurationId) {
 
 function closePresetEditor({ preserveStatus = false } = {}) {
   editingPresetId = null;
+  editingPresetProviderSettings = null;
   editingPresetMcpConfig = "";
   presetsListView.hidden = false;
   presetEditorForm.hidden = true;
@@ -664,12 +693,7 @@ async function savePresetEdit() {
   const updated = {
     ...current,
     name: presetEditorName.value.trim() || `Preset ${index + 1}`,
-    providerSettings: {
-      provider: presetEditorProvider.value,
-      model: presetEditorModel.value.trim(),
-      baseUrl: presetEditorBaseUrl.value.trim(),
-      apiKey: presetEditorApiKey.value,
-    },
+    providerSettings: providerSettingsFromRecord(editingPresetProviderSettings),
     componentState,
     toolPermissions,
     systemPrompts,
@@ -2303,6 +2327,7 @@ toolsModal.addEventListener("save-tool-permissions", saveToolPermissions);
 presetsModal.addEventListener("create-preset", duplicateActivePreset);
 presetsModal.addEventListener("cancel-preset-edit", closePresetEditor);
 presetsModal.addEventListener("save-preset-edit", savePresetEdit);
+presetsModal.addEventListener("preset-provider-change", selectPresetProvider);
 presetsModal.addEventListener("preset-mcp-type-change", renderPresetMcpTypeFields);
 presetsModal.addEventListener("add-preset-mcp-server", addPresetMcpServer);
 mcpModal.addEventListener("add-mcp-tool", saveTool);

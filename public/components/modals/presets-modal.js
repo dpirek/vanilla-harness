@@ -36,10 +36,7 @@ class PresetsModal extends BaseComponent {
               ] }),
               this.createElement("div", { class: "presetFieldGrid", children: [
                 this.createElement("label", { class: "presetField presetFieldWide", children: [this.createElement("span", { children: [document.createTextNode("Preset name")] }), this.createElement("input", { id: "presetEditorName", type: "text", required: "", maxlength: "120" })] }),
-                this.createElement("label", { class: "presetField", children: [this.createElement("span", { children: [document.createTextNode("Provider")] }), this.createElement("select", { id: "presetEditorProvider", children: [this.createElement("option", { value: "openai", children: [document.createTextNode("OpenAI")] }), this.createElement("option", { value: "ollama", children: [document.createTextNode("Ollama")] }), this.createElement("option", { value: "custom", children: [document.createTextNode("Custom")] })] })] }),
-                this.createElement("label", { class: "presetField", children: [this.createElement("span", { children: [document.createTextNode("Model")] }), this.createElement("input", { id: "presetEditorModel", type: "text", required: "", spellcheck: "false" })] }),
-                this.createElement("label", { class: "presetField", children: [this.createElement("span", { children: [document.createTextNode("Base URL")] }), this.createElement("input", { id: "presetEditorBaseUrl", type: "url", spellcheck: "false", placeholder: "Provider default" })] }),
-                this.createElement("label", { class: "presetField", children: [this.createElement("span", { children: [document.createTextNode("API key")] }), this.createElement("input", { id: "presetEditorApiKey", type: "password", autocomplete: "off", placeholder: "Optional bearer token" })] }),
+                this.createElement("label", { class: "presetField presetFieldWide", children: [this.createElement("span", { children: [document.createTextNode("Provider identity")] }), this.createElement("select", { id: "presetEditorProvider", required: "" })] }),
               ] }),
             ] }),
             this.createElement("section", { class: "presetEditorSection", children: [
@@ -114,6 +111,7 @@ class PresetsModal extends BaseComponent {
     const dialog = this.querySelector("dialog");
     this.querySelector("#closePresetsButton").addEventListener("click", () => dialog.close());
     this.querySelector("#createPresetButton").addEventListener("click", () => this.emit("create-preset"));
+    this.querySelector("#presetEditorProvider").addEventListener("change", () => this.emit("preset-provider-change"));
     this.querySelector("#presetMcpType").addEventListener("change", () => this.emit("preset-mcp-type-change"));
     this.querySelector("#addPresetMcpServerButton").addEventListener("click", () => this.emit("add-preset-mcp-server"));
     this.querySelector("#presetMcpAddForm").addEventListener("keydown", (event) => {
