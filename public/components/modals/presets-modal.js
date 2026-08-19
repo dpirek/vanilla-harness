@@ -71,13 +71,24 @@ class PresetsModal extends BaseComponent {
             this.createElement("section", { class: "presetEditorSection", children: [
               this.createElement("div", { class: "presetSectionHeading", children: [
                 this.createElement("span", { children: [document.createTextNode("04")] }),
+                this.createElement("div", { children: [this.createElement("h3", { children: [document.createTextNode("Skills")] }), this.createElement("p", { children: [document.createTextNode("Choose which stored skills are enabled by this preset.")] })] }),
+              ] }),
+              this.createElement("label", { class: "presetSkillSearch", children: [
+                this.createElement("span", { children: [document.createTextNode("Search skills")] }),
+                this.createElement("input", { id: "presetSkillsSearch", type: "search", placeholder: "Search by name or description", autocomplete: "off" }),
+              ] }),
+              this.createElement("div", { id: "presetSkillsList", class: "presetToggleGrid presetSkillsList", "aria-label": "Preset skills" }),
+            ] }),
+            this.createElement("section", { class: "presetEditorSection", children: [
+              this.createElement("div", { class: "presetSectionHeading", children: [
+                this.createElement("span", { children: [document.createTextNode("05")] }),
                 this.createElement("div", { children: [this.createElement("h3", { children: [document.createTextNode("System prompts")] }), this.createElement("p", { children: [document.createTextNode("Edit every instruction stored in the preset snapshot.")] })] }),
               ] }),
               this.createElement("div", { id: "presetSystemPrompts", class: "presetPromptList" }),
             ] }),
             this.createElement("section", { class: "presetEditorSection", children: [
               this.createElement("div", { class: "presetSectionHeading", children: [
-                this.createElement("span", { children: [document.createTextNode("05")] }),
+                this.createElement("span", { children: [document.createTextNode("06")] }),
                 this.createElement("div", { children: [this.createElement("h3", { children: [document.createTextNode("MCP configuration")] }), this.createElement("p", { children: [document.createTextNode("Manage the MCP servers stored with this preset in SQLite.")] })] }),
               ] }),
               this.createElement("div", { id: "presetMcpServerList", class: "presetMcpServerList" }),
@@ -112,6 +123,7 @@ class PresetsModal extends BaseComponent {
     this.querySelector("#closePresetsButton").addEventListener("click", () => dialog.close());
     this.querySelector("#createPresetButton").addEventListener("click", () => this.emit("create-preset"));
     this.querySelector("#presetEditorProvider").addEventListener("change", () => this.emit("preset-provider-change"));
+    this.querySelector("#presetSkillsSearch").addEventListener("input", () => this.emit("preset-skill-search"));
     this.querySelector("#presetMcpType").addEventListener("change", () => this.emit("preset-mcp-type-change"));
     this.querySelector("#addPresetMcpServerButton").addEventListener("click", () => this.emit("add-preset-mcp-server"));
     this.querySelector("#presetMcpAddForm").addEventListener("keydown", (event) => {

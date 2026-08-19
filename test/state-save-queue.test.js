@@ -17,14 +17,14 @@ test("state saves coalesce pending history updates into the latest snapshot", as
     { role: "user", text: "Hello" },
     { role: "agent", text: "Final response" },
   ] }] });
-  persist({ activeSessionId: "session-1" });
+  persist({ toolPermissions: { read_file: true } });
 
   releaseFirstSave();
   await Promise.all([initial, final]);
 
   assert.equal(calls.length, 2);
   assert.equal(calls[1].sessions[0].messages.at(-1).text, "Final response");
-  assert.equal(calls[1].activeSessionId, "session-1");
+  assert.equal(calls[1].toolPermissions.read_file, true);
 });
 
 test("state save failures do not discard a newer pending snapshot", async () => {

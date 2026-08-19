@@ -82,6 +82,8 @@ const backToPresetsButton = document.querySelector("#backToPresetsButton");
 const presetEditorName = document.querySelector("#presetEditorName");
 const presetEditorProvider = document.querySelector("#presetEditorProvider");
 const presetEditorInputSource = document.querySelector("#presetEditorInputSource");
+const presetSkillsSearch = document.querySelector("#presetSkillsSearch");
+const presetSkillsList = document.querySelector("#presetSkillsList");
 const presetSystemPrompts = document.querySelector("#presetSystemPrompts");
 const presetMcpServerList = document.querySelector("#presetMcpServerList");
 const presetMcpType = document.querySelector("#presetMcpType");
@@ -204,6 +206,8 @@ function updateFileEditorPreview(filePath, content) {
 const MIN_STREAM_WIDTH = 260;
 const MIN_SIDEBAR_WIDTH = 220;
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+const ACTIVE_SESSION_STORAGE_KEY = "ai-harness.activeSessionId";
+const SIDEBAR_COLLAPSED_STORAGE_KEY = "ai-harness.sidebarCollapsed";
 const SIDEBAR_WIDTH_STORAGE_KEY = "ai-harness.sidebarWidth";
 const STREAM_WIDTH_STORAGE_KEY = "ai-harness.streamWidth";
 const FILES_WIDTH_STORAGE_KEY = "ai-harness.filesWidth";
@@ -439,6 +443,7 @@ let presetConfigurations = [];
 let activePresetId = null;
 let editingPresetId = null;
 let editingPresetProviderSettings = null;
+let editingPresetSkillIds = new Set();
 let editingPresetMcpConfig = "";
 let presetMutationPending = false;
 let sidebarWidth = 344;
@@ -459,7 +464,8 @@ function presetMeta(configuration) {
   const provider = settings.provider || "openai";
   const model = settings.model || "default model";
   const toolCount = Object.values(configuration.toolPermissions || {}).filter(Boolean).length;
-  return `${provider} · ${model} · ${toolCount} tools enabled`;
+  const skillCount = Array.isArray(configuration.skillIds) ? configuration.skillIds.length : 0;
+  return `${provider} · ${model} · ${toolCount} tools · ${skillCount} skills`;
 }
 
 function renderPresetProviderOptions(settings = {}) {
@@ -538,6 +544,49 @@ function renderPresetPromptEditors(prompts = {}) {
     textarea.value = content;
     label.append(title, textarea);
     presetSystemPrompts.append(label);
+  }
+}
+
+function renderPresetSkills() {
+  presetSkillsList.replaceChildren();
+  if (skills.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "presetSkillsEmpty";
+    empty.textContent = "No skills have been created yet.";
+    presetSkillsList.append(empty);
+    return;
+  }
+  const query = presetSkillsSearch.value.trim().toLocaleLowerCase();
+  const visibleSkills = query
+    ? skills.filter((skill) => [skill.name, summarizeSkillContent(skill.content)]
+      .some((value) => String(value || "").toLocaleLowerCase().includes(query)))
+    : skills;
+  if (visibleSkills.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "presetSkillsEmpty";
+    empty.textContent = `No skills match “${presetSkillsSearch.value.trim()}”.`;
+    presetSkillsList.append(empty);
+    return;
+  }
+  for (const skill of visibleSkills) {
+    const label = document.createElement("label");
+    label.className = "presetToggle";
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = editingPresetSkillIds.has(String(skill.id));
+    checkbox.dataset.skillId = skill.id;
+    checkbox.addEventListener("change", () => {
+      if (checkbox.checked) editingPresetSkillIds.add(String(skill.id));
+      else editingPresetSkillIds.delete(String(skill.id));
+    });
+    const identity = document.createElement("span");
+    const name = document.createElement("strong");
+    name.textContent = skill.name;
+    const summary = document.createElement("small");
+    summary.textContent = summarizeSkillContent(skill.content);
+    identity.append(name, summary);
+    label.append(checkbox, identity);
+    presetSkillsList.append(label);
   }
 }
 
@@ -643,6 +692,9 @@ function openPresetEditor(configurationId) {
   for (const [key, id] of Object.entries(PRESET_TOOL_INPUTS)) {
     document.querySelector(`#${id}`).checked = permissions[key] === true;
   }
+  editingPresetSkillIds = new Set((configuration.skillIds || []).map((id) => String(id)));
+  presetSkillsSearch.value = "";
+  renderPresetSkills();
   renderPresetPromptEditors(configuration.systemPrompts || {});
   editingPresetMcpConfig = configuration.mcpConfig || "";
   presetMcpType.value = "remote";
@@ -664,6 +716,7 @@ function openPresetEditor(configurationId) {
 function closePresetEditor({ preserveStatus = false } = {}) {
   editingPresetId = null;
   editingPresetProviderSettings = null;
+  editingPresetSkillIds = new Set();
   editingPresetMcpConfig = "";
   presetsListView.hidden = false;
   presetEditorForm.hidden = true;
@@ -690,12 +743,14 @@ async function savePresetEdit() {
   const toolPermissions = normalizeToolPermissions(
     Object.fromEntries(Object.entries(PRESET_TOOL_INPUTS).map(([key, id]) => [key, document.querySelector(`#${id}`).checked])),
   );
+  const skillIds = [...editingPresetSkillIds];
   const updated = {
     ...current,
     name: presetEditorName.value.trim() || `Preset ${index + 1}`,
     providerSettings: providerSettingsFromRecord(editingPresetProviderSettings),
     componentState,
     toolPermissions,
+    skillIds,
     systemPrompts,
     mcpConfig: editingPresetMcpConfig,
     updatedAt: Date.now(),
@@ -777,12 +832,13 @@ function renderPresets() {
 }
 
 async function syncPresetRuntimeState() {
-  const [state, config] = await Promise.all([loadUiState(), fetchConfig()]);
+  const [state, config, storedSkills] = await Promise.all([loadUiState(), fetchConfig(), fetchSkills()]);
   providerSettings = { ...defaultProviderSettings(), ...(state.providerSettings || {}) };
   providers = Array.isArray(state.providers) ? state.providers : [];
   editingProviderId = providers.find((provider) => provider.selected)?.id || null;
   storedToolPermissions = normalizeToolPermissions(state.toolPermissions);
   toolsConfigContent = config.content || "";
+  skills = storedSkills;
   systemPrompts = [];
   renderProviderSettings(providerSettings);
   renderProvidersTable();
@@ -792,6 +848,7 @@ async function syncPresetRuntimeState() {
   send({ type: "provider_settings", ...providerSettings });
   send({ type: "tool_permissions", permissions: storedToolPermissions });
   send({ type: "reload_tools" });
+  send({ type: "reload_skills" });
 }
 
 async function savePresetConfigurations(configurations, nextActivePresetId, { syncRuntime = false, successMessage } = {}) {
@@ -827,7 +884,8 @@ async function loadPresets() {
   createPresetButton.disabled = true;
   setPresetsStatus("Loading presets...");
   try {
-    const result = await fetchRigConfigurations();
+    const [result, storedSkills] = await Promise.all([fetchRigConfigurations(), fetchSkills()]);
+    skills = storedSkills;
     presetConfigurations = Array.isArray(result.configurations) ? result.configurations : [];
     activePresetId = result.activeConfigurationId || presetConfigurations.find((configuration) => configuration.selected)?.id || null;
     setPresetsStatus("Presets are shared with the workflow interface.");
@@ -896,7 +954,7 @@ function applySidebarState(collapsed) {
 
 function toggleSidebar() {
   const collapsed = !appShell.classList.contains("sidebar-collapsed");
-  persistUiState({ sidebarCollapsed: collapsed });
+  localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, String(collapsed));
   applySidebarState(collapsed);
 }
 
@@ -932,7 +990,7 @@ function startSidebarResize(event) {
   event.preventDefault();
   appShell.classList.remove("sidebar-collapsed");
   applySidebarState(false);
-  persistUiState({ sidebarCollapsed: false });
+  localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, "false");
   appShell.classList.add("resizing-column");
   sidebarResizeHandle.classList.add("is-resizing");
   sidebarResizeHandle.setPointerCapture(event.pointerId);
@@ -1524,7 +1582,7 @@ function renderRecents() {
     button.addEventListener("click", () => {
       if (runActive || session.id === activeSessionId) return;
       activeSessionId = session.id;
-      persistUiState({ activeSessionId });
+      localStorage.setItem(ACTIVE_SESSION_STORAGE_KEY, activeSessionId);
       renderRecents();
       renderMessages();
       renderEvents();
@@ -1545,7 +1603,8 @@ function renderRecents() {
       sessions = sessions.filter((candidate) => candidate.id !== session.id);
       if (sessions.length === 0) sessions = [createSession("AI Harness Session", defaultWorkspace)];
       if (deletingActive) activeSessionId = sessions[0].id;
-      persistUiState({ sessions, activeSessionId });
+      localStorage.setItem(ACTIVE_SESSION_STORAGE_KEY, activeSessionId);
+      persistUiState({ sessions });
       send({ type: "reset", sessionId: session.id });
       renderRecents();
       renderMessages();
@@ -1563,7 +1622,8 @@ function startNewChat() {
   const session = createSession("New chat", defaultWorkspace);
   sessions = [session, ...sessions];
   activeSessionId = session.id;
-  persistUiState({ sessions, activeSessionId });
+  localStorage.setItem(ACTIVE_SESSION_STORAGE_KEY, activeSessionId);
+  persistUiState({ sessions });
   renderRecents();
   renderMessages();
   renderWorkspace();
@@ -1755,7 +1815,7 @@ function saveToolPermissions() {
   storedToolPermissions = permissions;
   persistUiState({ toolPermissions: permissions });
   send({ type: "tool_permissions", permissions });
-  toolPermissionsStatus.textContent = "Tool permissions saved";
+  toolPermissionsStatus.textContent = "Tool permissions saved to the active preset";
   toolPermissionsStatus.dataset.state = "success";
 }
 
@@ -2240,7 +2300,7 @@ sidebarResizeHandle.addEventListener("column-resize-start", (event) => startSide
 sidebarResizeHandle.addEventListener("column-resize-key", (event) => {
   if (appShell.classList.contains("sidebar-collapsed")) {
     applySidebarState(false);
-    persistUiState({ sidebarCollapsed: false });
+    localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, "false");
   }
   setSidebarWidth(sidebarWidth + (event.detail.key === "ArrowLeft" ? -24 : 24));
 });
@@ -2298,7 +2358,7 @@ sidebarComponent.addEventListener("open-modal", async (event) => {
   }
   if (event.detail.modal === "tools") {
     toolsDialog.showModal(); renderToolPermissions();
-    toolPermissionsStatus.textContent = "Tool permissions are stored in SQLite."; toolPermissionsStatus.dataset.state = "";
+    toolPermissionsStatus.textContent = "Tool permissions are stored in the active preset."; toolPermissionsStatus.dataset.state = "";
   }
   if (event.detail.modal === "mcp") {
     mcpDialog.showModal(); closeMcpEditor(); await loadTools();
@@ -2328,6 +2388,7 @@ presetsModal.addEventListener("create-preset", duplicateActivePreset);
 presetsModal.addEventListener("cancel-preset-edit", closePresetEditor);
 presetsModal.addEventListener("save-preset-edit", savePresetEdit);
 presetsModal.addEventListener("preset-provider-change", selectPresetProvider);
+presetsModal.addEventListener("preset-skill-search", renderPresetSkills);
 presetsModal.addEventListener("preset-mcp-type-change", renderPresetMcpTypeFields);
 presetsModal.addEventListener("add-preset-mcp-server", addPresetMcpServer);
 mcpModal.addEventListener("add-mcp-tool", saveTool);
@@ -2391,27 +2452,24 @@ async function initialize() {
     shouldOpenProvidersModal = providers.length === 0;
     editingProviderId = providers.find((item) => item.selected)?.id || null;
     storedToolPermissions = normalizeToolPermissions(state.toolPermissions);
-    const localSidebarWidth = Number(localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY));
-    const localStreamWidth = Number(localStorage.getItem(STREAM_WIDTH_STORAGE_KEY));
-    const localFilesWidth = Number(localStorage.getItem(FILES_WIDTH_STORAGE_KEY));
-    sidebarWidth = Number.isFinite(localSidebarWidth) && localSidebarWidth > 0
-      ? localSidebarWidth
-      : 344;
-    streamWidth = Number.isFinite(localStreamWidth) && localStreamWidth > 0
-      ? localStreamWidth
-      : 360;
-    filesWidth = Number.isFinite(localFilesWidth) && localFilesWidth > 0 ? localFilesWidth : 300;
-    applySidebarState(state.sidebarCollapsed === true);
-    applyRightColumnState("files", localStorage.getItem(FILES_VISIBLE_STORAGE_KEY) !== "false");
-    applyRightColumnState("stream", localStorage.getItem(STREAM_VISIBLE_STORAGE_KEY) !== "false");
   } catch (error) {
     sessions = [createSession("AI Harness Session", defaultWorkspace)];
-    applySidebarState(false);
     addEvent("UI state load failed", error.message, { persist: false });
   }
-  activeSessionId = sessions.some((session) => session.id === state?.activeSessionId)
-    ? state.activeSessionId
+  const localSidebarWidth = Number(localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY));
+  const localStreamWidth = Number(localStorage.getItem(STREAM_WIDTH_STORAGE_KEY));
+  const localFilesWidth = Number(localStorage.getItem(FILES_WIDTH_STORAGE_KEY));
+  sidebarWidth = Number.isFinite(localSidebarWidth) && localSidebarWidth > 0 ? localSidebarWidth : 344;
+  streamWidth = Number.isFinite(localStreamWidth) && localStreamWidth > 0 ? localStreamWidth : 360;
+  filesWidth = Number.isFinite(localFilesWidth) && localFilesWidth > 0 ? localFilesWidth : 300;
+  applySidebarState(localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === "true");
+  applyRightColumnState("files", localStorage.getItem(FILES_VISIBLE_STORAGE_KEY) !== "false");
+  applyRightColumnState("stream", localStorage.getItem(STREAM_VISIBLE_STORAGE_KEY) !== "false");
+  const storedActiveSessionId = localStorage.getItem(ACTIVE_SESSION_STORAGE_KEY);
+  activeSessionId = sessions.some((session) => session.id === storedActiveSessionId)
+    ? storedActiveSessionId
     : sessions[0].id;
+  localStorage.setItem(ACTIVE_SESSION_STORAGE_KEY, activeSessionId);
   setSidebarWidth(sidebarWidth);
   setStreamWidth(streamWidth);
   setFilesWidth(filesWidth);

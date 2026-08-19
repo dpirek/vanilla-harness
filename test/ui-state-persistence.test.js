@@ -38,7 +38,7 @@ test("SQLite preserves conversation messages and step events across reopen", asy
   let store;
   try {
     store = createUiStateStore(databasePath);
-    store.set({ sessions: [session], activeSessionId: session.id });
+    store.set({ sessions: [session] });
     store.close();
     store = null;
 
@@ -50,7 +50,7 @@ test("SQLite preserves conversation messages and step events across reopen", asy
       input_tokens: 20,
       output_tokens: 8,
     });
-    assert.equal(restored.activeSessionId, session.id);
+    assert.equal(Object.hasOwn(restored, "activeSessionId"), false);
   } finally {
     store?.close();
     await fs.rm(directory, { recursive: true, force: true });
@@ -70,16 +70,51 @@ test("SQLite is the sole skill store and removes the legacy source column", asyn
       selected INTEGER NOT NULL DEFAULT 0 CHECK (selected IN (0, 1)),
       updated_at INTEGER NOT NULL
     ) STRICT;
+    CREATE TABLE rig_configurations (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      component_state TEXT NOT NULL,
+      system_prompts TEXT NOT NULL,
+      tool_permissions TEXT NOT NULL,
+      mcp_config TEXT NOT NULL DEFAULT '',
+      updated_at INTEGER NOT NULL,
+      sort_order INTEGER NOT NULL,
+      selected INTEGER NOT NULL DEFAULT 0 CHECK (selected IN (0, 1))
+    ) STRICT;
+    CREATE TABLE layout (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      active_session_id TEXT,
+      sidebar_collapsed INTEGER NOT NULL DEFAULT 0 CHECK (sidebar_collapsed IN (0, 1))
+    ) STRICT;
+    INSERT INTO layout (id, active_session_id, sidebar_collapsed)
+      VALUES (1, 'legacy-session', 1);
+    CREATE TABLE tool_permissions (
+      name TEXT PRIMARY KEY,
+      enabled INTEGER NOT NULL CHECK (enabled IN (0, 1))
+    ) STRICT;
+    INSERT INTO tool_permissions (name, enabled) VALUES ('read_file', 1);
   `);
   legacy.prepare(`
     INSERT INTO skills (id, name, source_path, content, selected, updated_at)
     VALUES (?, ?, ?, ?, ?, ?)
   `).run("legacy-skill", "legacy-skill", "/previous/location/SKILL.md", "legacy content", 1, 10);
+  legacy.prepare(`
+    INSERT INTO rig_configurations
+      (id, name, component_state, system_prompts, tool_permissions, mcp_config, updated_at, sort_order, selected)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run("legacy-preset", "Legacy preset", "{}", "{}", '{"read_file":false}', "", 10, 0, 1);
   legacy.close();
 
   let store;
   try {
     store = createUiStateStore(databasePath);
+    assert.equal(store.getAll().toolPermissions.read_file, false);
+    store.set({ toolPermissions: { run_command: false } });
+    assert.equal(
+      store.getRigConfigurations().configurations.find((configuration) => configuration.selected)
+        .toolPermissions.run_command,
+      false,
+    );
     assert.deepEqual(store.getSkills(), [{
       id: "legacy-skill",
       name: "legacy-skill",
@@ -97,19 +132,53 @@ test("SQLite is the sole skill store and removes the legacy source column", asyn
     assert.equal(updated.skill.name, "renamed-skill");
     assert.equal(updated.skill.content, "updated content");
     store.setSelectedSkills([created.skill.id]);
+    const activePreset = store.getRigConfigurations().configurations.find((configuration) => configuration.selected);
+    assert.deepEqual(activePreset.skillIds, [created.skill.id]);
+
+    const alternatePreset = {
+      ...structuredClone(activePreset),
+      id: "alternate-preset",
+      name: "Alternate preset",
+      skillIds: ["legacy-skill"],
+      selected: true,
+    };
+    store.setRigConfigurations(
+      [{ ...activePreset, selected: false }, alternatePreset],
+      alternatePreset.id,
+    );
+    assert.deepEqual(store.getSelectedSkills().map((skill) => skill.id), ["legacy-skill"]);
     store.close();
     store = null;
 
     store = createUiStateStore(databasePath);
-    assert.equal(store.getSelectedSkills()[0].name, "renamed-skill");
+    assert.equal(store.getSelectedSkills()[0].name, "legacy-skill");
+    assert.deepEqual(
+      store.getRigConfigurations().configurations.find((configuration) => configuration.selected).skillIds,
+      ["legacy-skill"],
+    );
     store.close();
     store = null;
 
     const database = new DatabaseSync(databasePath);
     const columns = database.prepare("SELECT name FROM pragma_table_info('skills')").all()
       .map(({ name }) => name);
+    const presetColumns = database.prepare("SELECT name FROM pragma_table_info('presets')").all()
+      .map(({ name }) => name);
+    const legacyPresetTable = database.prepare(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'rig_configurations'",
+    ).get();
+    const legacyLayoutTable = database.prepare(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'layout'",
+    ).get();
+    const legacyToolPermissionsTable = database.prepare(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'tool_permissions'",
+    ).get();
     database.close();
     assert.deepEqual(columns, ["id", "name", "content", "selected", "updated_at"]);
+    assert.ok(presetColumns.includes("skill_ids"));
+    assert.equal(legacyPresetTable, undefined);
+    assert.equal(legacyLayoutTable, undefined);
+    assert.equal(legacyToolPermissionsTable, undefined);
   } finally {
     store?.close();
     await fs.rm(directory, { recursive: true, force: true });
