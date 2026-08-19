@@ -14,6 +14,7 @@ import { normalizeRigComponentState } from "./lib/rig-presets.js";
 import { CONFIG_TEMPLATES, mcpBlocks, quoteToml, replaceToolBlock, setToolBlockEnabled, updateToolBlock } from "./lib/mcp-config.js";
 import { appendEvent, describeAgentEvent, renderEventList } from "./lib/event-rendering.js";
 import { readFileAsDataUrl, renderImagePreviews as renderImagePreviewList } from "./lib/image-attachments.js";
+import { normalizeSkillName, skillDraft, syncSkillContentName, validateSkillContent } from "./lib/skill-content.js";
 import { clearSessionHistory, createSession, promptHistoryFromSessions, titleFromPrompt } from "./lib/sessions.js";
 import { formatStepDuration, formatTokenCount, sessionActivityRuns } from "./lib/session-activity.js";
 import { createStateSaveQueue } from "./lib/state-save-queue.js";
@@ -26,6 +27,7 @@ import {
   resolveWorkspaceMarkdownLink,
 } from "./services/workspace-api.js";
 import {
+  createSkill as persistNewSkill,
   loadConfig as fetchConfig,
   loadHealth as fetchHealth,
   loadProviderModels as fetchProviderModels,
@@ -35,6 +37,7 @@ import {
   saveConfig as persistConfig,
   saveRigConfigurations as persistRigConfigurations,
   saveSelectedSkills as persistSelectedSkills,
+  saveSkillContent as persistSkillContent,
   saveSystemPrompt as persistSystemPrompt,
 } from "./services/settings-api.js";
 import SocketService from "./services/socket-service.js";
@@ -103,6 +106,17 @@ const saveSystemPromptButton = document.querySelector("#saveSystemPromptButton")
 const skillsTableBody = document.querySelector("#skillsTableBody");
 const skillsSearchInput = document.querySelector("#skillsSearchInput");
 const skillsStatus = document.querySelector("#skillsStatus");
+const skillLibrary = document.querySelector(".skillLibrary");
+const skillEditor = document.querySelector("#skillEditor");
+const skillEditorName = document.querySelector("#skillEditorName");
+const skillEditorContent = document.querySelector("#skillEditorContent");
+const skillsDialogTitle = document.querySelector("#skillsDialogTitle");
+const skillsDialogDescription = document.querySelector("#skillsDialogDescription");
+const backToSkillsButton = document.querySelector("#backToSkillsButton");
+const toggleSkillColumnButton = document.querySelector("#toggleSkillColumnButton");
+const cancelSkillEditButton = document.querySelector("#cancelSkillEditButton");
+const saveSkillEditButton = document.querySelector("#saveSkillEditButton");
+const saveSkillsButton = document.querySelector("#saveSkillsButton");
 const configInput = document.querySelector("#configInput");
 const configStatus = document.querySelector("#configStatus");
 const saveConfigButton = document.querySelector("#saveConfigButton");
@@ -201,6 +215,7 @@ let toolsConfigContent = "";
 let systemPrompts = [];
 let skills = [];
 let editingSystemPromptKey = null;
+let editingSkillId = null;
 
 function renderSystemPrompts() {
   systemPromptsList.replaceChildren();
@@ -236,7 +251,12 @@ function summarizeSkillSource(sourcePath = "") {
 }
 
 function summarizeSkillContent(content = "") {
-  return String(content).split(/\r?\n/).find((line) => line.trim() && !line.trim().startsWith("#")) || "SKILL.md";
+  const description = String(content).match(/^description\s*:\s*(.+)$/m)?.[1]?.trim();
+  if (description) return description.replace(/^(["'])(.*)\1$/, "$2");
+  return String(content).split(/\r?\n/).find((line) => {
+    const value = line.trim();
+    return value && value !== "---" && !value.startsWith("#") && !/^name\s*:/.test(value);
+  }) || "SKILL.md";
 }
 
 function renderSkills() {
@@ -244,7 +264,7 @@ function renderSkills() {
   if (skills.length === 0) {
     const row = document.createElement("tr");
     const cell = document.createElement("td");
-    cell.colSpan = 3;
+    cell.colSpan = 4;
     cell.className = "skillEmptyState";
     cell.textContent = "No SKILL.md files were discovered under ~/.codex.";
     row.append(cell);
@@ -260,7 +280,7 @@ function renderSkills() {
   if (visibleSkills.length === 0) {
     const row = document.createElement("tr");
     const cell = document.createElement("td");
-    cell.colSpan = 3;
+    cell.colSpan = 4;
     cell.className = "skillEmptyState";
     cell.textContent = `No skills match “${skillsSearchInput.value.trim()}”.`;
     row.append(cell);
@@ -285,6 +305,7 @@ function renderSkills() {
     sourceCell.textContent = summarizeSkillSource(skill.sourcePath);
 
     const toggleCell = document.createElement("td");
+    toggleCell.className = "skillToggleColumn";
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
     checkbox.checked = skill.selected === true;
@@ -293,7 +314,17 @@ function renderSkills() {
     checkbox.addEventListener("change", () => { skill.selected = checkbox.checked; });
     toggleCell.append(checkbox);
 
-    row.append(nameCell, sourceCell, toggleCell);
+    const actionCell = document.createElement("td");
+    actionCell.className = "skillActionColumn";
+    const editButton = document.createElement("button");
+    editButton.type = "button";
+    editButton.className = "skillEditButton";
+    editButton.textContent = "Edit";
+    editButton.setAttribute("aria-label", `Edit ${skill.name}`);
+    editButton.addEventListener("click", () => openSkillEditor(skill.id));
+    actionCell.append(editButton);
+
+    row.append(nameCell, sourceCell, toggleCell, actionCell);
     skillsTableBody.append(row);
   }
 }
@@ -301,6 +332,97 @@ function renderSkills() {
 async function loadSkills() {
   skills = await fetchSkills();
   renderSkills();
+}
+
+function setSkillEditorPending(pending) {
+  const inactive = skillEditor.hidden;
+  skillEditorName.disabled = inactive || pending || editingSkillId !== null;
+  skillEditorContent.disabled = inactive || pending;
+  saveSkillEditButton.disabled = pending;
+  cancelSkillEditButton.disabled = pending;
+  backToSkillsButton.disabled = pending;
+  saveSkillEditButton.textContent = pending
+    ? "Saving…"
+    : editingSkillId === null ? "Create skill" : "Save skill";
+}
+
+function openSkillEditor(skillId = null) {
+  const skill = skillId ? skills.find((entry) => entry.id === skillId) : null;
+  if (skillId && !skill) return;
+  editingSkillId = skill?.id || null;
+  skillEditorName.value = skill?.name || "";
+  skillEditorContent.value = skill?.content || skillDraft();
+  skillLibrary.hidden = true;
+  skillEditor.hidden = false;
+  backToSkillsButton.hidden = false;
+  toggleSkillColumnButton.hidden = true;
+  cancelSkillEditButton.hidden = false;
+  saveSkillEditButton.hidden = false;
+  saveSkillsButton.hidden = true;
+  skillsDialogTitle.textContent = skill ? `Edit ${skill.name}` : "Add skill";
+  skillsDialogDescription.textContent = skill
+    ? "Update this skill's SKILL.md instructions"
+    : "Create a local skill with valid metadata and instructions";
+  skillsStatus.textContent = skill
+    ? `Editing ${summarizeSkillSource(skill.sourcePath)}`
+    : "New skills are created under ~/.codex/skills.";
+  skillsStatus.dataset.state = "";
+  setSkillEditorPending(false);
+  if (skill) skillEditorContent.focus();
+  else skillEditorName.focus();
+}
+
+function closeSkillEditor({ preserveStatus = false } = {}) {
+  editingSkillId = null;
+  skillLibrary.hidden = false;
+  skillEditor.hidden = true;
+  backToSkillsButton.hidden = true;
+  toggleSkillColumnButton.hidden = false;
+  cancelSkillEditButton.hidden = true;
+  saveSkillEditButton.hidden = true;
+  saveSkillsButton.hidden = false;
+  skillsDialogTitle.textContent = "Skills";
+  skillsDialogDescription.textContent = "Choose which SKILL.md guides are injected into new agent sessions";
+  setSkillEditorPending(false);
+  if (skillsDialog.open && !preserveStatus) {
+    skillsStatus.textContent = "Skill selections are stored in SQLite.";
+    skillsStatus.dataset.state = "";
+  }
+}
+
+async function saveSkillEdit() {
+  const name = normalizeSkillName(skillEditorName.value);
+  if (!name) {
+    skillsStatus.textContent = "Enter a skill name using lowercase letters, numbers, and hyphens.";
+    skillsStatus.dataset.state = "error";
+    skillEditorName.focus();
+    return;
+  }
+  let content;
+  try {
+    content = validateSkillContent(syncSkillContentName(skillEditorContent.value, name));
+  } catch (error) {
+    skillsStatus.textContent = error.message;
+    skillsStatus.dataset.state = "error";
+    skillEditorContent.focus();
+    return;
+  }
+  setSkillEditorPending(true);
+  try {
+    const result = editingSkillId
+      ? await persistSkillContent(editingSkillId, content)
+      : await persistNewSkill(name, content);
+    skills = Array.isArray(result.skills) ? result.skills : await fetchSkills();
+    renderSkills();
+    send({ type: "reload_skills" });
+    skillsStatus.textContent = editingSkillId ? `${name} updated.` : `${name} created.`;
+    skillsStatus.dataset.state = "success";
+    closeSkillEditor({ preserveStatus: true });
+  } catch (error) {
+    skillsStatus.textContent = error.message;
+    skillsStatus.dataset.state = "error";
+    setSkillEditorPending(false);
+  }
 }
 
 function currentSelectedSkillIds() {
@@ -2153,6 +2275,7 @@ sidebarComponent.addEventListener("open-modal", async (event) => {
     try { await loadSystemPrompts(); } catch (error) { systemPromptsStatus.textContent = error.message; systemPromptsStatus.dataset.state = "error"; }
   }
   if (event.detail.modal === "skills") {
+    closeSkillEditor();
     skillsSearchInput.value = "";
     skillsDialog.showModal();
     skillsStatus.textContent = "Loading skills from local SKILL.md files..."; skillsStatus.dataset.state = "";
@@ -2174,6 +2297,9 @@ skillsModal.addEventListener("save-skills", async () => {
   try { await saveSkills(); } catch (error) { skillsStatus.textContent = error.message; skillsStatus.dataset.state = "error"; }
 });
 skillsModal.addEventListener("search-skills", renderSkills);
+skillsModal.addEventListener("create-skill", () => openSkillEditor());
+skillsModal.addEventListener("cancel-skill-edit", closeSkillEditor);
+skillsModal.addEventListener("save-skill-edit", saveSkillEdit);
 providersModal.addEventListener("refresh-provider-models", loadProviderModels);
 providersModal.addEventListener("add-provider", addProvider);
 mcpModal.addEventListener("reload-mcp-config", loadConfig);

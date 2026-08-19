@@ -1724,6 +1724,21 @@ textarea:disabled {
   gap: 12px;
 }
 
+.skillLibrary[hidden],
+.skillEditor[hidden],
+.skillFooterActions button[hidden],
+#backToSkillsButton[hidden],
+#toggleSkillColumnButton[hidden] {
+  display: none;
+}
+
+.skillModalIdentity {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+}
+
 .skillLibraryHeader {
   display: flex;
   align-items: end;
@@ -1734,6 +1749,12 @@ textarea:disabled {
 .skillLibraryHeader > div {
   display: grid;
   gap: 3px;
+}
+
+.skillLibraryHeader .skillLibraryActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .skillLibrary h3 {
@@ -1749,7 +1770,7 @@ textarea:disabled {
 }
 
 .skillSearch {
-  width: min(280px, 42%);
+  width: min(280px, 42vw);
 }
 
 .skillSearch input {
@@ -1818,10 +1839,30 @@ textarea:disabled {
   border-bottom: 0;
 }
 
-.skillTable th:last-child,
-.skillTable td:last-child {
+.skillTable .skillToggleColumn {
   width: 96px;
   text-align: center;
+}
+
+.skillTable .skillActionColumn {
+  width: 92px;
+  text-align: right;
+}
+
+.skillEditButton {
+  min-height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--raised);
+  padding: 0 11px;
+  color: var(--text);
+  font-size: .76rem;
+  font-weight: 650;
+}
+
+.skillEditButton:hover {
+  border-color: var(--strong-line);
+  background: var(--surface-hover);
 }
 
 .skillName {
@@ -1866,9 +1907,63 @@ textarea:disabled {
     linear-gradient(180deg, #5d89db, #355fb4);
 }
 
-.skill-column-hidden .skillTable th:last-child,
-.skill-column-hidden .skillTable td:last-child {
+.skill-column-hidden .skillTable .skillToggleColumn {
   display: none;
+}
+
+.skillEditor {
+  display: grid;
+  gap: 14px;
+}
+
+.skillEditorField {
+  display: grid;
+  gap: 7px;
+}
+
+.skillEditorField > span {
+  color: var(--text);
+  font-size: .82rem;
+  font-weight: 750;
+}
+
+.skillEditorField > small {
+  color: var(--muted);
+  font-size: .72rem;
+}
+
+.skillEditorField input,
+.skillEditorField textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  outline: 0;
+  background: var(--field);
+  color: var(--text);
+  padding: 10px 12px;
+  font: 500 .8rem/1.5 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.skillEditorField input:focus,
+.skillEditorField textarea:focus {
+  border-color: var(--strong-line);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.skillEditorField input:disabled {
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.skillEditorField textarea {
+  min-height: 430px;
+  resize: vertical;
+  tab-size: 2;
+}
+
+.skillFooterActions {
+  display: flex;
+  gap: 8px;
 }
 
 .skillEmptyState {
@@ -2690,6 +2785,11 @@ textarea,
   }
 
   .skillLibraryHeader {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .skillLibraryHeader .skillLibraryActions {
     align-items: stretch;
     flex-direction: column;
   }

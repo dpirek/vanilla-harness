@@ -14,9 +14,12 @@ class SkillsModal extends BaseComponent {
       element("dialog", { id: "skillsDialog", class: "settingsDialog", children: [
         element("form", { id: "skillsForm", class: "settingsPanel", method: "dialog", children: [
           element("header", { class: "settingsHeader", children: [
-            element("div", { children: [
-              element("h2", { children: [text("Skills")] }),
-              element("p", { children: [text("Choose which SKILL.md guides are injected into new agent sessions")] }),
+            element("div", { class: "skillModalIdentity", children: [
+              element("button", { id: "backToSkillsButton", class: "iconButton", type: "button", hidden: "", "aria-label": "Back to skills", children: [text("←")] }),
+              element("div", { children: [
+                element("h2", { id: "skillsDialogTitle", children: [text("Skills")] }),
+                element("p", { id: "skillsDialogDescription", children: [text("Choose which SKILL.md guides are injected into new agent sessions")] }),
+              ] }),
             ] }),
             element("div", { class: "settingsHeaderActions", children: [
               element("button", { id: "toggleSkillColumnButton", class: "iconButton", type: "button", "aria-label": "Hide skill column", "aria-pressed": "true", title: "Hide skill column", children: [text("☷")] }),
@@ -29,8 +32,11 @@ class SkillsModal extends BaseComponent {
                 element("h3", { children: [text("Installed Skills")] }),
                 element("p", { children: [text("Imported from local SKILL.md files and stored in SQLite.")] }),
               ] }),
-              element("label", { class: "skillSearch", children: [
-                element("input", { id: "skillsSearchInput", type: "search", placeholder: "Search skills", autocomplete: "off", "aria-label": "Search skills" }),
+              element("div", { class: "skillLibraryActions", children: [
+                element("label", { class: "skillSearch", children: [
+                  element("input", { id: "skillsSearchInput", type: "search", placeholder: "Search skills", autocomplete: "off", "aria-label": "Search skills" }),
+                ] }),
+                element("button", { id: "addSkillButton", class: "primaryButton", type: "button", children: [text("Add new")] }),
               ] }),
             ] }),
             element("div", { class: "skillTableWrap", children: [
@@ -38,15 +44,32 @@ class SkillsModal extends BaseComponent {
                 element("thead", { children: [element("tr", { children: [
                   element("th", { scope: "col", children: [text("Name")] }),
                   element("th", { scope: "col", children: [text("Source")] }),
-                  element("th", { scope: "col", children: [text("Skills")] }),
+                  element("th", { class: "skillToggleColumn", scope: "col", children: [text("Enabled")] }),
+                  element("th", { class: "skillActionColumn", scope: "col", children: [text("Actions")] }),
                 ] })] }),
                 element("tbody", { id: "skillsTableBody" }),
               ] }),
             ] }),
           ] }),
+          element("section", { id: "skillEditor", class: "skillEditor", hidden: "", "aria-label": "Skill editor", children: [
+            element("label", { class: "skillEditorField", children: [
+              element("span", { children: [text("Skill name")] }),
+              element("input", { id: "skillEditorName", type: "text", required: "", disabled: "", maxlength: "63", spellcheck: "false", placeholder: "review-pull-request" }),
+              element("small", { children: [text("Use lowercase letters, numbers, and hyphens. Existing skill folder names cannot be changed here.")] }),
+            ] }),
+            element("label", { class: "skillEditorField skillContentField", children: [
+              element("span", { children: [text("SKILL.md")] }),
+              element("textarea", { id: "skillEditorContent", required: "", disabled: "", spellcheck: "false", "aria-describedby": "skillEditorHelp" }),
+              element("small", { id: "skillEditorHelp", children: [text("Include YAML frontmatter with name and description, followed by concise Markdown instructions.")] }),
+            ] }),
+          ] }),
           element("footer", { class: "settingsFooter", children: [
             element("span", { id: "skillsStatus", class: "configStatus", children: [text("Skill selections are stored in SQLite.")] }),
-            element("div", { children: [element("button", { id: "saveSkillsButton", class: "primaryButton", type: "submit", children: [text("Save skills")] })] }),
+            element("div", { class: "skillFooterActions", children: [
+              element("button", { id: "cancelSkillEditButton", type: "button", hidden: "", children: [text("Cancel")] }),
+              element("button", { id: "saveSkillEditButton", class: "primaryButton", type: "submit", hidden: "", children: [text("Create skill")] }),
+              element("button", { id: "saveSkillsButton", class: "primaryButton", type: "submit", children: [text("Save skills")] }),
+            ] }),
           ] }),
         ] }),
       ] }),
@@ -62,11 +85,18 @@ class SkillsModal extends BaseComponent {
     };
     this.querySelector("#closeSkillsButton").addEventListener("click", () => dialog.close());
     this.querySelector("#skillsSearchInput").addEventListener("input", () => this.emit("search-skills"));
+    this.querySelector("#addSkillButton").addEventListener("click", () => this.emit("create-skill"));
+    this.querySelector("#backToSkillsButton").addEventListener("click", () => this.emit("cancel-skill-edit"));
+    this.querySelector("#cancelSkillEditButton").addEventListener("click", () => this.emit("cancel-skill-edit"));
     toggleSkillColumnButton.addEventListener("click", () => {
       dialog.classList.toggle("skill-column-hidden");
       updateSkillColumnButton();
     });
-    this.querySelector("form").addEventListener("submit", (event) => { event.preventDefault(); this.emit("save-skills"); });
+    this.querySelector("form").addEventListener("submit", (event) => {
+      event.preventDefault();
+      this.emit(this.querySelector("#skillEditor").hidden ? "save-skills" : "save-skill-edit");
+    });
+    dialog.addEventListener("close", () => this.emit("cancel-skill-edit"));
     updateSkillColumnButton();
   }
 }
