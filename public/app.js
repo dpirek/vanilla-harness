@@ -37,7 +37,7 @@ import {
   saveConfig as persistConfig,
   saveRigConfigurations as persistRigConfigurations,
   saveSelectedSkills as persistSelectedSkills,
-  saveSkillContent as persistSkillContent,
+  saveSkill as persistSkill,
   saveSystemPrompt as persistSystemPrompt,
 } from "./services/settings-api.js";
 import SocketService from "./services/socket-service.js";
@@ -245,11 +245,6 @@ async function saveSystemPrompt() {
   await loadSystemPrompts();
 }
 
-function summarizeSkillSource(sourcePath = "") {
-  const parts = String(sourcePath).split("/").filter(Boolean);
-  return parts.slice(-4).join("/");
-}
-
 function summarizeSkillContent(content = "") {
   const description = String(content).match(/^description\s*:\s*(.+)$/m)?.[1]?.trim();
   if (description) return description.replace(/^(["'])(.*)\1$/, "$2");
@@ -264,9 +259,9 @@ function renderSkills() {
   if (skills.length === 0) {
     const row = document.createElement("tr");
     const cell = document.createElement("td");
-    cell.colSpan = 4;
+    cell.colSpan = 3;
     cell.className = "skillEmptyState";
-    cell.textContent = "No SKILL.md files were discovered under ~/.codex.";
+    cell.textContent = "No skills have been created yet.";
     row.append(cell);
     skillsTableBody.append(row);
     return;
@@ -274,13 +269,13 @@ function renderSkills() {
 
   const query = skillsSearchInput.value.trim().toLocaleLowerCase();
   const visibleSkills = query
-    ? skills.filter((skill) => [skill.name, skill.sourcePath, summarizeSkillContent(skill.content)]
+    ? skills.filter((skill) => [skill.name, summarizeSkillContent(skill.content)]
       .some((value) => String(value || "").toLocaleLowerCase().includes(query)))
     : skills;
   if (visibleSkills.length === 0) {
     const row = document.createElement("tr");
     const cell = document.createElement("td");
-    cell.colSpan = 4;
+    cell.colSpan = 3;
     cell.className = "skillEmptyState";
     cell.textContent = `No skills match “${skillsSearchInput.value.trim()}”.`;
     row.append(cell);
@@ -299,10 +294,6 @@ function renderSkills() {
     summary.className = "skillSummary";
     summary.textContent = summarizeSkillContent(skill.content);
     nameCell.append(name, summary);
-
-    const sourceCell = document.createElement("td");
-    sourceCell.className = "skillSource";
-    sourceCell.textContent = summarizeSkillSource(skill.sourcePath);
 
     const toggleCell = document.createElement("td");
     toggleCell.className = "skillToggleColumn";
@@ -324,7 +315,7 @@ function renderSkills() {
     editButton.addEventListener("click", () => openSkillEditor(skill.id));
     actionCell.append(editButton);
 
-    row.append(nameCell, sourceCell, toggleCell, actionCell);
+    row.append(nameCell, toggleCell, actionCell);
     skillsTableBody.append(row);
   }
 }
@@ -336,7 +327,7 @@ async function loadSkills() {
 
 function setSkillEditorPending(pending) {
   const inactive = skillEditor.hidden;
-  skillEditorName.disabled = inactive || pending || editingSkillId !== null;
+  skillEditorName.disabled = inactive || pending;
   skillEditorContent.disabled = inactive || pending;
   saveSkillEditButton.disabled = pending;
   cancelSkillEditButton.disabled = pending;
@@ -361,11 +352,11 @@ function openSkillEditor(skillId = null) {
   saveSkillsButton.hidden = true;
   skillsDialogTitle.textContent = skill ? `Edit ${skill.name}` : "Add skill";
   skillsDialogDescription.textContent = skill
-    ? "Update this skill's SKILL.md instructions"
-    : "Create a local skill with valid metadata and instructions";
+    ? "Update this skill's metadata and instructions"
+    : "Create a skill with valid metadata and instructions";
   skillsStatus.textContent = skill
-    ? `Editing ${summarizeSkillSource(skill.sourcePath)}`
-    : "New skills are created under ~/.codex/skills.";
+    ? `Editing ${skill.name}`
+    : "New skills are stored in SQLite.";
   skillsStatus.dataset.state = "";
   setSkillEditorPending(false);
   if (skill) skillEditorContent.focus();
@@ -410,7 +401,7 @@ async function saveSkillEdit() {
   setSkillEditorPending(true);
   try {
     const result = editingSkillId
-      ? await persistSkillContent(editingSkillId, content)
+      ? await persistSkill(editingSkillId, name, content)
       : await persistNewSkill(name, content);
     skills = Array.isArray(result.skills) ? result.skills : await fetchSkills();
     renderSkills();
@@ -2278,7 +2269,7 @@ sidebarComponent.addEventListener("open-modal", async (event) => {
     closeSkillEditor();
     skillsSearchInput.value = "";
     skillsDialog.showModal();
-    skillsStatus.textContent = "Loading skills from local SKILL.md files..."; skillsStatus.dataset.state = "";
+    skillsStatus.textContent = "Loading skills from SQLite..."; skillsStatus.dataset.state = "";
     try { await loadSkills(); skillsStatus.textContent = "Skill selections are stored in SQLite."; skillsStatus.dataset.state = ""; } catch (error) { skillsStatus.textContent = error.message; skillsStatus.dataset.state = "error"; }
   }
   if (event.detail.modal === "tools") {

@@ -9,8 +9,8 @@ The application supports:
 - Custom OpenAI-compatible endpoints
 - Workspace-scoped file listing, reading, searching, and writing
 - Approval-gated shell commands and file changes
-- MCP servers and local Codex `SKILL.md` files
-- Persistent conversations and settings in a local SQLite database
+- MCP servers and configurable skills
+- Persistent conversations, skills, and settings in SQLite
 - Image attachments and optional microphone transcription
 
 ## Requirements

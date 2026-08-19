@@ -1871,22 +1871,14 @@ textarea:disabled {
   font-weight: 620;
 }
 
-.skillSummary,
-.skillSource {
+.skillSummary {
   color: #9b9b9b;
   font-size: 0.81rem;
-}
-
-.skillSummary {
   margin-top: 2px;
   max-width: 320px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.skillSource {
-  font-family: "SFMono-Regular", "Monaco", "Consolas", monospace;
 }
 
 .skillTable input[type="checkbox"] {

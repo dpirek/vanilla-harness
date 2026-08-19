@@ -18,8 +18,8 @@ function saveSelectedSkills(selectedSkillIds) {
   return requestJson("/api/skills", jsonOptions("PUT", { selectedSkillIds }), "Unable to save skills.");
 }
 
-function saveSkillContent(skillId, content) {
-  return requestJson("/api/skills", jsonOptions("PUT", { skillId, content }), "Unable to save skill.");
+function saveSkill(skillId, name, content) {
+  return requestJson("/api/skills", jsonOptions("PUT", { skillId, name, content }), "Unable to save skill.");
 }
 
 function createSkill(name, content) {
@@ -68,7 +68,7 @@ export {
   loadSystemPrompts,
   saveConfig,
   saveRigConfigurations,
-  saveSkillContent,
+  saveSkill,
   saveSelectedSkills,
   saveSystemPrompt,
 };

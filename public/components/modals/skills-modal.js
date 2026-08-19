@@ -29,8 +29,8 @@ class SkillsModal extends BaseComponent {
           element("section", { class: "skillLibrary", "aria-label": "Skill library", children: [
             element("div", { class: "skillLibraryHeader", children: [
               element("div", { children: [
-                element("h3", { children: [text("Installed Skills")] }),
-                element("p", { children: [text("Imported from local SKILL.md files and stored in SQLite.")] }),
+                element("h3", { children: [text("Stored skills")] }),
+                element("p", { children: [text("Skill definitions are stored exclusively in SQLite.")] }),
               ] }),
               element("div", { class: "skillLibraryActions", children: [
                 element("label", { class: "skillSearch", children: [
@@ -43,7 +43,6 @@ class SkillsModal extends BaseComponent {
               element("table", { class: "skillTable", children: [
                 element("thead", { children: [element("tr", { children: [
                   element("th", { scope: "col", children: [text("Name")] }),
-                  element("th", { scope: "col", children: [text("Source")] }),
                   element("th", { class: "skillToggleColumn", scope: "col", children: [text("Enabled")] }),
                   element("th", { class: "skillActionColumn", scope: "col", children: [text("Actions")] }),
                 ] })] }),
@@ -55,7 +54,7 @@ class SkillsModal extends BaseComponent {
             element("label", { class: "skillEditorField", children: [
               element("span", { children: [text("Skill name")] }),
               element("input", { id: "skillEditorName", type: "text", required: "", disabled: "", maxlength: "63", spellcheck: "false", placeholder: "review-pull-request" }),
-              element("small", { children: [text("Use lowercase letters, numbers, and hyphens. Existing skill folder names cannot be changed here.")] }),
+              element("small", { children: [text("Use lowercase letters, numbers, and hyphens.")] }),
             ] }),
             element("label", { class: "skillEditorField skillContentField", children: [
               element("span", { children: [text("SKILL.md")] }),

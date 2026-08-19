@@ -7,11 +7,16 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createModelClient } from "./lib/openai.js";
 import { CodingAgent, resolveDisabledSteps } from "./lib/agent.js";
-import { createSkillOnDisk, loadSkillsFromDisk } from "./lib/skills.js";
 import { createTools } from "./lib/tools.js";
 import { loadMcpTools } from "./lib/mcp.js";
 import { createUiStateStore } from "./lib/ui-state.js";
 import { createWorkspaceTree } from "./lib/workspace-tree.js";
+import {
+  normalizeSkillName,
+  skillDraft,
+  syncSkillContentName,
+  validateSkillContent,
+} from "./public/lib/skill-content.js";
 import {
   defaultBaseUrlForProvider,
   defaultModelForProvider,
@@ -77,9 +82,6 @@ const WEBSOCKET_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 const MAX_WEBSOCKET_TEXT_BYTES = 40 * 1024 * 1024;
 const providerSettings = new Map();
 const toolPermissions = new Map();
-let skillsSyncPromise = null;
-
-await syncSkillsFromDisk();
 
 const DEFAULT_TOOL_PERMISSIONS = {
   list_files: true,
@@ -106,17 +108,6 @@ function json(res, status, payload) {
     "content-length": Buffer.byteLength(body),
   });
   res.end(body);
-}
-
-async function syncSkillsFromDisk() {
-  if (!skillsSyncPromise) {
-    skillsSyncPromise = loadSkillsFromDisk()
-      .then((skills) => uiStateStore.syncSkills(skills))
-      .finally(() => {
-        skillsSyncPromise = null;
-      });
-  }
-  return skillsSyncPromise;
 }
 
 async function readRequestBody(req, limit = 250_000) {
@@ -287,27 +278,20 @@ async function handleSystemPromptsApi(req, res) {
 
 async function handleSkillsApi(req, res) {
   if (req.method === "GET") {
-    try {
-      json(res, 200, { ok: true, skills: await syncSkillsFromDisk() });
-    } catch (error) {
-      json(res, 400, { ok: false, error: error.message });
-    }
+    json(res, 200, { ok: true, skills: uiStateStore.getSkills() });
     return;
   }
   if (req.method === "POST") {
     try {
       const body = JSON.parse(await readRequestBody(req, 2_100_000) || "{}");
       if (typeof body.name !== "string") throw new Error("Expected skill name.");
-      const created = await createSkillOnDisk({
-        name: body.name,
-        content: typeof body.content === "string" ? body.content : "",
-      });
-      const skills = await syncSkillsFromDisk();
-      json(res, 200, {
-        ok: true,
-        skill: skills.find((entry) => entry.id === created.id) || created,
-        skills,
-      });
+      const name = normalizeSkillName(body.name);
+      if (!name) throw new Error("Enter a skill name using letters, numbers, and hyphens.");
+      const draft = typeof body.content === "string" && body.content.trim()
+        ? body.content
+        : skillDraft(name);
+      const content = validateSkillContent(syncSkillContentName(draft, name));
+      json(res, 200, { ok: true, ...uiStateStore.createSkill({ name, content }) });
     } catch (error) {
       json(res, 400, { ok: false, error: error.message });
     }
@@ -323,12 +307,12 @@ async function handleSkillsApi(req, res) {
       if (typeof body.skillId === "string" && typeof body.content === "string") {
         const skill = uiStateStore.getSkills().find((entry) => entry.id === body.skillId);
         if (!skill) throw new Error(`Unknown skill: ${body.skillId}`);
-        await fs.writeFile(skill.sourcePath, body.content, "utf8");
-        const skills = await syncSkillsFromDisk();
+        const name = normalizeSkillName(typeof body.name === "string" ? body.name : skill.name);
+        if (!name) throw new Error("Enter a skill name using letters, numbers, and hyphens.");
+        const content = validateSkillContent(syncSkillContentName(body.content, name));
         json(res, 200, {
           ok: true,
-          skill: skills.find((entry) => entry.id === body.skillId) || null,
-          skills,
+          ...uiStateStore.updateSkill(body.skillId, { name, content }),
         });
         return;
       }

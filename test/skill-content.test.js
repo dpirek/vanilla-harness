@@ -33,7 +33,7 @@ Keep these instructions.
   assert.match(updated, /Keep these instructions\./);
 });
 
-test("skill names normalize to lowercase hyphenated folder names", () => {
+test("skill names normalize to lowercase hyphenated identifiers", () => {
   assert.equal(normalizeSkillName("  My Skill / Helper  "), "my-skill-helper");
   assert.equal(normalizeSkillName("---"), "");
 });
