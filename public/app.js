@@ -844,8 +844,7 @@ async function syncPresetRuntimeState() {
   renderProvidersTable();
   renderToolPermissions();
   renderTools();
-  workspaceMeta.textContent = `${providerSettings.provider} · ${providerSettings.model || "default model"}`;
-  send({ type: "provider_settings", ...providerSettings });
+  applyActiveProviderSettings(providerSettings);
   send({ type: "tool_permissions", permissions: storedToolPermissions });
   send({ type: "reload_tools" });
   send({ type: "reload_skills" });
@@ -1667,6 +1666,12 @@ function currentProviderSettings() {
   };
 }
 
+function applyActiveProviderSettings(settings) {
+  providerSettings = { ...defaultProviderSettings(), ...(settings || {}) };
+  workspaceMeta.textContent = `${providerSettings.provider} · ${providerSettings.model || "default model"}`;
+  send({ type: "provider_settings", ...providerSettings });
+}
+
 function providerFormRecord(existing = {}) {
   return {
     id: existing.id || crypto.randomUUID(),
@@ -1700,12 +1705,16 @@ function renderProvidersTable() {
     checkbox.setAttribute("aria-label", `Use ${item.name}`);
     checkbox.addEventListener("change", () => {
       providers = providers.map((provider) => ({ ...provider, selected: provider.id === item.id }));
-      providerSettings = { provider: item.type, model: item.model, baseUrl: item.baseUrl, apiKey: item.apiKey };
+      applyActiveProviderSettings({
+        provider: item.type,
+        model: item.model,
+        baseUrl: item.baseUrl,
+        apiKey: item.apiKey,
+      });
       editingProviderId = item.id;
       persistUiState({ providers });
       renderProvidersTable();
       renderProviderSettings(providerSettings, item.name);
-      send({ type: "provider_settings", ...providerSettings });
     });
     selectCell.append(checkbox);
     row.append(selectCell);
@@ -1739,13 +1748,11 @@ function renderProvidersTable() {
       if (deletedSelectedProvider && providers.length > 0) {
         providers = providers.map((provider, index) => ({ ...provider, selected: index === 0 }));
         const next = providers[0];
-        providerSettings = {
+        applyActiveProviderSettings({
           provider: next.type, model: next.model, baseUrl: next.baseUrl, apiKey: next.apiKey,
-        };
-        send({ type: "provider_settings", ...providerSettings });
+        });
       } else if (deletedSelectedProvider) {
-        providerSettings = defaultProviderSettings();
-        send({ type: "provider_settings", ...providerSettings });
+        applyActiveProviderSettings(defaultProviderSettings());
       }
       if (editingProviderId === item.id) editingProviderId = null;
       persistUiState({ providers });
@@ -1784,9 +1791,7 @@ function saveProviderSettings() {
   renderProvidersTable();
   const updated = providers.find((item) => item.id === editingProviderId);
   if (!updated || updated.selected) {
-    providerSettings = settings;
-    send({ type: "provider_settings", ...settings });
-    workspaceMeta.textContent = `${settings.provider} · ${settings.model || "default model"}`;
+    applyActiveProviderSettings(settings);
   }
   settingsStatus.textContent = "Provider settings saved";
   settingsStatus.dataset.state = "success";

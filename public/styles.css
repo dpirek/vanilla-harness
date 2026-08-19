@@ -1333,6 +1333,23 @@ textarea:disabled {
 
 #settingsDialog {
   width: min(1120px, calc(100vw - 40px));
+  height: min(760px, calc(100vh - 48px));
+}
+
+#settingsDialog .settingsPanel {
+  height: 100%;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+}
+
+#settingsDialog .providerSettings {
+  min-height: 0;
+  align-content: start;
+  overflow-y: auto;
+}
+
+#settingsDialog .providerTableWrap {
+  max-height: none;
 }
 
 #saveSettingsButton[hidden] { display: none; }
