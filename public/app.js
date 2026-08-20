@@ -24,9 +24,11 @@ import { renderWorkspaceNodes, renderWorkspacePicker } from "./lib/workspace-ren
 import { loadUiState, saveUiState } from "./services/ui-state-api.js";
 import {
   createWorkspaceFolder,
+  isWorkspaceImagePath,
   loadWorkspaceFile,
   loadWorkspaceTree as fetchWorkspaceTree,
   resolveWorkspaceMarkdownLink,
+  workspaceFileAssetUrl,
 } from "./services/workspace-api.js";
 import {
   createSkill as persistNewSkill,
@@ -177,6 +179,8 @@ const fileEditorDialog = document.querySelector("#fileEditorDialog");
 const fileEditorTitle = document.querySelector("#fileEditorTitle");
 const fileEditorPath = document.querySelector("#fileEditorPath");
 const fileEditorLanguage = document.querySelector("#fileEditorLanguage");
+const fileEditorPreviewImage = document.querySelector("#fileEditorPreviewImage");
+const fileEditorPreviewText = document.querySelector("#fileEditorPreviewText");
 const fileEditorPreviewCode = document.querySelector("#fileEditorPreviewCode");
 const fileEditorStatus = document.querySelector("#fileEditorStatus");
 
@@ -199,8 +203,24 @@ let previewingFilePath = null;
 let editingMcpBlock = null;
 
 function updateFileEditorPreview(filePath, content) {
+  fileEditorPreviewImage.hidden = true;
+  fileEditorPreviewImage.removeAttribute("src");
+  fileEditorPreviewText.hidden = false;
   const language = renderFilePreview(fileEditorPreviewCode, content, { filePath });
   fileEditorLanguage.textContent = codeLanguageLabel(language || "plaintext");
+}
+
+function updateImagePreview(workspace, node) {
+  fileEditorPreviewCode.replaceChildren();
+  fileEditorPreviewText.hidden = true;
+  fileEditorPreviewImage.hidden = false;
+  fileEditorPreviewImage.alt = `Preview of ${node.name}`;
+  fileEditorLanguage.textContent = "Image";
+  return new Promise((resolve, reject) => {
+    fileEditorPreviewImage.addEventListener("load", resolve, { once: true });
+    fileEditorPreviewImage.addEventListener("error", () => reject(new Error("Unable to load image preview.")), { once: true });
+    fileEditorPreviewImage.src = workspaceFileAssetUrl(workspace, node.path);
+  });
 }
 
 const MIN_STREAM_WIDTH = 260;
@@ -1077,15 +1097,21 @@ async function openFilePreview(node) {
   previewingFilePath = node.path;
   fileEditorTitle.textContent = node.name;
   fileEditorPath.textContent = node.path;
-  updateFileEditorPreview(node.path, "");
   fileEditorStatus.textContent = "Loading…";
   fileEditorDialog.showModal();
   try {
-    const content = await loadWorkspaceFile(workspace, node.path);
+    if (isWorkspaceImagePath(node.path)) {
+      await updateImagePreview(workspace, node);
+    } else {
+      updateFileEditorPreview(node.path, "");
+      const content = await loadWorkspaceFile(workspace, node.path);
+      if (previewingFilePath !== node.path || !fileEditorDialog.open) return;
+      updateFileEditorPreview(node.path, content);
+    }
     if (previewingFilePath !== node.path || !fileEditorDialog.open) return;
-    updateFileEditorPreview(node.path, content);
     fileEditorStatus.textContent = "";
   } catch (error) {
+    if (previewingFilePath !== node.path || !fileEditorDialog.open) return;
     fileEditorStatus.textContent = error.message;
   }
 }
@@ -2289,6 +2315,10 @@ chatComponent.addEventListener("submit-prompt", () => {
 });
 
 workspaceComponent.addEventListener("workspace-change", saveActiveWorkspace);
+fileEditorDialog.addEventListener("close", () => {
+  previewingFilePath = null;
+  fileEditorPreviewImage.removeAttribute("src");
+});
 workspaceComponent.addEventListener("focus-prompt", () => promptInput.focus());
 workspaceComponent.addEventListener("refresh-workspace", loadWorkspaceTree);
 workspaceComponent.addEventListener("choose-workspace", openWorkspacePicker);

@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { resolveWorkspaceMarkdownLink, workspaceFileAssetUrl } from "../public/services/workspace-api.js";
+import {
+  isWorkspaceImagePath,
+  resolveWorkspaceMarkdownLink,
+  workspaceFileAssetUrl,
+} from "../public/services/workspace-api.js";
 
 test("relative Markdown links resolve through the selected workspace", () => {
   assert.equal(
@@ -15,6 +19,8 @@ test("relative Markdown links resolve through the selected workspace", () => {
 });
 
 test("workspace image links are marked for chat preview", () => {
+  assert.equal(isWorkspaceImagePath("images/trump-news-latest.PNG"), true);
+  assert.equal(isWorkspaceImagePath("reports/trump-news-latest.html"), false);
   assert.deepEqual(resolveWorkspaceMarkdownLink("/tmp/project", "./images/trump-news-latest.PNG"), {
     href: "/api/workspace-file-asset?workspace=%2Ftmp%2Fproject&path=images%2Ftrump-news-latest.PNG",
     previewImage: true,

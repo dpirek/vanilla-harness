@@ -1248,6 +1248,8 @@ textarea:disabled {
 .fileEditorPreviewHeader span { color: var(--muted); font-size: .76rem; }
 .fileEditorPreviewContent { min-height: 0; flex: 1 1 0; margin: 0; overflow: auto; padding: 14px; color: #d7dae0; font: .85rem/1.55 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
 .fileEditorPreviewContent code { display: block; white-space: pre; }
+.fileEditorPreviewImage { width: 100%; min-height: 0; flex: 1 1 0; object-fit: contain; padding: 16px; }
+.fileEditorPreviewImage[hidden], .fileEditorPreviewContent[hidden] { display: none; }
 #fileEditorStatus { color: var(--muted); font-size: .8rem; }
 
 .columnResizeHandle {

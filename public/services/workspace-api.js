@@ -28,6 +28,13 @@ function workspaceFileAssetUrl(workspace, path) {
   return `/api/workspace-file-asset?workspace=${encodeURIComponent(workspace)}&path=${encodeURIComponent(path)}`;
 }
 
+function isWorkspaceImagePath(path) {
+  const value = String(path || "");
+  const extensionIndex = value.lastIndexOf(".");
+  const extension = extensionIndex >= 0 ? value.slice(extensionIndex).toLowerCase() : "";
+  return WORKSPACE_IMAGE_EXTENSIONS.has(extension);
+}
+
 function resolveWorkspaceMarkdownLink(workspace, href) {
   const value = String(href || "").trim();
   if (!value || /^(?:https?:|mailto:)/i.test(value) || value.startsWith("#") || value.startsWith("?")) {
@@ -39,11 +46,9 @@ function resolveWorkspaceMarkdownLink(workspace, href) {
   const fileReference = withoutHash.split("?", 1)[0];
   const path = normalizeWorkspaceLinkPath(fileReference);
   if (!path) return { href: "", previewImage: false };
-  const extensionIndex = path.lastIndexOf(".");
-  const extension = extensionIndex >= 0 ? path.slice(extensionIndex).toLowerCase() : "";
   return {
     href: `${workspaceFileAssetUrl(workspace, path)}${hash}`,
-    previewImage: WORKSPACE_IMAGE_EXTENSIONS.has(extension),
+    previewImage: isWorkspaceImagePath(path),
   };
 }
 
@@ -70,6 +75,7 @@ async function loadWorkspaceFile(workspace, path) {
 
 export {
   createWorkspaceFolder,
+  isWorkspaceImagePath,
   loadWorkspaceFile,
   loadWorkspaceTree,
   resolveWorkspaceMarkdownLink,
