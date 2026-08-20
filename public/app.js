@@ -66,7 +66,6 @@ const skillsModal = document.querySelector("skills-modal");
 const toolsModal = document.querySelector("tools-modal");
 const mcpModal = document.querySelector("mcp-modal");
 
-const socketState = document.querySelector("#socketState");
 const workspaceMeta = document.querySelector("#workspaceMeta");
 const workspaceInput = document.querySelector("#workspaceInput");
 const messages = document.querySelector("#messages");
@@ -1580,11 +1579,6 @@ function resizePromptInput() {
   promptInput.style.overflowY = promptInput.scrollHeight > 168 ? "auto" : "hidden";
 }
 
-function setState(label, className) {
-  socketState.textContent = label;
-  socketState.className = `state ${className}`;
-}
-
 function setBusy(value) {
   runActive = value;
   sendButton.disabled = value || microphoneState !== "idle" || !socketService?.isOpen;
@@ -2567,7 +2561,6 @@ async function handleSocketMessage(payload) {
       addMessageToSession(targetSessionId, "agent", payload.error);
       if (targetSessionId === activeSessionId) renderMessages();
       addEvent("Error", payload.error);
-      setState("Error", "state-error");
       finishStreamingAnswer();
       pendingSessionId = null;
       setBusy(false);
@@ -2576,23 +2569,19 @@ async function handleSocketMessage(payload) {
 }
 
 function connect() {
-  setState("Connecting", "state-pending");
   socketService = new SocketService({
     onOpen() {
-      setState("Online", "state-online");
       send({ type: "provider_settings", ...providerSettings });
       send({ type: "tool_permissions", permissions: storedToolPermissions });
       setBusy(false);
       addEvent("Socket connected");
     },
     onClose() {
-      setState("Offline", "state-idle");
       setBusy(false);
       addEvent("Socket closed");
       window.setTimeout(connect, 1500);
     },
     onError() {
-      setState("Error", "state-error");
       addEvent("Socket error");
     },
     onMessage: handleSocketMessage,

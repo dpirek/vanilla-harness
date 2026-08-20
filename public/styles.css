@@ -477,7 +477,6 @@ code {
 .chatActions,
 .columnVisibilityControls,
 .workspacePicker,
-.state,
 .resetFab {
   pointer-events: auto;
 }
@@ -532,31 +531,6 @@ dropdown-button { position: relative; display: block; }
   background: transparent;
   color: #eee;
   font: 500 0.82rem ui-monospace, SFMono-Regular, Menlo, monospace;
-}
-
-.state {
-  display: inline-flex;
-  min-height: 30px;
-  align-items: center;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 0 11px;
-  background: rgba(20, 20, 20, 0.84);
-  color: var(--muted);
-  font-size: 0.82rem;
-  font-weight: 700;
-}
-
-.state-online {
-  color: #88d8c6;
-}
-
-.state-pending {
-  color: #f5cf77;
-}
-
-.state-error {
-  color: var(--danger);
 }
 
 .textButton {
@@ -2590,7 +2564,6 @@ textarea,
 .app.sidebar-collapsed .sidebarSection button,
 .columnVisibilityControls button,
 .workspacePicker,
-.state,
 .resetFab,
 .composer,
 .imagePreview,
@@ -2611,7 +2584,6 @@ textarea,
 
 .columnVisibilityControls button,
 .workspacePicker,
-.state,
 .resetFab,
 .streamHeader button,
 .systemPromptRow button,
