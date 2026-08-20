@@ -21,6 +21,7 @@ import { clearSessionHistory, createSession, promptHistoryFromSessions, titleFro
 import { formatStepDuration, formatTokenCount, sessionActivityRuns } from "./lib/session-activity.js";
 import { createStateSaveQueue } from "./lib/state-save-queue.js";
 import { loadDefaultWorkspace, saveDefaultWorkspace } from "./lib/workspace-preferences.js";
+import { shouldRefreshWorkspaceForAgentEvent } from "./lib/workspace-refresh.js";
 import { renderWorkspaceNodes, renderWorkspacePicker } from "./lib/workspace-rendering.js";
 import { loadUiState, saveUiState } from "./services/ui-state-api.js";
 import {
@@ -209,6 +210,8 @@ let microphoneStream = null;
 let defaultWorkspace = ".";
 let workspaceBrowserRoot = null;
 let workspaceBrowserNodes = [];
+let workspaceRefreshTimer = null;
+let workspaceTreeLoadId = 0;
 let pendingWorkspacePath = null;
 let workspacePickerRoot = null;
 let workspacePickerParent = null;
@@ -1173,12 +1176,14 @@ async function openFilePreview(node) {
 }
 
 async function loadWorkspaceTree() {
+  const loadId = ++workspaceTreeLoadId;
   const selectedWorkspace = activeSession()?.workspace || defaultWorkspace;
   filesWorkspaceLabel.textContent = selectedWorkspace;
   workspaceTreeElement.innerHTML = '<p class="workspaceTreeStatus">Loading files…</p>';
   selectWorkspaceRootButton.disabled = true;
   try {
     const payload = await fetchWorkspaceTree(selectedWorkspace);
+    if (loadId !== workspaceTreeLoadId || selectedWorkspace !== (activeSession()?.workspace || defaultWorkspace)) return;
     workspaceBrowserRoot = payload.root;
     workspaceBrowserNodes = payload.tree || [];
     selectWorkspaceRootButton.disabled = false;
@@ -1189,12 +1194,21 @@ async function loadWorkspaceTree() {
       onSelectFolder(path) { workspaceInput.value = path; saveActiveWorkspace(); },
     });
   } catch (error) {
+    if (loadId !== workspaceTreeLoadId) return;
     workspaceBrowserRoot = null;
     workspaceBrowserNodes = [];
     workspaceTreeElement.innerHTML = "";
     const status = document.createElement("p"); status.className = "workspaceTreeStatus"; status.textContent = error.message;
     workspaceTreeElement.append(status);
   }
+}
+
+function scheduleWorkspaceTreeRefresh(delay = 140) {
+  window.clearTimeout(workspaceRefreshTimer);
+  workspaceRefreshTimer = window.setTimeout(() => {
+    workspaceRefreshTimer = null;
+    loadWorkspaceTree();
+  }, delay);
 }
 
 function chooseWorkspacePickerPath(path) {
@@ -2482,6 +2496,7 @@ async function handleSocketMessage(payload) {
       return;
     }
     if (payload.type === "agent_event") {
+      if (shouldRefreshWorkspaceForAgentEvent(payload.event)) scheduleWorkspaceTreeRefresh();
       addEvent(describeAgentEvent(payload.event), payload.event);
       return;
     }
@@ -2503,6 +2518,7 @@ async function handleSocketMessage(payload) {
       await saved;
       pendingSessionId = null;
       setBusy(false);
+      scheduleWorkspaceTreeRefresh(0);
       return;
     }
     if (payload.type === "reset") {
@@ -2518,6 +2534,7 @@ async function handleSocketMessage(payload) {
       finishStreamingAnswer();
       pendingSessionId = null;
       setBusy(false);
+      scheduleWorkspaceTreeRefresh(0);
     }
 }
 
