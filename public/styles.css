@@ -1223,6 +1223,7 @@ textarea:disabled {
 .workspacePickerPanel p { margin: 4px 0 0; overflow: hidden; color: var(--muted); font-size: .78rem; text-overflow: ellipsis; white-space: nowrap; }
 .workspacePickerPanel button { min-height: 34px; border: 1px solid #333; border-radius: 8px; padding: 0 12px; }
 .workspacePickerPanel header button { display: inline-grid; width: 34px; padding: 0; place-items: center; line-height: 1; }
+.workspacePickerPanel button[hidden] { display: none; }
 .workspacePickerPanel header button .workspaceExplorerIcon { width: 18px; height: 18px; }
 .workspacePickerTree { max-height: 460px; overflow: auto; border: 1px solid #292929; border-radius: 8px; padding: 8px; }
 .workspacePickerOption { display: flex; width: 100%; min-height: 34px; align-items: center; gap: 8px; border: 0 !important; padding: 0 9px !important; text-align: left; }

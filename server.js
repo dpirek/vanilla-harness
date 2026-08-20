@@ -12,6 +12,10 @@ import { loadMcpTools } from "./lib/mcp.js";
 import { createUiStateStore } from "./lib/ui-state.js";
 import { createWorkspaceTree } from "./lib/workspace-tree.js";
 import {
+  createConversationWorkspace,
+  deleteConversationWorkspace,
+} from "./lib/conversation-workspace.js";
+import {
   normalizeSkillName,
   skillDraft,
   syncSkillContentName,
@@ -355,6 +359,23 @@ async function handleWorkspaceFolderApi(req, res) {
       throw error;
     }
     json(res, 201, { ok: true, path: await fs.realpath(folder) });
+  } catch (error) {
+    json(res, 400, { ok: false, error: error.message });
+  }
+}
+
+async function handleConversationWorkspaceApi(req, res) {
+  if (req.method !== "POST" && req.method !== "DELETE") {
+    res.writeHead(405, { allow: "POST, DELETE" });
+    res.end();
+    return;
+  }
+  try {
+    const body = JSON.parse(await readRequestBody(req, 10_000) || "{}");
+    const result = req.method === "POST"
+      ? await createConversationWorkspace(body.root, body.sessionId)
+      : await deleteConversationWorkspace(body.root, body.sessionId);
+    json(res, req.method === "POST" ? 201 : 200, { ok: true, ...result });
   } catch (error) {
     json(res, 400, { ok: false, error: error.message });
   }
@@ -1012,6 +1033,10 @@ const server = http.createServer(async (req, res) => {
   }
   if (url.pathname === "/api/workspace-folder") {
     await handleWorkspaceFolderApi(req, res);
+    return;
+  }
+  if (url.pathname === "/api/conversation-workspace") {
+    await handleConversationWorkspaceApi(req, res);
     return;
   }
   if (url.pathname === "/api/workspace-file") {

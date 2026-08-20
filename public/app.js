@@ -20,10 +20,13 @@ import { normalizeSkillName, skillDraft, syncSkillContentName, validateSkillCont
 import { clearSessionHistory, createSession, promptHistoryFromSessions, titleFromPrompt } from "./lib/sessions.js";
 import { formatStepDuration, formatTokenCount, sessionActivityRuns } from "./lib/session-activity.js";
 import { createStateSaveQueue } from "./lib/state-save-queue.js";
+import { loadDefaultWorkspace, saveDefaultWorkspace } from "./lib/workspace-preferences.js";
 import { renderWorkspaceNodes, renderWorkspacePicker } from "./lib/workspace-rendering.js";
 import { loadUiState, saveUiState } from "./services/ui-state-api.js";
 import {
+  createConversationWorkspace,
   createWorkspaceFolder,
+  deleteConversationWorkspace,
   isWorkspaceImagePath,
   loadWorkspaceFile,
   loadWorkspaceTree as fetchWorkspaceTree,
@@ -173,6 +176,9 @@ const confirmCreateWorkspaceButton = document.querySelector("#confirmCreateWorks
 const workspacePickerDialog = document.querySelector("#workspacePickerDialog");
 const workspacePickerTree = document.querySelector("#workspacePickerTree");
 const workspacePickerPath = document.querySelector("#workspacePickerPath");
+const workspacePickerTitle = document.querySelector("#workspacePickerTitle");
+const closeWorkspacePickerButton = document.querySelector("#closeWorkspacePickerButton");
+const cancelWorkspacePickerButton = document.querySelector("#cancelWorkspacePickerButton");
 const parentWorkspacePickerButton = document.querySelector("#parentWorkspacePickerButton");
 const confirmWorkspacePickerButton = document.querySelector("#confirmWorkspacePickerButton");
 const fileEditorDialog = document.querySelector("#fileEditorDialog");
@@ -186,6 +192,7 @@ const fileEditorStatus = document.querySelector("#fileEditorStatus");
 
 let socketService;
 let runActive = false;
+let creatingConversation = false;
 let activeSessionId = null;
 let pendingSessionId = null;
 let promptHistoryIndex = null;
@@ -199,6 +206,8 @@ let pendingWorkspacePath = null;
 let workspacePickerRoot = null;
 let workspacePickerParent = null;
 let pendingWorkspaceParent = null;
+let selectingDefaultWorkspace = false;
+let openProvidersAfterWorkspaceSelection = false;
 let previewingFilePath = null;
 let editingMcpBlock = null;
 
@@ -1165,10 +1174,60 @@ async function loadWorkspacePickerRoot(rootPath) {
   chooseWorkspacePickerPath(workspacePickerRoot);
 }
 
+function setWorkspacePickerMode({ chooseDefault = false } = {}) {
+  selectingDefaultWorkspace = chooseDefault;
+  workspacePickerTitle.textContent = chooseDefault ? "Choose default workspace" : "Select workspace folder";
+  closeWorkspacePickerButton.hidden = chooseDefault;
+  cancelWorkspacePickerButton.hidden = chooseDefault;
+  confirmWorkspacePickerButton.disabled = false;
+  confirmWorkspacePickerButton.textContent = chooseDefault ? "Set default workspace" : "Select folder";
+}
+
 async function openWorkspacePicker() {
   if (!workspaceBrowserRoot) return;
+  setWorkspacePickerMode();
   workspacePickerDialog.showModal();
   try { await loadWorkspacePickerRoot(workspaceBrowserRoot); } catch (error) { workspacePickerPath.textContent = error.message; }
+}
+
+async function openDefaultWorkspacePicker() {
+  setWorkspacePickerMode({ chooseDefault: true });
+  workspacePickerDialog.showModal();
+  try {
+    await loadWorkspacePickerRoot(workspaceBrowserRoot || defaultWorkspace);
+  } catch (error) {
+    workspacePickerPath.textContent = error.message;
+  }
+}
+
+async function selectWorkspace(path) {
+  const isDefaultSelection = selectingDefaultWorkspace;
+  if (isDefaultSelection) {
+    confirmWorkspacePickerButton.disabled = true;
+    workspacePickerPath.textContent = "Creating conversation workspaces…";
+    try {
+      await provisionConversationWorkspaces(path);
+      defaultWorkspace = saveDefaultWorkspace(path);
+    } catch (error) {
+      workspacePickerPath.textContent = error.message;
+      confirmWorkspacePickerButton.disabled = false;
+      return;
+    }
+  }
+  workspaceInput.value = isDefaultSelection ? activeSession()?.workspace || path : path;
+  selectingDefaultWorkspace = false;
+  if (workspacePickerDialog.open) workspacePickerDialog.close();
+  setWorkspacePickerMode();
+  if (!isDefaultSelection) saveActiveWorkspace();
+  if (isDefaultSelection) {
+    renderWorkspace();
+    loadWorkspaceTree();
+    addEvent("Default workspace selected", path);
+  }
+  if (openProvidersAfterWorkspaceSelection) {
+    openProvidersAfterWorkspaceSelection = false;
+    openProvidersModal();
+  }
 }
 
 function openCreateWorkspaceDialog() {
@@ -1196,10 +1255,8 @@ async function createAndSelectWorkspace() {
   createWorkspaceStatus.textContent = "Creating folder…";
   try {
     const result = await createWorkspaceFolder(parent, name);
-    workspaceInput.value = result.path;
     createWorkspaceDialog.close();
-    if (workspacePickerDialog.open) workspacePickerDialog.close();
-    saveActiveWorkspace();
+    await selectWorkspace(result.path);
     addEvent("Workspace created", result.path);
   } catch (error) {
     createWorkspaceStatus.textContent = error.message;
@@ -1216,6 +1273,38 @@ function saveSessions() {
 
 function activeSession() {
   return sessions.find((session) => session.id === activeSessionId);
+}
+
+function applyConversationWorkspace(session, result) {
+  const changed = session.workspace !== result.path || session.managedWorkspaceRoot !== result.root;
+  session.workspace = result.path;
+  session.managedWorkspaceRoot = result.root;
+  if (changed) session.updatedAt = Date.now();
+  return changed;
+}
+
+async function createManagedSession(title, root = defaultWorkspace) {
+  const session = createSession(title, root);
+  const result = await createConversationWorkspace(root, session.id);
+  applyConversationWorkspace(session, result);
+  return session;
+}
+
+async function provisionConversationWorkspaces(root = defaultWorkspace) {
+  const provisioned = await Promise.all(sessions.map(async (session) => ({
+    session,
+    result: await createConversationWorkspace(session.managedWorkspaceRoot || root, session.id),
+  })));
+  let changed = false;
+  for (const { session, result } of provisioned) {
+    changed = applyConversationWorkspace(session, result) || changed;
+  }
+  if (changed) await saveSessions();
+}
+
+async function removeConversationWorkspace(session) {
+  if (!session?.managedWorkspaceRoot) return;
+  await deleteConversationWorkspace(session.managedWorkspaceRoot, session.id);
 }
 
 function renderWorkspace() {
@@ -1621,40 +1710,62 @@ function renderRecents() {
     deleteButton.title = `Delete ${session.title || "conversation"}`;
     deleteButton.setAttribute("aria-label", `Delete ${session.title || "conversation"}`);
     deleteButton.textContent = "×";
-    deleteButton.addEventListener("click", () => {
+    deleteButton.addEventListener("click", async () => {
       if (runActive && session.id === activeSessionId) return;
-      if (!window.confirm(`Delete conversation “${session.title || "New chat"}”?`)) return;
-      const deletingActive = session.id === activeSessionId;
-      sessions = sessions.filter((candidate) => candidate.id !== session.id);
-      if (sessions.length === 0) sessions = [createSession("AI Harness Session", defaultWorkspace)];
-      if (deletingActive) activeSessionId = sessions[0].id;
-      localStorage.setItem(ACTIVE_SESSION_STORAGE_KEY, activeSessionId);
-      persistUiState({ sessions });
-      send({ type: "reset", sessionId: session.id });
-      renderRecents();
-      renderMessages();
-      renderEvents();
-      renderWorkspace();
-      loadWorkspaceTree();
+      if (!window.confirm(`Delete conversation “${session.title || "New chat"}” and all files in its workspace? This cannot be undone.`)) return;
+      deleteButton.disabled = true;
+      let replacement = null;
+      try {
+        if (sessions.length === 1) replacement = await createManagedSession("AI Harness Session");
+        try {
+          await removeConversationWorkspace(session);
+        } catch (error) {
+          if (replacement) await removeConversationWorkspace(replacement).catch(() => {});
+          throw error;
+        }
+        const deletingActive = session.id === activeSessionId;
+        sessions = sessions.filter((candidate) => candidate.id !== session.id);
+        if (replacement) sessions = [replacement];
+        if (deletingActive) activeSessionId = sessions[0]?.id || null;
+        if (activeSessionId) localStorage.setItem(ACTIVE_SESSION_STORAGE_KEY, activeSessionId);
+        else localStorage.removeItem(ACTIVE_SESSION_STORAGE_KEY);
+        await persistUiState({ sessions });
+        send({ type: "reset", sessionId: session.id });
+        renderRecents();
+        renderMessages();
+        renderEvents();
+        renderWorkspace();
+        loadWorkspaceTree();
+      } catch (error) {
+        deleteButton.disabled = false;
+        addEvent("Conversation deletion failed", error.message, { persist: false });
+      }
     });
     row.append(button, deleteButton);
     recentsList.append(row);
   }
 }
 
-function startNewChat() {
-  if (runActive) return;
-  const session = createSession("New chat", defaultWorkspace);
-  sessions = [session, ...sessions];
-  activeSessionId = session.id;
-  localStorage.setItem(ACTIVE_SESSION_STORAGE_KEY, activeSessionId);
-  persistUiState({ sessions });
-  renderRecents();
-  renderMessages();
-  renderWorkspace();
-  renderEvents();
-  loadWorkspaceTree();
-  addEvent("New chat started");
+async function startNewChat() {
+  if (runActive || creatingConversation) return;
+  creatingConversation = true;
+  try {
+    const session = await createManagedSession("New chat");
+    sessions = [session, ...sessions];
+    activeSessionId = session.id;
+    localStorage.setItem(ACTIVE_SESSION_STORAGE_KEY, activeSessionId);
+    await persistUiState({ sessions });
+    renderRecents();
+    renderMessages();
+    renderWorkspace();
+    renderEvents();
+    loadWorkspaceTree();
+    addEvent("New chat started");
+  } catch (error) {
+    addEvent("Unable to create conversation", error.message, { persist: false });
+  } finally {
+    creatingConversation = false;
+  }
 }
 
 function renderEvent({ title, detail, timestamp }) {
@@ -2162,7 +2273,7 @@ async function saveTool() {
 async function loadHealth() {
   try {
     const health = await fetchHealth();
-    defaultWorkspace = health.workspace || ".";
+    defaultWorkspace = loadDefaultWorkspace() || health.workspace || ".";
     let changed = false;
     for (const session of sessions) {
       if (!session.workspace || session.workspace === ".") {
@@ -2354,9 +2465,10 @@ workspacePickerModal.addEventListener("workspace-picker-parent", async () => {
 });
 workspacePickerModal.addEventListener("workspace-picker-confirm", () => {
   if (!pendingWorkspacePath) return;
-  workspaceInput.value = pendingWorkspacePath;
-  workspacePickerDialog.close();
-  saveActiveWorkspace();
+  selectWorkspace(pendingWorkspacePath);
+});
+workspacePickerDialog.addEventListener("cancel", (event) => {
+  if (selectingDefaultWorkspace) event.preventDefault();
 });
 window.addEventListener("resize", () => {
   setStreamWidth(streamWidth);
@@ -2472,6 +2584,9 @@ streamComponent.addEventListener("clear-stream", () => {
 async function initialize() {
   let state = {};
   let shouldOpenProvidersModal = false;
+  const storedDefaultWorkspace = loadDefaultWorkspace();
+  const needsDefaultWorkspace = !storedDefaultWorkspace;
+  if (storedDefaultWorkspace) defaultWorkspace = storedDefaultWorkspace;
   try {
     state = await loadUiState();
     sessions = Array.isArray(state.sessions) && state.sessions.length > 0
@@ -2515,9 +2630,22 @@ async function initialize() {
   renderEvents();
   renderWorkspace();
   resizePromptInput();
-  if (shouldOpenProvidersModal) openProvidersModal();
   await loadHealth();
+  if (!needsDefaultWorkspace) {
+    try {
+      await provisionConversationWorkspaces(defaultWorkspace);
+      renderWorkspace();
+    } catch (error) {
+      addEvent("Conversation workspace setup failed", error.message, { persist: false });
+    }
+  }
   await loadWorkspaceTree();
+  if (needsDefaultWorkspace) {
+    openProvidersAfterWorkspaceSelection = shouldOpenProvidersModal;
+    await openDefaultWorkspacePicker();
+  } else if (shouldOpenProvidersModal) {
+    openProvidersModal();
+  }
   connect();
 }
 

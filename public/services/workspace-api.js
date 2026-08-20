@@ -64,6 +64,22 @@ function createWorkspaceFolder(parent, name) {
   );
 }
 
+function createConversationWorkspace(root, sessionId) {
+  return requestJson(
+    "/api/conversation-workspace",
+    jsonOptions("POST", { root, sessionId }),
+    "Unable to create the conversation workspace.",
+  );
+}
+
+function deleteConversationWorkspace(root, sessionId) {
+  return requestJson(
+    "/api/conversation-workspace",
+    jsonOptions("DELETE", { root, sessionId }),
+    "Unable to delete the conversation workspace.",
+  );
+}
+
 async function loadWorkspaceFile(workspace, path) {
   const payload = await requestJson(
     `/api/workspace-file?workspace=${encodeURIComponent(workspace)}&path=${encodeURIComponent(path)}`,
@@ -74,7 +90,9 @@ async function loadWorkspaceFile(workspace, path) {
 }
 
 export {
+  createConversationWorkspace,
   createWorkspaceFolder,
+  deleteConversationWorkspace,
   isWorkspaceImagePath,
   loadWorkspaceFile,
   loadWorkspaceTree,
