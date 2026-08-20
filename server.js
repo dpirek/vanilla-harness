@@ -452,12 +452,13 @@ async function handleWorkspaceRecordingApi(req, res) {
     const body = JSON.parse(await readRequestBody(req, 34_000_000) || "{}");
     const formats = new Map([
       ["audio/webm", "webm"],
-      ["audio/webm;codecs=opus", "webm"],
       ["audio/ogg", "ogg"],
-      ["audio/ogg;codecs=opus", "ogg"],
       ["audio/mp4", "m4a"],
     ]);
-    const extension = formats.get(body.mimeType);
+    const normalizedMimeType = typeof body.mimeType === "string"
+      ? body.mimeType.toLowerCase().split(";", 1)[0].trim()
+      : "";
+    const extension = formats.get(normalizedMimeType);
     if (!extension || typeof body.data !== "string") throw new Error("Unsupported microphone recording format.");
     if (!/^[A-Za-z0-9+/]*={0,2}$/.test(body.data)) throw new Error("Invalid recording data.");
     const recording = Buffer.from(body.data, "base64");

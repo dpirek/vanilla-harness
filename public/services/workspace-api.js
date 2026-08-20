@@ -80,6 +80,22 @@ function deleteConversationWorkspace(root, sessionId) {
   );
 }
 
+function saveWorkspaceRecording(workspace, mimeType, data) {
+  return requestJson(
+    "/api/workspace-recording",
+    jsonOptions("POST", { workspace, mimeType, data }),
+    "Unable to save the microphone recording.",
+  );
+}
+
+function transcribeWorkspaceRecording(workspace, path) {
+  return requestJson(
+    "/api/workspace-transcription",
+    jsonOptions("POST", { workspace, path }),
+    "Unable to transcribe the microphone recording.",
+  );
+}
+
 async function loadWorkspaceFile(workspace, path) {
   const payload = await requestJson(
     `/api/workspace-file?workspace=${encodeURIComponent(workspace)}&path=${encodeURIComponent(path)}`,
@@ -97,5 +113,7 @@ export {
   loadWorkspaceFile,
   loadWorkspaceTree,
   resolveWorkspaceMarkdownLink,
+  saveWorkspaceRecording,
+  transcribeWorkspaceRecording,
   workspaceFileAssetUrl,
 };

@@ -95,6 +95,35 @@ export function newWorkspaceIcon(className = "workspaceExplorerIcon") {
   return svg;
 }
 
+export function microphoneIcon(className = "microphoneIcon") {
+  const svg = createSvgNode("svg", {
+    class: className,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    "aria-hidden": "true",
+    focusable: "false",
+  });
+
+  svg.append(
+    createSvgNode("rect", {
+      x: "8.25",
+      y: "2.75",
+      width: "7.5",
+      height: "12",
+      rx: "3.75",
+      stroke: "currentColor",
+      "stroke-width": "1.8",
+    }),
+    createSvgNode("path", {
+      d: "M5.75 11.5v.75a6.25 6.25 0 0 0 12.5 0v-.75M12 18.5v2.75M8.75 21.25h6.5",
+      stroke: "currentColor",
+      "stroke-width": "1.8",
+      "stroke-linecap": "round",
+    }),
+  );
+  return svg;
+}
+
 export function panelIcon(className = "dmfuUa_panelIcon") {
   const svg = createSvgNode("svg", {
     width: "16",

@@ -1017,7 +1017,7 @@ code {
 
 .composer {
   display: grid;
-  grid-template-columns: 40px minmax(0, 1fr) 44px;
+  grid-template-columns: 40px minmax(0, 1fr) 36px 44px;
   align-items: center;
   gap: 10px;
   width: min(var(--chat-content-width), 100%);
@@ -1116,6 +1116,31 @@ textarea:disabled {
   color: #171717;
   font-size: 1.4rem;
   font-weight: 900;
+}
+
+.microphoneButton .microphoneIcon {
+  width: 21px;
+  height: 21px;
+}
+
+.microphoneButton[data-state="recording"] {
+  background: #a93636;
+  color: #fff;
+  animation: microphonePulse 1.4s ease-in-out infinite;
+}
+
+.microphoneButton[data-state="transcribing"],
+.microphoneButton[data-state="requesting"] {
+  color: var(--muted);
+  cursor: wait;
+}
+
+.microphoneButton:disabled {
+  opacity: .55;
+}
+
+@keyframes microphonePulse {
+  50% { box-shadow: 0 0 0 5px rgba(169, 54, 54, .18); }
 }
 
 .resetFab {
@@ -2747,7 +2772,7 @@ textarea,
   }
 
   .composer {
-    grid-template-columns: 38px minmax(0, 1fr) 42px;
+    grid-template-columns: 38px minmax(0, 1fr) 36px 42px;
     min-height: 64px;
     padding-left: 18px;
   }

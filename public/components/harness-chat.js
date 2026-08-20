@@ -1,5 +1,5 @@
 import BaseComponent from "./base-component.js";
-import { workspaceExplorerIcon } from "../lib/icons.js";
+import { microphoneIcon, workspaceExplorerIcon } from "../lib/icons.js";
 
 class HarnessChat extends BaseComponent {
   connectedCallback() {
@@ -28,6 +28,15 @@ class HarnessChat extends BaseComponent {
         "Ask AI Harness", 
         "required": "" 
       }), 
+      this.createElement("button", {
+        "id": "microphoneButton",
+        "class": "composerIcon microphoneButton",
+        "type": "button",
+        "aria-label": "Start voice input",
+        "aria-pressed": "false",
+        "title": "Start voice input",
+        children: [microphoneIcon()],
+      }),
       this.createElement("button", { "id": "sendButton", "class": "sendButton", "type": "submit", "aria-label": "Send", children: [document.createTextNode("↑")] })] })] }),
       this.createElement("button", { "id": "resetButton", "class": "resetFab", "type": "button", children: [document.createTextNode("Reset")] })
     ]);
@@ -36,6 +45,7 @@ class HarnessChat extends BaseComponent {
     const imageInput = this.querySelector("#imageInput");
     form.addEventListener("submit", (event) => { event.preventDefault(); this.emit("submit-prompt"); });
     this.querySelector("#addImageButton").addEventListener("click", () => imageInput.click());
+    this.querySelector("#microphoneButton").addEventListener("click", () => this.emit("toggle-microphone"));
     imageInput.addEventListener("change", () => {
       this.emit("images-selected", { files: Array.from(imageInput.files || []) });
       imageInput.value = "";

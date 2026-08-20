@@ -31,6 +31,8 @@ import {
   loadWorkspaceFile,
   loadWorkspaceTree as fetchWorkspaceTree,
   resolveWorkspaceMarkdownLink,
+  saveWorkspaceRecording,
+  transcribeWorkspaceRecording,
   workspaceFileAssetUrl,
 } from "./services/workspace-api.js";
 import {
@@ -70,6 +72,7 @@ const messages = document.querySelector("#messages");
 const eventList = document.querySelector("#eventList");
 const promptInput = document.querySelector("#promptInput");
 const sendButton = document.querySelector("#sendButton");
+const microphoneButton = document.querySelector("#microphoneButton");
 const imagePreviewList = document.querySelector("#imagePreviewList");
 const emptyState = document.querySelector("#emptyState");
 const recentsList = document.querySelector("#recentsList");
@@ -199,6 +202,9 @@ let promptHistoryIndex = null;
 let promptHistoryDraft = "";
 let streamingAnswer = null;
 let attachedImages = [];
+let microphoneState = "idle";
+let microphoneRecorder = null;
+let microphoneStream = null;
 let defaultWorkspace = ".";
 let workspaceBrowserRoot = null;
 let workspaceBrowserNodes = [];
@@ -1344,6 +1350,105 @@ function setPromptInput(value) {
   promptInput.setSelectionRange(promptInput.value.length, promptInput.value.length);
 }
 
+function setMicrophoneState(state) {
+  const labels = {
+    idle: "Start voice input",
+    requesting: "Requesting microphone access…",
+    recording: "Stop voice input",
+    transcribing: "Transcribing voice input…",
+  };
+  microphoneState = state;
+  microphoneButton.dataset.state = state;
+  microphoneButton.title = labels[state];
+  microphoneButton.setAttribute("aria-label", labels[state]);
+  microphoneButton.setAttribute("aria-pressed", String(state === "recording"));
+  microphoneButton.disabled = runActive || state === "requesting" || state === "transcribing";
+  sendButton.disabled = runActive || state !== "idle" || !socketService?.isOpen;
+}
+
+function releaseMicrophone() {
+  microphoneStream?.getTracks().forEach((track) => track.stop());
+  microphoneStream = null;
+}
+
+function preferredMicrophoneMimeType() {
+  if (typeof MediaRecorder?.isTypeSupported !== "function") return "";
+  return ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"]
+    .find((type) => MediaRecorder.isTypeSupported(type)) || "";
+}
+
+async function transcribeMicrophoneBlob(recording, workspace) {
+  const dataUrl = await readFileAsDataUrl(recording);
+  const separator = dataUrl.indexOf(",");
+  if (separator < 0) throw new Error("Unable to read the microphone recording.");
+  const saved = await saveWorkspaceRecording(workspace, recording.type, dataUrl.slice(separator + 1));
+  const result = await transcribeWorkspaceRecording(workspace, saved.relativePath);
+  const current = promptInput.value.trimEnd();
+  setPromptInput(current ? `${current} ${result.text}` : result.text);
+  resetPromptHistoryCursor();
+  addEvent("Voice input transcribed", { model: result.model, recording: saved.relativePath });
+  loadWorkspaceTree();
+}
+
+async function startMicrophoneRecording() {
+  if (runActive || microphoneState !== "idle") return;
+  if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+    addEvent("Microphone unavailable", "This browser does not support audio recording.", { persist: false });
+    return;
+  }
+
+  setMicrophoneState("requesting");
+  try {
+    const workspace = activeSession()?.workspace || defaultWorkspace;
+    microphoneStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const mimeType = preferredMicrophoneMimeType();
+    const recorder = mimeType
+      ? new MediaRecorder(microphoneStream, { mimeType })
+      : new MediaRecorder(microphoneStream);
+    const chunks = [];
+    let recorderError = null;
+    microphoneRecorder = recorder;
+    recorder.addEventListener("dataavailable", (event) => {
+      if (event.data.size > 0) chunks.push(event.data);
+    });
+    recorder.addEventListener("error", (event) => {
+      recorderError = event.error || new Error("Microphone recording failed.");
+    });
+    recorder.addEventListener("stop", async () => {
+      releaseMicrophone();
+      if (microphoneRecorder === recorder) microphoneRecorder = null;
+      setMicrophoneState("transcribing");
+      try {
+        if (recorderError) throw recorderError;
+        const recording = new Blob(chunks, { type: recorder.mimeType || mimeType });
+        if (!recording.size) throw new Error("The microphone recording is empty.");
+        await transcribeMicrophoneBlob(recording, workspace);
+      } catch (error) {
+        addEvent("Voice input failed", error.message, { persist: false });
+      } finally {
+        setMicrophoneState("idle");
+        promptInput.focus();
+      }
+    }, { once: true });
+    recorder.start();
+    setMicrophoneState("recording");
+  } catch (error) {
+    microphoneRecorder = null;
+    releaseMicrophone();
+    setMicrophoneState("idle");
+    addEvent("Microphone unavailable", error.message, { persist: false });
+  }
+}
+
+function toggleMicrophone() {
+  if (microphoneState === "recording" && microphoneRecorder?.state === "recording") {
+    setMicrophoneState("transcribing");
+    microphoneRecorder.stop();
+    return;
+  }
+  startMicrophoneRecording();
+}
+
 function navigatePromptHistory(direction) {
   const history = promptHistory();
   if (history.length === 0) return false;
@@ -1420,7 +1525,8 @@ function setState(label, className) {
 
 function setBusy(value) {
   runActive = value;
-  sendButton.disabled = value || !socketService?.isOpen;
+  sendButton.disabled = value || microphoneState !== "idle" || !socketService?.isOpen;
+  microphoneButton.disabled = value || microphoneState === "requesting" || microphoneState === "transcribing";
   promptInput.disabled = value;
   workspaceInput.disabled = value;
   renderSessionActivity();
@@ -1694,7 +1800,7 @@ function renderRecents() {
     label.textContent = session.title || "New chat";
     button.append(label);
     button.addEventListener("click", () => {
-      if (runActive || session.id === activeSessionId) return;
+      if (runActive || microphoneState !== "idle" || session.id === activeSessionId) return;
       activeSessionId = session.id;
       localStorage.setItem(ACTIVE_SESSION_STORAGE_KEY, activeSessionId);
       renderRecents();
@@ -1711,7 +1817,7 @@ function renderRecents() {
     deleteButton.setAttribute("aria-label", `Delete ${session.title || "conversation"}`);
     deleteButton.textContent = "×";
     deleteButton.addEventListener("click", async () => {
-      if (runActive && session.id === activeSessionId) return;
+      if (microphoneState !== "idle" || (runActive && session.id === activeSessionId)) return;
       if (!window.confirm(`Delete conversation “${session.title || "New chat"}” and all files in its workspace? This cannot be undone.`)) return;
       deleteButton.disabled = true;
       let replacement = null;
@@ -1747,7 +1853,7 @@ function renderRecents() {
 }
 
 async function startNewChat() {
-  if (runActive || creatingConversation) return;
+  if (runActive || microphoneState !== "idle" || creatingConversation) return;
   creatingConversation = true;
   try {
     const session = await createManagedSession("New chat");
@@ -2436,6 +2542,7 @@ workspaceComponent.addEventListener("choose-workspace", openWorkspacePicker);
 workspacePickerModal.addEventListener("create-workspace", openCreateWorkspaceDialog);
 createWorkspaceModal.addEventListener("create-workspace-confirm", createAndSelectWorkspace);
 chatComponent.addEventListener("images-selected", async (event) => addImages(event.detail.files));
+chatComponent.addEventListener("toggle-microphone", toggleMicrophone);
 chatComponent.addEventListener("prompt-edited", resetPromptHistoryCursor);
 chatComponent.addEventListener("navigate-prompt-history", (event) => navigatePromptHistory(event.detail.direction));
 chatComponent.addEventListener("toggle-column", (event) => toggleRightColumn(event.detail.column));
