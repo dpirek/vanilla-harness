@@ -30,6 +30,75 @@ function formatTokenCount(value = 0) {
   return Math.max(0, Math.round(Number(value) || 0)).toLocaleString("en-US");
 }
 
+function printableValue(value) {
+  if (typeof value === "string") return value.trim();
+  if (value === undefined || value === null) return "";
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+}
+
+function formatModelTurnInput(inputPrompt) {
+  if (!inputPrompt || typeof inputPrompt !== "object") return "Input prompt unavailable.";
+  const sections = [];
+  if (typeof inputPrompt.instructions === "string" && inputPrompt.instructions.trim()) {
+    sections.push(`Instructions\n${inputPrompt.instructions.trim()}`);
+  }
+  for (const item of Array.isArray(inputPrompt.input) ? inputPrompt.input : []) {
+    if (item?.role) {
+      const content = (Array.isArray(item.content) ? item.content : [])
+        .map((part) => {
+          if (typeof part?.text === "string") return part.text.trim();
+          if (part?.type === "input_image") return "[Image input]";
+          return printableValue(part);
+        })
+        .filter(Boolean)
+        .join("\n\n");
+      if (content) sections.push(`${String(item.role).replace(/^./, (letter) => letter.toUpperCase())}\n${content}`);
+      continue;
+    }
+    if (item?.type === "function_call_output") {
+      const callId = item.call_id ? ` · ${item.call_id}` : "";
+      sections.push(`Tool output${callId}\n${printableValue(item.output) || "(empty output)"}`);
+      continue;
+    }
+    const value = printableValue(item);
+    if (value) sections.push(value);
+  }
+  return sections.join("\n\n") || printableValue(inputPrompt) || "Input prompt unavailable.";
+}
+
+function formatModelTurnOutput(serverResponse) {
+  if (!serverResponse || typeof serverResponse !== "object") return "Model output unavailable.";
+  if (typeof serverResponse.output_text === "string" && serverResponse.output_text.trim()) {
+    return serverResponse.output_text.trim();
+  }
+  const sections = [];
+  for (const item of Array.isArray(serverResponse.output) ? serverResponse.output : []) {
+    if (item?.type === "message") {
+      const text = (Array.isArray(item.content) ? item.content : [])
+        .map((part) => typeof part?.text === "string" ? part.text.trim() : "")
+        .filter(Boolean)
+        .join("\n\n");
+      if (text) sections.push(text);
+      continue;
+    }
+    if (item?.type === "function_call") {
+      sections.push(`Tool call · ${item.name || "unknown"}\n${printableValue(item.arguments) || "{}"}`);
+      continue;
+    }
+    if (item?.type === "mcp_call") {
+      sections.push(`MCP call · ${item.server_label || "unknown"}.${item.name || item.tool || "unknown"}`);
+      continue;
+    }
+    const value = printableValue(item);
+    if (value) sections.push(value);
+  }
+  return sections.join("\n\n") || "No output text was returned for this turn.";
+}
+
 function sessionActivities(events = [], now = Date.now()) {
   const items = [];
   let sequence = 0;
@@ -60,6 +129,17 @@ function sessionActivities(events = [], now = Date.now()) {
     if (item) item.usage = normalizeTokenUsage(usage);
     return item;
   };
+  const setDetails = (item, sections = []) => {
+    if (!item) return item;
+    item.details = sections
+      .map((section) => ({
+        title: String(section.title || "Details"),
+        text: printableValue(section.text),
+        meta: section.meta ? String(section.meta) : "",
+      }))
+      .filter((section) => section.text);
+    return item;
+  };
   const finish = (predicate, event, status = "completed", label) => {
     const item = findRunning(predicate);
     if (!item) return null;
@@ -83,28 +163,61 @@ function sessionActivities(events = [], now = Date.now()) {
     const type = detail.type;
 
     if (event.title === "Prompt sent") {
-      add("Send prompt", "running", event, "prompt");
+      setDetails(add("Send prompt", "running", event, "prompt"), [
+        { title: "Prompt", text: event.detail },
+      ]);
     } else if (type === "composer_start") {
       finish((item) => item.key === "prompt", event);
-      add("Refine the prompt", "running", event, "composer");
+      setDetails(add("Refine the prompt", "running", event, "composer"), [
+        { title: "Original prompt", text: detail.prompt },
+        { title: "Model", text: detail.model },
+      ]);
     } else if (type === "composer_complete") {
-      setUsage(
+      setDetails(setUsage(
         finish((item) => item.key === "composer", event, "completed", "Prompt refined"),
         detail.usage,
-      );
+      ), [
+        { title: "Original prompt", text: detail.originalPrompt },
+        { title: "Refined prompt", text: detail.refinedPrompt },
+        { title: "Model", text: detail.model },
+      ]);
     } else if (type === "start") {
       finish((item) => item.key === "prompt", event);
       finish((item) => item.key === "composer", event);
-      add("Start agent run", "completed", event, "run");
+      setDetails(add("Start agent run", "completed", event, "run"), [
+        { title: "Agent prompt", text: detail.prompt },
+        { title: "Images", text: detail.images ? `${detail.images} attached` : "" },
+      ]);
     } else if (type === "turn_start") {
       add(`Model turn ${detail.turn}`, "running", event, `turn:${detail.turn}`);
     } else if (type === "turn") {
-      setUsage(
-        finish((item) => item.key === `turn:${detail.turn}`, event),
+      const item = setUsage(
+        finish((candidate) => candidate.key === `turn:${detail.turn}`, event),
         detail.serverResponse?.usage || detail.usage,
       );
+      if (item) {
+        item.modelTurn = {
+          input: formatModelTurnInput(detail.inputPrompt),
+          output: formatModelTurnOutput(detail.serverResponse),
+        };
+        setDetails(item, [
+          {
+            title: "Input prompt",
+            text: item.modelTurn.input,
+            meta: item.usage ? `${formatTokenCount(item.usage.inputTokens)} tokens` : "Tokens unavailable",
+          },
+          {
+            title: "Model output",
+            text: item.modelTurn.output,
+            meta: item.usage ? `${formatTokenCount(item.usage.outputTokens)} tokens` : "Tokens unavailable",
+          },
+        ]);
+      }
     } else if (type === "tool_start") {
       const item = add(`Run ${humanizeToolName(detail.name)}`, "running", event, `tool:${detail.name}`);
+      setDetails(item, [
+        { title: "Arguments", text: detail.args },
+      ]);
       if (detail.name === "run_command") item.command = String(detail.args?.command || "");
     } else if (type === "tool_result") {
       const failed = detail.output?.ok === false;
@@ -115,24 +228,41 @@ function sessionActivities(events = [], now = Date.now()) {
         failed ? "failed" : "completed",
         label,
       ) || add(label, failed ? "failed" : "completed", event, `tool:${detail.name}`);
+      const priorArguments = item.details?.find((section) => section.title === "Arguments")?.text;
+      setDetails(item, [
+        { title: "Arguments", text: priorArguments || detail.args },
+        { title: "Response", text: detail.output },
+      ]);
       if (detail.name === "run_command") {
         item.command ||= String(detail.args?.command || "");
         item.response = detail.output;
       }
     } else if (type === "tool_blocked") {
-      add(`${humanizeToolName(detail.name)} blocked`, "failed", event, `tool:${detail.name}`);
+      setDetails(add(`${humanizeToolName(detail.name)} blocked`, "failed", event, `tool:${detail.name}`), [
+        { title: "Arguments", text: detail.args },
+      ]);
     } else if (type === "mcp_call") {
-      add(`Call ${detail.server}.${detail.name}`, "completed", event, `mcp:${detail.server}:${detail.name}`);
+      setDetails(add(`Call ${detail.server}.${detail.name}`, "completed", event, `mcp:${detail.server}:${detail.name}`), [
+        { title: "Server", text: detail.server },
+        { title: "Tool", text: detail.name },
+      ]);
     } else if (type === "validation" && ["pending", "required"].includes(detail.status)) {
       const paths = Array.isArray(detail.paths) && detail.paths.length ? ` · ${detail.paths.join(", ")}` : "";
       if (!findRunning((item) => item.key === "validation")) {
-        add(`Validate workspace changes${paths}`, "running", event, "validation");
+        setDetails(add(`Validate workspace changes${paths}`, "running", event, "validation"), [
+          { title: "Changed paths", text: detail.paths },
+          { title: "Validation tool", text: detail.tool },
+        ]);
       }
     } else if (type === "validation" && ["passed", "failed"].includes(detail.status)) {
       const status = detail.status === "passed" ? "completed" : "failed";
-      if (!finish((item) => item.key === "validation", event, status, `Validation ${detail.status}`)) {
-        add(`Validation ${detail.status}`, status, event, "validation");
-      }
+      const item = finish((candidate) => candidate.key === "validation", event, status, `Validation ${detail.status}`)
+        || add(`Validation ${detail.status}`, status, event, "validation");
+      setDetails(item, [
+        { title: "Changed paths", text: detail.paths },
+        { title: "Validation tool", text: detail.tool },
+        { title: "Status", text: detail.status },
+      ]);
     } else if (type === "response_stream") {
       if (!findRunning((item) => item.key === "response")) add("Write response", "running", event, "response");
     } else if (type === "response_complete") {
@@ -178,4 +308,12 @@ function sessionActivityRuns(events = [], now = Date.now()) {
   ).filter((activity) => activity.items.length > 0);
 }
 
-export { formatStepDuration, formatTokenCount, normalizeTokenUsage, sessionActivities, sessionActivityRuns };
+export {
+  formatModelTurnInput,
+  formatModelTurnOutput,
+  formatStepDuration,
+  formatTokenCount,
+  normalizeTokenUsage,
+  sessionActivities,
+  sessionActivityRuns,
+};

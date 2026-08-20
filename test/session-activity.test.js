@@ -50,6 +50,73 @@ test("model steps expose token usage and aggregate totals per prompt", () => {
   assert.deepEqual(activity.usage, { inputTokens: 350, outputTokens: 70, totalTokens: 420 });
 });
 
+test("model turns retain expandable input prompt and output text", () => {
+  const activity = sessionActivities([
+    { detail: { type: "turn_start", turn: 1 }, timestamp: 1 },
+    {
+      detail: {
+        type: "turn",
+        turn: 1,
+        inputPrompt: {
+          instructions: "Inspect the selected workspace.",
+          input: [{ role: "user", content: [{ type: "input_text", text: "Create report.md" }] }],
+        },
+        serverResponse: {
+          output_text: "I will create the report.",
+          usage: { input_tokens: 42, output_tokens: 9 },
+        },
+      },
+      timestamp: 2,
+    },
+  ]);
+
+  const turn = activity.items.find((item) => item.key === "turn:1");
+  assert.deepEqual(turn.usage, { inputTokens: 42, outputTokens: 9, totalTokens: 51 });
+  assert.equal(turn.modelTurn.input, "Instructions\nInspect the selected workspace.\n\nUser\nCreate report.md");
+  assert.equal(turn.modelTurn.output, "I will create the report.");
+  assert.deepEqual(turn.details.map(({ title, meta }) => ({ title, meta })), [
+    { title: "Input prompt", meta: "42 tokens" },
+    { title: "Model output", meta: "9 tokens" },
+  ]);
+});
+
+test("prompt and completed tools expose expandable details", () => {
+  const activity = sessionActivities([
+    { title: "Prompt sent", detail: "Check the endpoint", timestamp: 1 },
+    { detail: { type: "start", prompt: "Check the endpoint" }, timestamp: 2 },
+    { detail: { type: "tool_start", name: "curl", args: { url: "https://example.com" } }, timestamp: 3 },
+    { detail: { type: "tool_result", name: "curl", output: { ok: true, status: 200 } }, timestamp: 4 },
+  ]);
+
+  assert.equal(activity.items.find((item) => item.key === "prompt").details[0].text, "Check the endpoint");
+  const curl = activity.items.find((item) => item.key === "tool:curl");
+  assert.deepEqual(curl.details.map((section) => section.title), ["Arguments", "Response"]);
+  assert.match(curl.details[0].text, /example\.com/);
+  assert.match(curl.details[1].text, /200/);
+});
+
+test("model turn output preserves tool-call text when no prose is returned", () => {
+  const activity = sessionActivities([
+    { detail: { type: "turn_start", turn: 2 }, timestamp: 1 },
+    {
+      detail: {
+        type: "turn",
+        turn: 2,
+        inputPrompt: { input: [{ type: "function_call_output", call_id: "call-1", output: { ok: true } }] },
+        serverResponse: {
+          output: [{ type: "function_call", name: "write_file", arguments: '{"path":"report.md"}' }],
+        },
+      },
+      timestamp: 2,
+    },
+  ]);
+
+  const turn = activity.items.find((item) => item.key === "turn:2");
+  assert.match(turn.modelTurn.input, /Tool output · call-1/);
+  assert.match(turn.modelTurn.output, /Tool call · write_file/);
+  assert.match(turn.modelTurn.output, /report\.md/);
+});
+
 test("streaming responses retain usage reported when the model turn completes", () => {
   const activity = sessionActivities([
     { detail: { type: "turn_start", turn: 1 }, timestamp: 1 },

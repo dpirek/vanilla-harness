@@ -1736,20 +1736,48 @@ function formatCommandResponse(response) {
   return [...metadata, ...sections].join("\n\n");
 }
 
-function createCommandDetails(task) {
-  const details = document.createElement("details");
-  details.className = "sessionCommandDetails";
-  details.open = task.response?.ok === false;
-  const summary = document.createElement("summary");
-  const command = document.createElement("code");
-  command.textContent = `$ ${task.command || "(command unavailable)"}`;
-  const hint = document.createElement("span");
-  hint.textContent = task.response === undefined ? "Running…" : "Command response";
-  summary.append(command, hint);
-  const response = document.createElement("pre");
-  response.textContent = formatCommandResponse(task.response);
-  details.append(summary, response);
-  return details;
+function createStepDetails(task) {
+  const body = document.createElement("div");
+  body.className = "sessionStepDetails";
+  body.hidden = true;
+  for (const section of task.details || []) {
+    const article = document.createElement("section");
+    const heading = document.createElement("h4");
+    const headingLabel = document.createElement("span");
+    headingLabel.textContent = section.title;
+    if (section.meta) {
+      const meta = document.createElement("span");
+      meta.className = "sessionStepDetailMeta";
+      meta.textContent = section.meta;
+      heading.append(headingLabel, meta);
+    } else {
+      heading.append(headingLabel);
+    }
+    const text = document.createElement("pre");
+    text.textContent = task.key === "tool:run_command" && section.title === "Response"
+      ? formatCommandResponse(task.response)
+      : section.text;
+    article.append(heading, text);
+    body.append(article);
+  }
+  return body;
+}
+
+function createStepDetailsButton(task, details, expanded = false) {
+  const button = document.createElement("button");
+  button.className = "sessionTaskExpand";
+  button.type = "button";
+  button.setAttribute("aria-label", `Show details for ${task.label}`);
+  const setExpanded = (open) => {
+    button.textContent = open ? "−" : "+";
+    button.setAttribute("aria-expanded", String(open));
+    button.setAttribute("aria-label", `${open ? "Hide" : "Show"} details for ${task.label}`);
+    details.hidden = !open;
+    details.closest(".sessionTask")?.toggleAttribute("data-details-open", open);
+  };
+  button.addEventListener("click", () => setExpanded(button.getAttribute("aria-expanded") !== "true"));
+  setExpanded(expanded);
+  return button;
 }
 
 function updateSessionActivityCard(card, activity, { active = false } = {}) {
@@ -1770,9 +1798,13 @@ function updateSessionActivityCard(card, activity, { active = false } = {}) {
   count.title = activity.usage
     ? `${formatTokenCount(activity.usage.inputTokens)} input · ${formatTokenCount(activity.usage.outputTokens)} output · ${formatTokenCount(activity.usage.totalTokens)} total tokens`
     : "";
+  const expandedTaskDetails = new Set(
+    [...list.querySelectorAll(".sessionTask[data-details-open]")].map((item) => item.dataset.taskId),
+  );
   list.replaceChildren(...activity.items.map((task) => {
     const item = document.createElement("li");
     item.className = `sessionTask sessionTask-${task.status}`;
+    item.dataset.taskId = task.id;
     const marker = document.createElement("span");
     marker.className = "sessionTaskMarker";
     marker.setAttribute("aria-hidden", "true");
@@ -1798,7 +1830,12 @@ function updateSessionActivityCard(card, activity, { active = false } = {}) {
       duration.dataset.startedAt = String(task.startedAt);
     }
     item.append(marker, content, duration);
-    if (task.key === "tool:run_command") item.append(createCommandDetails(task));
+    if (task.details?.length) {
+      const details = createStepDetails(task);
+      const expanded = expandedTaskDetails.has(task.id) || task.response?.ok === false;
+      item.append(createStepDetailsButton(task, details, expanded), details);
+      item.toggleAttribute("data-details-open", expanded);
+    }
     return item;
   }));
   card.dataset.running = String(isRunning);
