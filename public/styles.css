@@ -482,10 +482,32 @@ code {
   pointer-events: auto;
 }
 
-.columnVisibilityControls { display: flex; gap: 6px; margin-left: auto; }
-.columnVisibilityControls button { display: grid; width: 32px; height: 32px; place-items: center; border: 1px solid var(--line); border-radius: 8px; background: #151515; padding: 0; color: var(--muted); font-size: 1rem; }
-.columnVisibilityControls button:hover, .columnVisibilityControls button[aria-pressed="true"] { background: #242424; color: var(--text); }
+.columnVisibilityControls { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+.columnVisibilityControls > .columnToggleButton,
+.dropdownButtonTrigger { display: grid; height: 32px; place-items: center; border: 1px solid var(--line); border-radius: 8px; background: #151515; padding: 0; color: var(--muted); font-size: 1rem; }
+.columnVisibilityControls > .columnToggleButton { width: 32px; }
+.columnVisibilityControls > .columnToggleButton:hover,
+.columnVisibilityControls > .columnToggleButton[aria-pressed="true"],
+.dropdownButtonTrigger:hover,
+.dropdownButtonTrigger[aria-expanded="true"] { background: #242424; color: var(--text); }
 .workspaceExplorerIcon { display: block; width: 20px; height: 20px; }
+
+dropdown-button { position: relative; display: block; }
+.dropdownButtonTrigger { display: flex; width: auto; max-width: 220px; align-items: center; gap: 8px; padding: 0 10px; font-size: .78rem; font-weight: 700; }
+.dropdownButtonLabel { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dropdownButtonCaret { display: block; width: 12px; height: 12px; flex: 0 0 12px; color: var(--muted); transition: transform 120ms ease; }
+.dropdownButtonTrigger[aria-expanded="true"] .dropdownButtonCaret { transform: rotate(180deg); }
+.dropdownButtonMenu { position: absolute; top: calc(100% + 7px); right: 0; display: grid; width: 248px; gap: 3px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); padding: 6px; box-shadow: 0 16px 38px rgba(0, 0, 0, .38); }
+.dropdownButtonMenu[hidden] { display: none; }
+.dropdownButtonMenu .dropdownButtonOption { display: flex; width: 100%; min-height: 34px; align-items: center; justify-content: space-between; gap: 12px; border: 0; border-radius: 7px; background: transparent; padding: 0 9px; color: var(--text); font-size: .78rem; text-align: left; }
+.dropdownButtonMenu .dropdownButtonOption:hover:not(:disabled),
+.dropdownButtonMenu .dropdownButtonOption:focus-visible,
+.dropdownButtonOption.active { background: var(--selected); }
+.dropdownButtonOptionLabel { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dropdownButtonCheck { width: 14px; flex: 0 0 14px; color: var(--accent); font-weight: 800; text-align: center; }
+.dropdownButtonDivider { height: 1px; margin: 4px 3px; background: var(--line); }
+.dropdownButtonStatus { padding: 9px; color: var(--muted); font-size: .76rem; }
+.dropdownButtonOption.action { color: var(--muted); }
 
 .workspacePicker {
   display: flex;

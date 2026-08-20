@@ -373,8 +373,8 @@ async function handleConversationWorkspaceApi(req, res) {
   try {
     const body = JSON.parse(await readRequestBody(req, 10_000) || "{}");
     const result = req.method === "POST"
-      ? await createConversationWorkspace(body.root, body.sessionId)
-      : await deleteConversationWorkspace(body.root, body.sessionId);
+      ? await createConversationWorkspace(body.root, body.sessionId, body.name)
+      : await deleteConversationWorkspace(body.root, body.sessionId, body.name);
     json(res, req.method === "POST" ? 201 : 200, { ok: true, ...result });
   } catch (error) {
     json(res, 400, { ok: false, error: error.message });

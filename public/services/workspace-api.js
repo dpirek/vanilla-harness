@@ -64,18 +64,18 @@ function createWorkspaceFolder(parent, name) {
   );
 }
 
-function createConversationWorkspace(root, sessionId) {
+function createConversationWorkspace(root, sessionId, name = "") {
   return requestJson(
     "/api/conversation-workspace",
-    jsonOptions("POST", { root, sessionId }),
+    jsonOptions("POST", { root, sessionId, name }),
     "Unable to create the conversation workspace.",
   );
 }
 
-function deleteConversationWorkspace(root, sessionId) {
+function deleteConversationWorkspace(root, sessionId, name = "") {
   return requestJson(
     "/api/conversation-workspace",
-    jsonOptions("DELETE", { root, sessionId }),
+    jsonOptions("DELETE", { root, sessionId, name }),
     "Unable to delete the conversation workspace.",
   );
 }

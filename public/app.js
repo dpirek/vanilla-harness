@@ -166,6 +166,7 @@ const sidebarResizeHandle = document.querySelector("#sidebarResizeHandle");
 const streamResizeHandle = document.querySelector("#streamResizeHandle");
 const toggleFilesColumnButton = document.querySelector("#toggleFilesColumnButton");
 const toggleStreamColumnButton = document.querySelector("#toggleStreamColumnButton");
+const presetDropdown = document.querySelector("#presetDropdown");
 const filesResizeHandle = document.querySelector("#filesResizeHandle");
 const workspaceTreeElement = document.querySelector("#workspaceTree");
 const filesWorkspaceLabel = document.querySelector("#filesWorkspaceLabel");
@@ -866,6 +867,44 @@ function renderPresets() {
   }
 }
 
+function closePresetDropdown({ restoreFocus = false } = {}) {
+  presetDropdown.close({ restoreFocus });
+}
+
+function renderPresetDropdown() {
+  const active = presetConfigurations.find((configuration) => configuration.id === activePresetId);
+  presetDropdown.setLabel(active?.name || "Presets", {
+    title: active ? `Current preset: ${active.name}` : "Select preset",
+  });
+  const items = presetConfigurations.length === 0
+    ? [{ type: "status", label: "No presets available" }]
+    : presetConfigurations.map((configuration) => ({
+      value: configuration.id,
+      label: configuration.name,
+      selected: configuration.id === activePresetId,
+      disabled: presetMutationPending || runActive,
+    }));
+  presetDropdown.setItems([
+    ...items,
+    { type: "separator" },
+    { value: "manage-presets", label: "Manage presets…", action: true },
+  ]);
+}
+
+async function loadPresetSummary() {
+  try {
+    const result = await fetchRigConfigurations();
+    presetConfigurations = Array.isArray(result.configurations) ? result.configurations : [];
+    activePresetId = result.activeConfigurationId
+      || presetConfigurations.find((configuration) => configuration.selected)?.id
+      || null;
+  } catch {
+    presetConfigurations = [];
+    activePresetId = null;
+  }
+  renderPresetDropdown();
+}
+
 async function syncPresetRuntimeState() {
   const [state, config, storedSkills] = await Promise.all([loadUiState(), fetchConfig(), fetchSkills()]);
   providerSettings = { ...defaultProviderSettings(), ...(state.providerSettings || {}) };
@@ -910,6 +949,7 @@ async function savePresetConfigurations(configurations, nextActivePresetId, { sy
   } finally {
     presetMutationPending = false;
     renderPresets();
+    renderPresetDropdown();
   }
 }
 
@@ -929,6 +969,7 @@ async function loadPresets() {
     setPresetsStatus(error.message, "error");
   }
   renderPresets();
+  renderPresetDropdown();
 }
 
 async function activatePreset(configurationId) {
@@ -1282,9 +1323,12 @@ function activeSession() {
 }
 
 function applyConversationWorkspace(session, result) {
-  const changed = session.workspace !== result.path || session.managedWorkspaceRoot !== result.root;
+  const changed = session.workspace !== result.path
+    || session.managedWorkspaceRoot !== result.root
+    || session.managedWorkspaceName !== result.name;
   session.workspace = result.path;
   session.managedWorkspaceRoot = result.root;
+  session.managedWorkspaceName = result.name;
   if (changed) session.updatedAt = Date.now();
   return changed;
 }
@@ -1299,7 +1343,11 @@ async function createManagedSession(title, root = defaultWorkspace) {
 async function provisionConversationWorkspaces(root = defaultWorkspace) {
   const provisioned = await Promise.all(sessions.map(async (session) => ({
     session,
-    result: await createConversationWorkspace(session.managedWorkspaceRoot || root, session.id),
+    result: await createConversationWorkspace(
+      session.managedWorkspaceRoot || root,
+      session.id,
+      session.managedWorkspaceName,
+    ),
   })));
   let changed = false;
   for (const { session, result } of provisioned) {
@@ -1310,7 +1358,7 @@ async function provisionConversationWorkspaces(root = defaultWorkspace) {
 
 async function removeConversationWorkspace(session) {
   if (!session?.managedWorkspaceRoot) return;
-  await deleteConversationWorkspace(session.managedWorkspaceRoot, session.id);
+  await deleteConversationWorkspace(session.managedWorkspaceRoot, session.id, session.managedWorkspaceName);
 }
 
 function renderWorkspace() {
@@ -2548,6 +2596,13 @@ chatComponent.addEventListener("navigate-prompt-history", (event) => navigatePro
 chatComponent.addEventListener("toggle-column", (event) => toggleRightColumn(event.detail.column));
 sidebarComponent.addEventListener("new-chat", startNewChat);
 sidebarComponent.addEventListener("toggle-sidebar", toggleSidebar);
+presetDropdown.addEventListener("dropdown-select", async (event) => {
+  if (event.detail.value === "manage-presets") {
+    await openPresetsModal();
+    return;
+  }
+  if (event.detail.value !== activePresetId) await activatePreset(event.detail.value);
+});
 
 sidebarResizeHandle.addEventListener("column-resize-start", (event) => startSidebarResize(event.detail.sourceEvent));
 sidebarResizeHandle.addEventListener("column-resize-key", (event) => {
@@ -2592,12 +2647,14 @@ function openProvidersModal() {
   if (!settingsDialog.open) settingsDialog.showModal();
 }
 
+async function openPresetsModal() {
+  closePresetDropdown();
+  if (!presetsDialog.open) presetsDialog.showModal();
+  await loadPresets();
+}
+
 sidebarComponent.addEventListener("open-modal", async (event) => {
   if (event.detail.modal === "providers") openProvidersModal();
-  if (event.detail.modal === "presets") {
-    presetsDialog.showModal();
-    await loadPresets();
-  }
   if (event.detail.modal === "system-prompts") {
     systemPromptEditor.hidden = true; systemPromptsList.hidden = false; saveSystemPromptButton.hidden = true;
     systemPromptsDialog.showModal();
@@ -2737,6 +2794,7 @@ async function initialize() {
   renderEvents();
   renderWorkspace();
   resizePromptInput();
+  await loadPresetSummary();
   await loadHealth();
   if (!needsDefaultWorkspace) {
     try {

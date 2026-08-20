@@ -1,45 +1,9 @@
 const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
 
-const SVG_CONFIGS = {
-  presets: {
-    viewBox: "0 0 24 24",
-    nodes: [
-      ["path", {
-        d: "M7 4.5h10a1.5 1.5 0 0 1 1.5 1.5v13l-6.5-3-6.5 3V6A1.5 1.5 0 0 1 7 4.5Z",
-        fill: "none",
-        stroke: "currentColor",
-        "stroke-width": "2",
-        "stroke-linejoin": "round",
-      }],
-      ["path", {
-        d: "M9 9h6M9 12h4",
-        fill: "none",
-        stroke: "currentColor",
-        "stroke-width": "2",
-        "stroke-linecap": "round",
-      }],
-    ],
-  },
-};
-
 function createSvgNode(tag, attrs = {}) {
   const node = document.createElementNS(SVG_NAMESPACE, tag);
   Object.entries(attrs).forEach(([name, value]) => node.setAttribute(name, value));
   return node;
-}
-
-function createConfiguredIcon(name, className) {
-  const config = SVG_CONFIGS[name];
-  if (!config) return null;
-  const svg = createSvgNode("svg", {
-    viewBox: config.viewBox,
-    fill: "none",
-    "aria-hidden": "true",
-    focusable: "false",
-  });
-  if (className) svg.setAttribute("class", className);
-  config.nodes.forEach(([tag, attrs]) => svg.append(createSvgNode(tag, attrs)));
-  return svg;
 }
 
 export function workspaceExplorerIcon(className = "workspaceExplorerIcon") {
@@ -142,8 +106,4 @@ export function panelIcon(className = "dmfuUa_panelIcon") {
     fill: "currentColor",
   }));
   return svg;
-}
-
-export function presetsIcon(className = "header-log-icon") {
-  return createConfiguredIcon("presets", className);
 }
