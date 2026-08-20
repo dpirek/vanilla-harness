@@ -1,5 +1,6 @@
 import BaseComponent from "./base-component.js";
 import { microphoneIcon, workspaceExplorerIcon } from "../lib/icons.js";
+import { shouldSubmitPrompt } from "../lib/prompt-keyboard.js";
 
 class HarnessChat extends BaseComponent {
   connectedCallback() {
@@ -24,6 +25,7 @@ class HarnessChat extends BaseComponent {
         "id": "promptInput", 
         "name": "prompt", 
         "rows": "1", 
+        "enterkeyhint": "send",
         "placeholder": 
         "Ask AI Harness", 
         "required": "" 
@@ -52,7 +54,11 @@ class HarnessChat extends BaseComponent {
     });
     input.addEventListener("input", () => { this.resizeInput(); this.emit("prompt-edited"); });
     input.addEventListener("keydown", (event) => {
-      if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); form.requestSubmit(); return; }
+      if (shouldSubmitPrompt(event)) {
+        event.preventDefault();
+        this.emit("submit-prompt");
+        return;
+      }
       if (!event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey && ["ArrowUp", "ArrowDown"].includes(event.key)) {
         event.preventDefault(); this.emit("navigate-prompt-history", { direction: event.key === "ArrowUp" ? -1 : 1 });
       }
