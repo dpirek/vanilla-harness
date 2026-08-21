@@ -13,7 +13,8 @@ class WorkspacePanel extends BaseComponent {
     this.appendChildren(this, [
       this.createElement("div", { "class": "filesHeader", children: [this.createElement("div", { children: [this.createElement("h2", { children: [document.createTextNode("Workspace")] }), this.createElement("span", { "id": "filesWorkspaceLabel", children: [document.createTextNode("Files")] })] }), this.createElement("div", { "class": "filesHeaderActions", children: [this.createElement("button", { "id": "selectWorkspaceRootButton", "type": "button", "title": "Choose workspace folder", "aria-label": "Choose workspace folder", children: [workspaceExplorerIcon()] }), this.createElement("button", { "id": "refreshFilesButton", "type": "button", "title": "Refresh files", "aria-label": "Refresh files", children: [document.createTextNode("↻")] })] })] }),
       this.createElement("input", { "id": "workspaceInput", "type": "text", "readonly": "", "hidden": "", "aria-label": "Selected workspace directory" }),
-      this.createElement("div", { "id": "workspaceTree", "class": "workspaceTree" })
+      this.createElement("div", { "id": "workspaceTree", "class": "workspaceTree" }),
+      this.createElement("div", { "class": "workspaceDropOverlay", "role": "status", "aria-live": "polite" })
     ]);
     const input = this.querySelector("#workspaceInput");
     input.addEventListener("change", () => this.emit("workspace-change"));
@@ -23,6 +24,41 @@ class WorkspacePanel extends BaseComponent {
     });
     this.querySelector("#refreshFilesButton").addEventListener("click", () => this.emit("refresh-workspace"));
     this.querySelector("#selectWorkspaceRootButton").addEventListener("click", () => this.emit("choose-workspace"));
+
+    let dragDepth = 0;
+    const isFileDrag = (event) => [...(event.dataTransfer?.types || [])].includes("Files");
+    this.addEventListener("dragenter", (event) => {
+      if (!isFileDrag(event)) return;
+      event.preventDefault();
+      dragDepth += 1;
+      this.setUploadStatus("Drop files to upload", "dragging");
+    });
+    this.addEventListener("dragover", (event) => {
+      if (!isFileDrag(event)) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "copy";
+    });
+    this.addEventListener("dragleave", (event) => {
+      if (!isFileDrag(event)) return;
+      dragDepth = Math.max(0, dragDepth - 1);
+      if (dragDepth === 0) this.setUploadStatus();
+    });
+    this.addEventListener("drop", (event) => {
+      if (!isFileDrag(event)) return;
+      event.preventDefault();
+      dragDepth = 0;
+      this.setUploadStatus();
+      const files = [...(event.dataTransfer?.files || [])];
+      if (files.length) this.emit("upload-files", { files });
+    });
+  }
+
+  setUploadStatus(message = "", state = "") {
+    const overlay = this.querySelector(".workspaceDropOverlay");
+    if (!overlay) return;
+    overlay.textContent = message;
+    overlay.dataset.state = state;
+    overlay.toggleAttribute("data-visible", Boolean(message));
   }
 }
 

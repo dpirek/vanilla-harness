@@ -34,6 +34,7 @@ import {
   resolveWorkspaceMarkdownLink,
   saveWorkspaceRecording,
   transcribeWorkspaceRecording,
+  uploadWorkspaceFile,
   workspaceFileAssetUrl,
 } from "./services/workspace-api.js";
 import {
@@ -211,6 +212,7 @@ let workspaceBrowserRoot = null;
 let workspaceBrowserNodes = [];
 let workspaceRefreshTimer = null;
 let workspaceTreeLoadId = 0;
+let workspaceUploadActive = false;
 let pendingWorkspacePath = null;
 let workspacePickerRoot = null;
 let workspacePickerParent = null;
@@ -1208,6 +1210,40 @@ function scheduleWorkspaceTreeRefresh(delay = 140) {
     workspaceRefreshTimer = null;
     loadWorkspaceTree();
   }, delay);
+}
+
+async function uploadDroppedWorkspaceFiles(files = []) {
+  if (workspaceUploadActive || files.length === 0) return;
+  workspaceUploadActive = true;
+  const workspace = activeSession()?.workspace || defaultWorkspace;
+  const failures = [];
+  let uploaded = 0;
+  try {
+    for (const [index, file] of files.entries()) {
+      workspaceComponent.setUploadStatus(`Uploading ${index + 1} of ${files.length}: ${file.name}`, "uploading");
+      try {
+        await uploadWorkspaceFile(workspace, file);
+        uploaded += 1;
+      } catch (error) {
+        failures.push(`${file.name}: ${error.message}`);
+      }
+    }
+    scheduleWorkspaceTreeRefresh(0);
+    if (failures.length === 0) {
+      const label = `${uploaded} file${uploaded === 1 ? "" : "s"} uploaded`;
+      workspaceComponent.setUploadStatus(label, "success");
+      addEvent("Workspace files uploaded", label);
+    } else {
+      const message = `${uploaded} uploaded · ${failures.length} failed`;
+      workspaceComponent.setUploadStatus(message, "error");
+      addEvent("Workspace upload failed", failures.join("\n"));
+    }
+  } finally {
+    workspaceUploadActive = false;
+    window.setTimeout(() => {
+      if (!workspaceUploadActive) workspaceComponent.setUploadStatus();
+    }, 2400);
+  }
 }
 
 function chooseWorkspacePickerPath(path) {
@@ -2630,6 +2666,7 @@ fileEditorDialog.addEventListener("close", () => {
 workspaceComponent.addEventListener("focus-prompt", () => promptInput.focus());
 workspaceComponent.addEventListener("refresh-workspace", loadWorkspaceTree);
 workspaceComponent.addEventListener("choose-workspace", openWorkspacePicker);
+workspaceComponent.addEventListener("upload-files", (event) => uploadDroppedWorkspaceFiles(event.detail.files));
 workspacePickerModal.addEventListener("create-workspace", openCreateWorkspaceDialog);
 createWorkspaceModal.addEventListener("create-workspace-confirm", createAndSelectWorkspace);
 chatComponent.addEventListener("images-selected", async (event) => addImages(event.detail.files));

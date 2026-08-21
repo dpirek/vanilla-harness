@@ -1204,6 +1204,7 @@ textarea:disabled {
 }
 
 .filesColumn {
+  position: relative;
   display: flex;
   min-width: 0;
   min-height: 0;
@@ -1247,6 +1248,26 @@ textarea:disabled {
 .selectFolderButton { width: 24px; height: 24px; margin-left: auto; flex: 0 0 24px; border-radius: 5px; color: var(--muted); font-size: .72rem; }
 .selectFolderButton:hover { background: #3a3a3a; color: #fff; }
 .workspaceTreeStatus { padding: 12px; color: var(--muted); }
+.workspaceDropOverlay {
+  position: absolute;
+  z-index: 5;
+  inset: 78px 10px 10px;
+  display: grid;
+  place-items: center;
+  border: 1px dashed color-mix(in srgb, var(--accent) 70%, var(--line));
+  border-radius: 10px;
+  opacity: 0;
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  color: var(--text);
+  font-size: .82rem;
+  font-weight: 700;
+  pointer-events: none;
+  text-align: center;
+  transition: opacity 100ms ease;
+}
+.workspaceDropOverlay[data-visible] { opacity: 1; }
+.workspaceDropOverlay[data-state="success"] { border-color: #88d8c6; color: #88d8c6; }
+.workspaceDropOverlay[data-state="error"] { border-color: var(--danger); color: var(--danger); }
 
 .createWorkspaceDialog { width: min(460px, calc(100vw - 32px)); border: 1px solid #333; border-radius: 12px; background: #141414; color: var(--text); padding: 0; }
 .createWorkspaceDialog::backdrop { background: rgba(0,0,0,.7); }

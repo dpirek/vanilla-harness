@@ -64,6 +64,18 @@ function createWorkspaceFolder(parent, name) {
   );
 }
 
+function uploadWorkspaceFile(workspace, file) {
+  return requestJson(
+    `/api/workspace-upload?workspace=${encodeURIComponent(workspace)}&name=${encodeURIComponent(file.name)}`,
+    {
+      method: "POST",
+      headers: { "content-type": file.type || "application/octet-stream" },
+      body: file,
+    },
+    `Unable to upload ${file.name}.`,
+  );
+}
+
 function createConversationWorkspace(root, sessionId, name = "") {
   return requestJson(
     "/api/conversation-workspace",
@@ -115,5 +127,6 @@ export {
   resolveWorkspaceMarkdownLink,
   saveWorkspaceRecording,
   transcribeWorkspaceRecording,
+  uploadWorkspaceFile,
   workspaceFileAssetUrl,
 };

@@ -11,6 +11,7 @@ import { createTools } from "./lib/tools.js";
 import { loadMcpTools } from "./lib/mcp.js";
 import { createUiStateStore } from "./lib/ui-state.js";
 import { createWorkspaceTree } from "./lib/workspace-tree.js";
+import { MAX_WORKSPACE_UPLOAD_BYTES, saveWorkspaceUpload } from "./lib/workspace-upload.js";
 import {
   createConversationWorkspace,
   deleteConversationWorkspace,
@@ -114,7 +115,7 @@ function json(res, status, payload) {
   res.end(body);
 }
 
-async function readRequestBody(req, limit = 250_000) {
+async function readRequestBuffer(req, limit = 250_000) {
   const chunks = [];
   let size = 0;
   for await (const chunk of req) {
@@ -122,7 +123,11 @@ async function readRequestBody(req, limit = 250_000) {
     if (size > limit) throw new Error("Request body is too large.");
     chunks.push(chunk);
   }
-  return Buffer.concat(chunks).toString("utf8");
+  return Buffer.concat(chunks);
+}
+
+async function readRequestBody(req, limit = 250_000) {
+  return (await readRequestBuffer(req, limit)).toString("utf8");
 }
 
 async function handleConfigApi(req, res) {
@@ -359,6 +364,22 @@ async function handleWorkspaceFolderApi(req, res) {
       throw error;
     }
     json(res, 201, { ok: true, path: await fs.realpath(folder) });
+  } catch (error) {
+    json(res, 400, { ok: false, error: error.message });
+  }
+}
+
+async function handleWorkspaceUploadApi(req, res, url) {
+  if (req.method !== "POST") { res.writeHead(405, { allow: "POST" }); res.end(); return; }
+  try {
+    const declaredSize = Number(req.headers["content-length"]);
+    if (Number.isFinite(declaredSize) && declaredSize > MAX_WORKSPACE_UPLOAD_BYTES) {
+      throw new Error("File is too large to upload (100 MB maximum).");
+    }
+    const root = await resolveWorkspace(url.searchParams.get("workspace"));
+    const content = await readRequestBuffer(req, MAX_WORKSPACE_UPLOAD_BYTES);
+    const uploaded = await saveWorkspaceUpload(root, url.searchParams.get("name"), content);
+    json(res, 201, { ok: true, ...uploaded });
   } catch (error) {
     json(res, 400, { ok: false, error: error.message });
   }
@@ -1034,6 +1055,10 @@ const server = http.createServer(async (req, res) => {
   }
   if (url.pathname === "/api/workspace-folder") {
     await handleWorkspaceFolderApi(req, res);
+    return;
+  }
+  if (url.pathname === "/api/workspace-upload") {
+    await handleWorkspaceUploadApi(req, res, url);
     return;
   }
   if (url.pathname === "/api/conversation-workspace") {
