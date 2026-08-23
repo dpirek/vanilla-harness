@@ -214,3 +214,54 @@ test("run command steps retain the command and structured response", () => {
     stderr: "",
   });
 });
+
+test("failed runs expose the last command and its response as expandable details", () => {
+  const activity = sessionActivities([
+    {
+      detail: {
+        type: "tool_start",
+        name: "run_command",
+        args: { command: "npm test" },
+      },
+      timestamp: 1,
+    },
+    {
+      detail: {
+        type: "tool_result",
+        name: "run_command",
+        output: { ok: false, exit_code: 1, stdout: "", stderr: "Tests failed\n" },
+      },
+      timestamp: 2,
+    },
+    { title: "Error", detail: "The agent stopped after the command failed.", timestamp: 3 },
+  ]);
+
+  const failure = activity.items.find((item) => item.key === "error");
+  assert.equal(failure.label, "Run failed");
+  assert.equal(failure.command, "npm test");
+  assert.deepEqual(failure.response, {
+    ok: false,
+    exit_code: 1,
+    stdout: "",
+    stderr: "Tests failed\n",
+  });
+  assert.deepEqual(failure.details.map((section) => section.title), [
+    "Command",
+    "Response",
+    "Run error",
+  ]);
+  assert.match(failure.details[1].text, /Tests failed/);
+  assert.equal(failure.details[2].text, "The agent stopped after the command failed.");
+});
+
+test("failed runs without a completed command still expose useful details", () => {
+  const activity = sessionActivities([
+    { title: "Error", detail: "Provider request timed out.", timestamp: 1 },
+  ]);
+
+  const failure = activity.items.find((item) => item.key === "error");
+  assert.deepEqual(failure.details.map(({ title, text }) => ({ title, text })), [
+    { title: "Command", text: "No command was recorded for this run." },
+    { title: "Response", text: "Provider request timed out." },
+  ]);
+});

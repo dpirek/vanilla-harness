@@ -274,7 +274,21 @@ function sessionActivities(events = [], now = Date.now()) {
       complete = true;
     } else if (event.title === "Error") {
       finishAll(event, "failed");
-      add("Run failed", "failed", event, "error");
+      const commandItem = [...items].reverse().find((item) => item.key === "tool:run_command");
+      const response = commandItem?.response ?? event.detail;
+      const errorText = printableValue(event.detail);
+      const responseText = printableValue(response);
+      const item = add("Run failed", "failed", event, "error");
+      item.command = commandItem?.command || "";
+      item.response = response;
+      setDetails(item, [
+        { title: "Command", text: item.command || "No command was recorded for this run." },
+        { title: "Response", text: responseText || "No response was recorded for this run." },
+        {
+          title: "Run error",
+          text: commandItem?.response !== undefined && errorText !== responseText ? errorText : "",
+        },
+      ]);
       complete = true;
     }
   }

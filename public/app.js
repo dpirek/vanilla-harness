@@ -1784,7 +1784,7 @@ function createStepDetails(task) {
       heading.append(headingLabel);
     }
     const text = document.createElement("pre");
-    text.textContent = task.key === "tool:run_command" && section.title === "Response"
+    text.textContent = task.response !== undefined && section.title === "Response"
       ? formatCommandResponse(task.response)
       : section.text;
     article.append(heading, text);
