@@ -191,6 +191,7 @@ const fileEditorTitle = document.querySelector("#fileEditorTitle");
 const fileEditorPath = document.querySelector("#fileEditorPath");
 const fileEditorLanguage = document.querySelector("#fileEditorLanguage");
 const fileEditorPreviewImage = document.querySelector("#fileEditorPreviewImage");
+const fileEditorMarkdown = document.querySelector("#fileEditorMarkdown");
 const fileEditorPreviewText = document.querySelector("#fileEditorPreviewText");
 const fileEditorPreviewCode = document.querySelector("#fileEditorPreviewCode");
 const fileEditorStatus = document.querySelector("#fileEditorStatus");
@@ -222,9 +223,21 @@ let openProvidersAfterWorkspaceSelection = false;
 let previewingFilePath = null;
 let editingMcpBlock = null;
 
-function updateFileEditorPreview(filePath, content) {
+function updateFileEditorPreview(workspace, filePath, content) {
   fileEditorPreviewImage.hidden = true;
   fileEditorPreviewImage.removeAttribute("src");
+  if (/\.md$/i.test(filePath)) {
+    fileEditorPreviewText.hidden = true;
+    fileEditorMarkdown.hidden = false;
+    fileEditorMarkdown.replaceChildren();
+    appendMarkdown(fileEditorMarkdown, content, {
+      resolveLink: (href) => resolveWorkspaceMarkdownLink(workspace, href, filePath),
+    });
+    fileEditorLanguage.textContent = "Markdown";
+    return;
+  }
+  fileEditorMarkdown.hidden = true;
+  fileEditorMarkdown.replaceChildren();
   fileEditorPreviewText.hidden = false;
   const language = renderFilePreview(fileEditorPreviewCode, content, { filePath });
   fileEditorLanguage.textContent = codeLanguageLabel(language || "plaintext");
@@ -232,6 +245,8 @@ function updateFileEditorPreview(filePath, content) {
 
 function updateImagePreview(workspace, node) {
   fileEditorPreviewCode.replaceChildren();
+  fileEditorMarkdown.replaceChildren();
+  fileEditorMarkdown.hidden = true;
   fileEditorPreviewText.hidden = true;
   fileEditorPreviewImage.hidden = false;
   fileEditorPreviewImage.alt = `Preview of ${node.name}`;
@@ -1164,10 +1179,10 @@ async function openFilePreview(node) {
     if (isWorkspaceImagePath(node.path)) {
       await updateImagePreview(workspace, node);
     } else {
-      updateFileEditorPreview(node.path, "");
+      updateFileEditorPreview(workspace, node.path, "");
       const content = await loadWorkspaceFile(workspace, node.path);
       if (previewingFilePath !== node.path || !fileEditorDialog.open) return;
-      updateFileEditorPreview(node.path, content);
+      updateFileEditorPreview(workspace, node.path, content);
     }
     if (previewingFilePath !== node.path || !fileEditorDialog.open) return;
     fileEditorStatus.textContent = "";

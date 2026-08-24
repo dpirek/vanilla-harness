@@ -1318,8 +1318,22 @@ textarea:disabled {
 .fileEditorPreviewHeader span { color: var(--muted); font-size: .76rem; }
 .fileEditorPreviewContent { min-height: 0; flex: 1 1 0; margin: 0; overflow: auto; padding: 14px; color: #d7dae0; font: .85rem/1.55 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
 .fileEditorPreviewContent code { display: block; white-space: pre; }
+.fileEditorMarkdownContent { min-height: 0; flex: 1 1 0; overflow: auto; padding: clamp(22px, 5vw, 48px); color: var(--text); font-size: 1rem; line-height: 1.65; }
+.fileEditorMarkdownContent > :first-child { margin-top: 0; }
+.fileEditorMarkdownContent > :last-child { margin-bottom: 0; }
+.fileEditorMarkdownContent :is(h1, h2, h3, h4, h5, h6) { margin-bottom: .45em; line-height: 1.25; }
+.fileEditorMarkdownContent h1 { border-bottom: 1px solid var(--line); padding-bottom: .35em; font-size: 2rem; }
+.fileEditorMarkdownContent h2 { border-bottom: 1px solid var(--line); padding-bottom: .3em; font-size: 1.5rem; }
+.fileEditorMarkdownContent h3 { font-size: 1.2rem; }
+.fileEditorMarkdownContent :is(ul, ol) { padding-left: 1.6rem; }
+.fileEditorMarkdownContent li + li { margin-top: .25rem; }
+.fileEditorMarkdownContent blockquote { margin-left: 0; border-left: 3px solid var(--strong-line); padding-left: 1rem; color: var(--muted); }
+.fileEditorMarkdownContent a { color: #8ecbff; text-underline-offset: 3px; }
+.fileEditorMarkdownContent .inlineCode { border: 1px solid #343942; border-radius: 5px; background: #171a1f; padding: .08em .34em; color: #e3e6eb; font-size: .88em; }
+.fileEditorMarkdownContent hr { border: 0; border-top: 1px solid var(--line); }
+.fileEditorMarkdownContent .workspaceImageLink { display: inline-flex; max-width: 100%; flex-direction: column; overflow: hidden; border: 1px solid var(--line); border-radius: 10px; text-decoration: none; }
 .fileEditorPreviewImage { width: 100%; min-height: 0; flex: 1 1 0; object-fit: contain; padding: 16px; }
-.fileEditorPreviewImage[hidden], .fileEditorPreviewContent[hidden] { display: none; }
+.fileEditorPreviewImage[hidden], .fileEditorPreviewContent[hidden], .fileEditorMarkdownContent[hidden] { display: none; }
 #fileEditorStatus { color: var(--muted); font-size: .8rem; }
 
 .columnResizeHandle {

@@ -35,7 +35,7 @@ function isWorkspaceImagePath(path) {
   return WORKSPACE_IMAGE_EXTENSIONS.has(extension);
 }
 
-function resolveWorkspaceMarkdownLink(workspace, href) {
+function resolveWorkspaceMarkdownLink(workspace, href, sourcePath = "") {
   const value = String(href || "").trim();
   if (!value || /^(?:https?:|mailto:)/i.test(value) || value.startsWith("#") || value.startsWith("?")) {
     return { href: value, previewImage: false };
@@ -44,7 +44,12 @@ function resolveWorkspaceMarkdownLink(workspace, href) {
   const hash = hashIndex >= 0 ? value.slice(hashIndex) : "";
   const withoutHash = hashIndex >= 0 ? value.slice(0, hashIndex) : value;
   const fileReference = withoutHash.split("?", 1)[0];
-  const path = normalizeWorkspaceLinkPath(fileReference);
+  const source = String(sourcePath || "").replace(/\\/g, "/");
+  const sourceDirectory = source.includes("/") ? source.slice(0, source.lastIndexOf("/")) : "";
+  const rootedReference = fileReference.startsWith("/") || !sourceDirectory
+    ? fileReference
+    : `${sourceDirectory}/${fileReference}`;
+  const path = normalizeWorkspaceLinkPath(rootedReference);
   if (!path) return { href: "", previewImage: false };
   return {
     href: `${workspaceFileAssetUrl(workspace, path)}${hash}`,

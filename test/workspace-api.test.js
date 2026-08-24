@@ -27,6 +27,17 @@ test("workspace image links are marked for chat preview", () => {
   });
 });
 
+test("Markdown preview links resolve relative to the source file", () => {
+  assert.deepEqual(resolveWorkspaceMarkdownLink(
+    "/tmp/project",
+    "../images/diagram.PNG",
+    "docs/guides/README.md",
+  ), {
+    href: "/api/workspace-file-asset?workspace=%2Ftmp%2Fproject&path=docs%2Fimages%2Fdiagram.PNG",
+    previewImage: true,
+  });
+});
+
 test("workspace links cannot traverse above the selected workspace", () => {
   assert.deepEqual(resolveWorkspaceMarkdownLink("/tmp/project", "../secret.png"), {
     href: "",
