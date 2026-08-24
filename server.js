@@ -7,7 +7,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createModelClient } from "./lib/openai.js";
 import { CodingAgent, resolveDisabledSteps } from "./lib/agent.js";
-import { createTools } from "./lib/tools.js";
+import { createTools } from "./lib/tools/index.js";
 import { loadMcpTools } from "./lib/mcp.js";
 import { createUiStateStore } from "./lib/ui-state.js";
 import { createWorkspaceTree } from "./lib/workspace-tree.js";
