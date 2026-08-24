@@ -9,7 +9,10 @@ import { createModelClient } from "./lib/openai.js";
 import { CodingAgent, resolveDisabledSteps } from "./lib/agent.js";
 import { createTools } from "./lib/tools/index.js";
 import { loadMcpTools } from "./lib/mcp.js";
-import { createUiStateStore } from "./lib/ui-state.js";
+import {
+  createUiStateStore,
+  normalizeStoredToolPermissions as normalizeToolPermissions,
+} from "./lib/ui-state.js";
 import { createWorkspaceTree } from "./lib/workspace-tree.js";
 import { MAX_WORKSPACE_UPLOAD_BYTES, saveWorkspaceUpload } from "./lib/workspace-upload.js";
 import {
@@ -87,24 +90,6 @@ const WEBSOCKET_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 const MAX_WEBSOCKET_TEXT_BYTES = 40 * 1024 * 1024;
 const providerSettings = new Map();
 const toolPermissions = new Map();
-
-const DEFAULT_TOOL_PERMISSIONS = {
-  list_files: true,
-  read_file: true,
-  write_file: true,
-  search_files: true,
-  curl: true,
-  run_command: true,
-};
-
-function normalizeToolPermissions(value = {}) {
-  return Object.fromEntries(
-    Object.entries(DEFAULT_TOOL_PERMISSIONS).map(([name, defaultValue]) => [
-      name,
-      typeof value[name] === "boolean" ? value[name] : defaultValue,
-    ]),
-  );
-}
 
 function json(res, status, payload) {
   const body = JSON.stringify(payload);

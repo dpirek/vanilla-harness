@@ -5,6 +5,7 @@ const DEFAULT_TOOL_PERMISSIONS = {
   search_files: true,
   curl: true,
   run_command: true,
+  chrome_devtools: true,
 };
 
 function defaultProviderSettings() {

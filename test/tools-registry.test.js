@@ -13,6 +13,7 @@ test("local tool modules compose into the existing tool registry", () => {
     "search_files",
     "curl",
     "run_command",
+    "chrome_devtools",
   ]);
   assert.equal(tools.find((tool) => tool.name === "read_file").validatesWorkspace, true);
   assert.equal(tools.find((tool) => tool.name === "write_file").mutatesWorkspace, true);

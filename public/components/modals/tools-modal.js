@@ -1,5 +1,15 @@
 import BaseComponent from "../base-component.js";
 
+const TOOL_ROWS = [
+  ["List files", "List files and folders inside the workspace.", "list_files"],
+  ["Search files", "Search workspace text files with a regular expression.", "search_files"],
+  ["Read files", "Read selected UTF-8 file contents from the workspace.", "read_file"],
+  ["Write files", "Create or replace UTF-8 files inside the workspace.", "write_file"],
+  ["Curl", "Fetch HTTP or HTTPS URLs for API and web inspection.", "curl"],
+  ["Run commands", "Run shell commands in the workspace.", "run_command"],
+  ["Chrome DevTools", "Browse pages, inspect source, run JavaScript, and save screenshots.", "chrome_devtools"],
+];
+
 class ToolsModal extends BaseComponent {
   connectedCallback() {
     if (this.childElementCount) return;
@@ -8,12 +18,95 @@ class ToolsModal extends BaseComponent {
   }
 
   render() {
-    this.appendChildren(this, [
-      this.createElement("dialog", { "id": "toolsDialog", "class": "settingsDialog", children: [this.createElement("form", { "id": "toolsForm", "class": "settingsPanel", "method": "dialog", children: [this.createElement("header", { "class": "settingsHeader", children: [this.createElement("div", { children: [this.createElement("h2", { children: [document.createTextNode("Tools")] }), this.createElement("p", { children: [document.createTextNode("Choose which built-in workspace tools the model can call")] })] }), this.createElement("button", { "id": "closeToolsButton", "class": "iconButton", "type": "button", "aria-label": "Close tools", children: [document.createTextNode("×")] })] }), this.createElement("section", { "class": "toolPermissions", "aria-label": "Local tool permissions", children: [this.createElement("div", { "class": "toolPermissionsHeader", children: [this.createElement("h3", { children: [document.createTextNode("Allowed Tool Calls")] }), this.createElement("p", { children: [document.createTextNode("Enabled tools are authorized to run without an additional prompt.")] })] }), this.createElement("div", { "class": "toolTableWrap", children: [this.createElement("table", { "class": "toolTable", children: [this.createElement("thead", { children: [this.createElement("tr", { children: [this.createElement("th", { "scope": "col", children: [document.createTextNode("Tool")] }), this.createElement("th", { "scope": "col", children: [document.createTextNode("Description")] }), this.createElement("th", { "scope": "col", children: [document.createTextNode("Enabled")] })] })] }), this.createElement("tbody", { children: [this.createElement("tr", { children: [this.createElement("th", { "scope": "row", children: [document.createTextNode("List files")] }), this.createElement("td", { children: [document.createTextNode("List files and folders inside the workspace.")] }), this.createElement("td", { children: [this.createElement("input", { "type": "checkbox", "data-tool-permission": "list_files", "aria-label": "Enable list files" })] })] }), this.createElement("tr", { children: [this.createElement("th", { "scope": "row", children: [document.createTextNode("Search files")] }), this.createElement("td", { children: [document.createTextNode("Search workspace text files with a regular expression.")] }), this.createElement("td", { children: [this.createElement("input", { "type": "checkbox", "data-tool-permission": "search_files", "aria-label": "Enable search files" })] })] }), this.createElement("tr", { children: [this.createElement("th", { "scope": "row", children: [document.createTextNode("Read files")] }), this.createElement("td", { children: [document.createTextNode("Read selected UTF-8 file contents from the workspace.")] }), this.createElement("td", { children: [this.createElement("input", { "type": "checkbox", "data-tool-permission": "read_file", "aria-label": "Enable read files" })] })] }), this.createElement("tr", { children: [this.createElement("th", { "scope": "row", children: [document.createTextNode("Write files")] }), this.createElement("td", { children: [document.createTextNode("Create or replace UTF-8 files in the workspace.")] }), this.createElement("td", { children: [this.createElement("input", { "type": "checkbox", "data-tool-permission": "write_file", "aria-label": "Enable write files" })] })] }), this.createElement("tr", { children: [this.createElement("th", { "scope": "row", children: [document.createTextNode("Curl")] }), this.createElement("td", { children: [document.createTextNode("Fetch HTTP or HTTPS URLs for API and web inspection.")] }), this.createElement("td", { children: [this.createElement("input", { "type": "checkbox", "data-tool-permission": "curl", "aria-label": "Enable curl" })] })] }), this.createElement("tr", { children: [this.createElement("th", { "scope": "row", children: [document.createTextNode("Run commands")] }), this.createElement("td", { children: [document.createTextNode("Run shell commands in the workspace.")] }), this.createElement("td", { children: [this.createElement("input", { "type": "checkbox", "data-tool-permission": "run_command", "aria-label": "Enable run commands" })] })] })] })] })] })] }), this.createElement("footer", { "class": "settingsFooter", children: [this.createElement("span", { "id": "toolPermissionsStatus", "class": "configStatus", children: [document.createTextNode("Tool permissions are stored in the active preset.")] }), this.createElement("div", { children: [this.createElement("button", { "id": "saveToolPermissionsButton", "class": "primaryButton", "type": "submit", children: [document.createTextNode("Save tools")] })] })] })] })] })
-    ]);
-    const dialog = this.querySelector("dialog");
+    const toolRows = TOOL_ROWS.map(([name, description, permission]) => this.createElement("tr", {
+      children: [
+        this.createElement("th", { scope: "row", children: [document.createTextNode(name)] }),
+        this.createElement("td", { children: [document.createTextNode(description)] }),
+        this.createElement("td", { children: [this.createElement("input", {
+          type: "checkbox",
+          "data-tool-permission": permission,
+          "aria-label": `Enable ${name}`,
+        })] }),
+      ],
+    }));
+
+    const dialog = this.createElement("dialog", {
+      id: "toolsDialog",
+      class: "settingsDialog",
+      children: [this.createElement("form", {
+        id: "toolsForm",
+        class: "settingsPanel",
+        method: "dialog",
+        children: [
+          this.createElement("header", {
+            class: "settingsHeader",
+            children: [
+              this.createElement("div", { children: [
+                this.createElement("h2", { children: [document.createTextNode("Tools")] }),
+                this.createElement("p", { children: [document.createTextNode("Choose which built-in workspace tools the model can call")] }),
+              ] }),
+              this.createElement("button", {
+                id: "closeToolsButton",
+                class: "iconButton",
+                type: "button",
+                "aria-label": "Close tools",
+                children: [document.createTextNode("×")],
+              }),
+            ],
+          }),
+          this.createElement("section", {
+            class: "toolPermissions",
+            "aria-label": "Local tool permissions",
+            children: [
+              this.createElement("div", {
+                class: "toolPermissionsHeader",
+                children: [
+                  this.createElement("h3", { children: [document.createTextNode("Allowed Tool Calls")] }),
+                  this.createElement("p", { children: [document.createTextNode("Enabled tools are authorized to run without an additional prompt.")] }),
+                ],
+              }),
+              this.createElement("div", {
+                class: "toolTableWrap",
+                children: [this.createElement("table", {
+                  class: "toolTable",
+                  children: [
+                    this.createElement("thead", { children: [this.createElement("tr", { children: [
+                      this.createElement("th", { scope: "col", children: [document.createTextNode("Tool")] }),
+                      this.createElement("th", { scope: "col", children: [document.createTextNode("Description")] }),
+                      this.createElement("th", { scope: "col", children: [document.createTextNode("Enabled")] }),
+                    ] })] }),
+                    this.createElement("tbody", { children: toolRows }),
+                  ],
+                })],
+              }),
+            ],
+          }),
+          this.createElement("footer", {
+            class: "settingsFooter",
+            children: [
+              this.createElement("span", {
+                id: "toolPermissionsStatus",
+                class: "configStatus",
+                children: [document.createTextNode("Tool permissions are stored in the active preset.")],
+              }),
+              this.createElement("div", { children: [this.createElement("button", {
+                id: "saveToolPermissionsButton",
+                class: "primaryButton",
+                type: "submit",
+                children: [document.createTextNode("Save tools")],
+              })] }),
+            ],
+          }),
+        ],
+      })],
+    });
+
+    this.appendChildren(this, [dialog]);
     this.querySelector("#closeToolsButton").addEventListener("click", () => dialog.close());
-    this.querySelector("form").addEventListener("submit", (event) => { event.preventDefault(); this.emit("save-tool-permissions"); });
+    this.querySelector("form").addEventListener("submit", (event) => {
+      event.preventDefault();
+      this.emit("save-tool-permissions");
+    });
   }
 }
 

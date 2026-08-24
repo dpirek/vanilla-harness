@@ -553,6 +553,7 @@ const PRESET_TOOL_INPUTS = {
   search_files: "presetToolSearchFiles",
   curl: "presetToolCurl",
   run_command: "presetToolRunCommand",
+  chrome_devtools: "presetToolChromeDevTools",
 };
 
 const PRESET_PROMPT_TITLES = {
