@@ -23,6 +23,7 @@ import { formatStepDuration, formatTokenCount, sessionActivityRuns } from "./lib
 import { createStateSaveQueue } from "./lib/state-save-queue.js";
 import { loadDefaultWorkspace, saveDefaultWorkspace } from "./lib/workspace-preferences.js";
 import { shouldRefreshWorkspaceForAgentEvent } from "./lib/workspace-refresh.js";
+import { createStepVisualization, updateStepVisualization } from "./lib/step-visualization.js";
 import { renderWorkspaceNodes, renderWorkspacePicker } from "./lib/workspace-rendering.js";
 import { loadUiState, saveUiState } from "./services/ui-state-api.js";
 import {
@@ -1773,6 +1774,7 @@ function createSessionActivityCard(activity, { active = false } = {}) {
   card.setAttribute("aria-label", "Session step summary");
   card.setAttribute("aria-live", "polite");
   const summary = document.createElement("summary");
+  const visualization = createStepVisualization();
   const eyebrow = document.createElement("span");
   eyebrow.className = "sessionActivityEyebrow";
   const current = document.createElement("strong");
@@ -1783,7 +1785,7 @@ function createSessionActivityCard(activity, { active = false } = {}) {
   chevron.className = "sessionActivityChevron";
   chevron.textContent = "›";
   chevron.setAttribute("aria-hidden", "true");
-  summary.append(eyebrow, current, count, chevron);
+  summary.append(visualization, eyebrow, current, count, chevron);
   summary.addEventListener("click", (event) => {
     if (card.dataset.running === "true") event.preventDefault();
   });
@@ -1862,10 +1864,12 @@ function updateSessionActivityCard(card, activity, { active = false } = {}) {
   const isRunning = active && !activity.complete;
   const failed = activity.items.some((item) => item.status === "failed");
   const eyebrow = card.querySelector(".sessionActivityEyebrow");
+  const visualization = card.querySelector(".stepVisualization");
   const current = card.querySelector(".currentSessionStep");
   const count = card.querySelector(".sessionTaskCount");
   const list = card.querySelector(".sessionTaskList");
   eyebrow.textContent = isRunning ? "Current step" : "Step summary";
+  updateStepVisualization(visualization, activity, { active });
   current.textContent = isRunning ? activity.current?.label || "Working…" : failed ? "Run completed with errors" : "Run completed";
   current.dataset.state = isRunning ? "running" : failed ? "failed" : "idle";
   const taskCount = `${activity.items.length} task${activity.items.length === 1 ? "" : "s"}`;
