@@ -5,6 +5,7 @@ import StreamPanel from "./components/stream-panel.js";
 import ColumnResizeHandle from "./components/column-resize-handle.js";
 import { mountAppShell } from "./components/app-shell.js";
 import { codeLanguageLabel, renderFilePreview } from "./lib/file-utils.js";
+import { copyTextToClipboard } from "./lib/clipboard.js";
 import { appendMarkdown, appendMessageText } from "./lib/message-rendering.js";
 import {
   defaultProviderSettings,
@@ -190,6 +191,7 @@ const fileEditorDialog = document.querySelector("#fileEditorDialog");
 const fileEditorTitle = document.querySelector("#fileEditorTitle");
 const fileEditorPath = document.querySelector("#fileEditorPath");
 const fileEditorLanguage = document.querySelector("#fileEditorLanguage");
+const copyFilePreviewButton = document.querySelector("#copyFilePreviewButton");
 const fileEditorPreviewImage = document.querySelector("#fileEditorPreviewImage");
 const fileEditorMarkdown = document.querySelector("#fileEditorMarkdown");
 const fileEditorPreviewText = document.querySelector("#fileEditorPreviewText");
@@ -221,11 +223,22 @@ let pendingWorkspaceParent = null;
 let selectingDefaultWorkspace = false;
 let openProvidersAfterWorkspaceSelection = false;
 let previewingFilePath = null;
+let filePreviewClipboardValue = null;
+let filePreviewStatusTimer = null;
 let editingMcpBlock = null;
 
-function updateFileEditorPreview(workspace, filePath, content) {
+function setFilePreviewClipboardValue(value, label = "source") {
+  filePreviewClipboardValue = value == null ? null : String(value);
+  copyFilePreviewButton.disabled = filePreviewClipboardValue == null;
+  const description = label === "image URL" ? "Copy image URL to clipboard" : "Copy source to clipboard";
+  copyFilePreviewButton.title = description;
+  copyFilePreviewButton.setAttribute("aria-label", description);
+}
+
+function updateFileEditorPreview(workspace, filePath, content, { copyable = true } = {}) {
   fileEditorPreviewImage.hidden = true;
   fileEditorPreviewImage.removeAttribute("src");
+  setFilePreviewClipboardValue(copyable ? content : null);
   if (/\.md$/i.test(filePath)) {
     fileEditorPreviewText.hidden = true;
     fileEditorMarkdown.hidden = false;
@@ -244,6 +257,7 @@ function updateFileEditorPreview(workspace, filePath, content) {
 }
 
 function updateImagePreview(workspace, node) {
+  const assetUrl = workspaceFileAssetUrl(workspace, node.path);
   fileEditorPreviewCode.replaceChildren();
   fileEditorMarkdown.replaceChildren();
   fileEditorMarkdown.hidden = true;
@@ -251,10 +265,11 @@ function updateImagePreview(workspace, node) {
   fileEditorPreviewImage.hidden = false;
   fileEditorPreviewImage.alt = `Preview of ${node.name}`;
   fileEditorLanguage.textContent = "Image";
+  setFilePreviewClipboardValue(new URL(assetUrl, window.location.href).href, "image URL");
   return new Promise((resolve, reject) => {
     fileEditorPreviewImage.addEventListener("load", resolve, { once: true });
     fileEditorPreviewImage.addEventListener("error", () => reject(new Error("Unable to load image preview.")), { once: true });
-    fileEditorPreviewImage.src = workspaceFileAssetUrl(workspace, node.path);
+    fileEditorPreviewImage.src = assetUrl;
   });
 }
 
@@ -1174,12 +1189,14 @@ async function openFilePreview(node) {
   fileEditorTitle.textContent = node.name;
   fileEditorPath.textContent = node.path;
   fileEditorStatus.textContent = "Loading…";
+  window.clearTimeout(filePreviewStatusTimer);
+  setFilePreviewClipboardValue(null);
   fileEditorDialog.showModal();
   try {
     if (isWorkspaceImagePath(node.path)) {
       await updateImagePreview(workspace, node);
     } else {
-      updateFileEditorPreview(workspace, node.path, "");
+      updateFileEditorPreview(workspace, node.path, "", { copyable: false });
       const content = await loadWorkspaceFile(workspace, node.path);
       if (previewingFilePath !== node.path || !fileEditorDialog.open) return;
       updateFileEditorPreview(workspace, node.path, content);
@@ -1188,6 +1205,20 @@ async function openFilePreview(node) {
     fileEditorStatus.textContent = "";
   } catch (error) {
     if (previewingFilePath !== node.path || !fileEditorDialog.open) return;
+    fileEditorStatus.textContent = error.message;
+  }
+}
+
+async function copyFilePreviewSource() {
+  if (filePreviewClipboardValue == null) return;
+  window.clearTimeout(filePreviewStatusTimer);
+  try {
+    await copyTextToClipboard(filePreviewClipboardValue);
+    fileEditorStatus.textContent = "Copied to clipboard.";
+    filePreviewStatusTimer = window.setTimeout(() => {
+      if (fileEditorDialog.open) fileEditorStatus.textContent = "";
+    }, 1800);
+  } catch (error) {
     fileEditorStatus.textContent = error.message;
   }
 }
@@ -2675,8 +2706,11 @@ chatComponent.addEventListener("submit-prompt", () => {
 });
 
 workspaceComponent.addEventListener("workspace-change", saveActiveWorkspace);
+copyFilePreviewButton.addEventListener("click", copyFilePreviewSource);
 fileEditorDialog.addEventListener("close", () => {
   previewingFilePath = null;
+  window.clearTimeout(filePreviewStatusTimer);
+  setFilePreviewClipboardValue(null);
   fileEditorPreviewImage.removeAttribute("src");
 });
 workspaceComponent.addEventListener("focus-prompt", () => promptInput.focus());

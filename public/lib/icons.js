@@ -6,6 +6,34 @@ function createSvgNode(tag, attrs = {}) {
   return node;
 }
 
+export function copyIcon(className = "copyIcon") {
+  const svg = createSvgNode("svg", {
+    class: className,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    "aria-hidden": "true",
+    focusable: "false",
+  });
+  svg.append(
+    createSvgNode("rect", {
+      x: "8",
+      y: "8",
+      width: "11",
+      height: "11",
+      rx: "2",
+      stroke: "currentColor",
+      "stroke-width": "1.8",
+    }),
+    createSvgNode("path", {
+      d: "M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2",
+      stroke: "currentColor",
+      "stroke-width": "1.8",
+      "stroke-linecap": "round",
+    }),
+  );
+  return svg;
+}
+
 export function workspaceExplorerIcon(className = "workspaceExplorerIcon") {
   const svg = createSvgNode("svg", {
     class: className,

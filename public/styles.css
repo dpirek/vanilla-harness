@@ -1316,6 +1316,11 @@ textarea:disabled {
 .fileEditorPreviewHeader { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid #292d34; background: #191c22; padding: 10px 12px; }
 .fileEditorPreviewHeader strong { font-size: .76rem; letter-spacing: .06em; text-transform: uppercase; }
 .fileEditorPreviewHeader span { color: var(--muted); font-size: .76rem; }
+.fileEditorPreviewActions { display: flex; align-items: center; gap: 9px; }
+.fileEditorCopyButton { display: inline-grid; width: 30px; min-width: 30px; height: 30px; min-height: 30px; place-items: center; border: 1px solid #343942; border-radius: 7px; background: #13161b; color: #b8bec8; padding: 0; }
+.fileEditorCopyButton:hover:not(:disabled), .fileEditorCopyButton:focus-visible { border-color: #536072; background: #222731; color: #fff; }
+.fileEditorCopyButton:disabled { opacity: .4; cursor: default; }
+.fileEditorCopyButton .copyIcon { width: 16px; height: 16px; }
 .fileEditorPreviewContent { min-height: 0; flex: 1 1 0; margin: 0; overflow: auto; padding: 14px; color: #d7dae0; font: .85rem/1.55 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
 .fileEditorPreviewContent code { display: block; white-space: pre; }
 .fileEditorMarkdownContent { min-height: 0; flex: 1 1 0; overflow: auto; padding: clamp(22px, 5vw, 48px); color: var(--text); font-size: 1rem; line-height: 1.65; }
