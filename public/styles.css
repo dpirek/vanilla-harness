@@ -192,14 +192,12 @@ code {
   background: var(--surface-hover);
 }
 
-.navList,
 .sidebarSection {
   display: grid;
   gap: 3px;
   padding: 8px 8px 0;
 }
 
-.navList button,
 .sidebarSection button {
   display: flex;
   min-height: 42px;
@@ -216,7 +214,6 @@ code {
   text-overflow: ellipsis;
 }
 
-.navList button:hover,
 .sidebarSection button:hover,
 .sidebarSection button.active {
   background: #1d1d1d;
@@ -246,23 +243,13 @@ code {
   text-overflow: ellipsis;
 }
 
-.sidebarSection {
-  margin-top: 26px;
-}
-
-.sidebarSection h2 {
-  margin: 0 0 8px;
-  padding: 0 12px;
-  color: #f3f3f3;
-  font-size: 0.95rem;
-  line-height: 1.2;
-}
-
 .recents {
   min-height: 0;
   overflow: auto;
   padding-bottom: 18px;
 }
+
+.conversationMenu { margin-top: 0; }
 
 .recentsList {
   display: grid;
@@ -381,27 +368,16 @@ code {
   opacity: 1;
 }
 
-.app.sidebar-collapsed .navList .navLabel,
-.app.sidebar-collapsed .sidebarSection h2 {
-  display: none;
-}
-
-.app.sidebar-collapsed .navList,
 .app.sidebar-collapsed .sidebarSection {
   gap: 9px;
   padding: 8px 12px 0;
   justify-items: start;
 }
 
-.app.sidebar-collapsed .navList {
-  padding-top: 11px;
-}
-
 .app.sidebar-collapsed .sidebarSection {
-  margin-top: 9px;
+  margin-top: 0;
 }
 
-.app.sidebar-collapsed .navList button,
 .app.sidebar-collapsed .sidebarSection button {
   width: 36px;
   height: 36px;
@@ -418,6 +394,8 @@ code {
   height: 26px;
 }
 
+.app.sidebar-collapsed #newChatButton .navLabel { display: none; }
+
 .app.sidebar-collapsed .recentIcon {
   border: 0;
 }
@@ -428,11 +406,12 @@ code {
 
 .app.sidebar-collapsed .recentsList .navLabel {
   display: block;
-  width: 26px;
+  width: 32px;
   overflow: hidden;
   color: #d9d9d9;
-  font-size: 0.72rem;
-  font-weight: 750;
+  font-size: 0.58rem;
+  font-weight: 700;
+  line-height: 1;
   text-align: center;
   text-overflow: clip;
 }
@@ -481,7 +460,7 @@ code {
   pointer-events: auto;
 }
 
-.columnVisibilityControls { display: flex; width: 100%; min-width: 0; align-items: center; gap: 6px; margin-left: auto; }
+.columnVisibilityControls { display: flex; width: 100%; min-width: 0; align-items: center; justify-content: flex-start; gap: 6px; margin-left: auto; }
 .columnVisibilityControls > .columnToggleButton,
 .dropdownButtonTrigger { display: grid; height: 32px; place-items: center; border: 1px solid var(--line); border-radius: 8px; background: #151515; padding: 0; color: var(--muted); font-size: 1rem; }
 .columnVisibilityControls > .columnToggleButton { width: 32px; flex: 0 0 32px; }
@@ -494,20 +473,30 @@ code {
 .presetStatusBar {
   display: flex;
   min-width: 0;
+  max-width: calc(100% - 76px);
   height: 32px;
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   align-items: center;
-  overflow-x: auto;
+  margin-right: auto;
   border: 1px solid rgba(255, 255, 255, .15);
   border-radius: 8px;
   background: rgba(10, 10, 10, .32);
   color: var(--muted);
-  scrollbar-width: none;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
 }
 
-.presetStatusBar::-webkit-scrollbar { display: none; }
+.presetStatusItems {
+  display: flex;
+  min-width: 0;
+  height: 100%;
+  flex: 0 1 auto;
+  align-items: center;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.presetStatusItems::-webkit-scrollbar { display: none; }
 
 .presetStatusItem {
   display: inline-flex;
@@ -523,12 +512,24 @@ code {
 }
 
 .presetStatusItem:last-child { border-right: 0; }
+.presetStatusItem:hover { background: rgba(255, 255, 255, .07); }
+.presetStatusItem:focus-visible { outline: 1px solid rgba(255, 255, 255, .65); outline-offset: -2px; }
 .presetStatusLabel { color: var(--faint); font-weight: 600; }
 .presetStatusValue { color: #d7d7d7; font-weight: 700; }
 .presetStatusEmpty { padding: 0 12px; color: var(--faint); font-size: .72rem; }
 
 dropdown-button { position: relative; display: block; flex: 0 0 auto; }
 .dropdownButtonTrigger { display: flex; width: auto; max-width: 220px; align-items: center; gap: 8px; padding: 0 10px; font-size: .78rem; font-weight: 700; }
+.presetStatusBar > dropdown-button .dropdownButtonTrigger {
+  height: 30px;
+  border: 0;
+  border-left: 1px solid rgba(255, 255, 255, .15);
+  border-radius: 0 7px 7px 0;
+  background: var(--raised);
+  color: #d7d7d7;
+}
+.presetStatusBar > dropdown-button .dropdownButtonTrigger:hover,
+.presetStatusBar > dropdown-button .dropdownButtonTrigger[aria-expanded="true"] { background: rgba(255, 255, 255, .07); color: #d7d7d7; }
 .dropdownButtonLabel { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dropdownButtonCaret { display: block; width: 12px; height: 12px; flex: 0 0 12px; color: var(--muted); transition: transform 120ms ease; }
 .dropdownButtonTrigger[aria-expanded="true"] .dropdownButtonCaret { transform: rotate(180deg); }
@@ -2645,7 +2646,6 @@ body,
 .sidebarToggle,
 .iconButton,
 .composerIcon,
-.navList button,
 .sidebarSection button,
 .navIcon,
 .textButton,
@@ -2658,7 +2658,6 @@ textarea,
   color: var(--text);
 }
 
-.navList button:hover,
 .sidebarSection button:hover,
 .sidebarSection button.active,
 .workspaceTree summary:hover,
@@ -2673,7 +2672,6 @@ textarea,
 }
 
 .recentIcon,
-.app.sidebar-collapsed .navList button,
 .app.sidebar-collapsed .sidebarSection button,
 .columnVisibilityControls button,
 .workspacePicker,

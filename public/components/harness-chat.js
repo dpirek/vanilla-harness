@@ -22,14 +22,20 @@ class HarnessChat extends BaseComponent {
               this.createElement("div", {
                 id: "presetStatusBar",
                 class: "presetStatusBar",
-                role: "status",
+                role: "group",
                 "aria-live": "polite",
-                "aria-label": "Active preset status",
-              }),
-              this.createElement("dropdown-button", {
-                id: "presetDropdown",
-                placeholder: "Presets",
-                "aria-label": "Select preset",
+                "aria-label": "Active preset settings",
+                children: [
+                  this.createElement("div", {
+                    id: "presetStatusItems",
+                    class: "presetStatusItems",
+                  }),
+                  this.createElement("dropdown-button", {
+                    id: "presetDropdown",
+                    placeholder: "Presets",
+                    "aria-label": "Select preset",
+                  }),
+                ],
               }),
               this.createElement("button", {
                 id: "toggleFilesColumnButton",

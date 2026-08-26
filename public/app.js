@@ -170,7 +170,7 @@ const streamResizeHandle = document.querySelector("#streamResizeHandle");
 const toggleFilesColumnButton = document.querySelector("#toggleFilesColumnButton");
 const toggleStreamColumnButton = document.querySelector("#toggleStreamColumnButton");
 const presetDropdown = document.querySelector("#presetDropdown");
-const presetStatusBar = document.querySelector("#presetStatusBar");
+const presetStatusItems = document.querySelector("#presetStatusItems");
 const filesResizeHandle = document.querySelector("#filesResizeHandle");
 const workspaceTreeElement = document.querySelector("#workspaceTree");
 const filesWorkspaceLabel = document.querySelector("#filesWorkspaceLabel");
@@ -315,6 +315,13 @@ async function loadSystemPrompts() {
 
 async function saveSystemPrompt() {
   await persistSystemPrompt(editingSystemPromptKey, systemPromptContent.value);
+  const active = presetConfigurations.find((configuration) => configuration.id === activePresetId);
+  updateActivePresetSnapshot({
+    systemPrompts: {
+      ...(active?.systemPrompts || {}),
+      [editingSystemPromptKey]: systemPromptContent.value,
+    },
+  });
   systemPromptsStatus.textContent = "System prompt saved"; systemPromptsStatus.dataset.state = "success";
   systemPromptEditor.hidden = true; systemPromptsList.hidden = false; saveSystemPromptButton.hidden = true;
   await loadSystemPrompts();
@@ -551,13 +558,15 @@ function titleCaseIdentifier(value = "") {
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
-function appendPresetStatusItem(label, values, compactValue = null) {
+function appendPresetStatusItem(label, values, compactValue = null, openSettings) {
   const normalizedValues = Array.isArray(values) ? values.filter(Boolean) : [values].filter(Boolean);
   const value = normalizedValues.length > 0 ? normalizedValues.join(", ") : "None";
-  const item = document.createElement("span");
+  const item = document.createElement("button");
+  item.type = "button";
   item.className = "presetStatusItem";
-  item.title = `${label}: ${value}`;
-  item.setAttribute("aria-label", `${label}: ${value}`);
+  item.title = `Open ${label.toLocaleLowerCase()} settings · ${value}`;
+  item.setAttribute("aria-label", `Open ${label} settings. Current selection: ${value}`);
+  item.addEventListener("click", () => openSettings());
 
   const labelElement = document.createElement("span");
   labelElement.className = "presetStatusLabel";
@@ -566,21 +575,24 @@ function appendPresetStatusItem(label, values, compactValue = null) {
   valueElement.className = "presetStatusValue";
   valueElement.textContent = compactValue ?? value;
   item.append(labelElement, valueElement);
-  presetStatusBar.append(item);
+  presetStatusItems.append(item);
 }
 
 function renderPresetStatusBar() {
-  presetStatusBar.replaceChildren();
+  presetStatusItems.replaceChildren();
   const active = presetConfigurations.find((configuration) => configuration.id === activePresetId);
   if (!active) {
     const empty = document.createElement("span");
     empty.className = "presetStatusEmpty";
     empty.textContent = "No active preset";
-    presetStatusBar.append(empty);
+    presetStatusItems.append(empty);
     return;
   }
 
   const activeSkillIds = new Set((active.skillIds || []).map((id) => String(id)));
+  const configuredPrompts = Object.entries(active.systemPrompts || {})
+    .filter(([, content]) => String(content || "").trim())
+    .map(([name]) => PRESET_PROMPT_TITLES[name] || titleCaseIdentifier(name));
   const selectedSkills = skills
     .filter((skill) => skill.selected === true || activeSkillIds.has(String(skill.id)))
     .map((skill) => skill.name);
@@ -601,11 +613,12 @@ function renderPresetStatusBar() {
   const providerName = matchedProvider?.name || titleCaseIdentifier(providerSnapshot.provider);
 
   const skillStatus = selectedSkills.length > 0 ? selectedSkills : activeSkillIds.size > 0 ? `${activeSkillIds.size} selected` : [];
-  appendPresetStatusItem("Skills", skillStatus, String(selectedSkills.length || activeSkillIds.size));
-  appendPresetStatusItem("Tools", selectedTools, String(selectedTools.length));
-  appendPresetStatusItem("MCP", selectedMcp, selectedMcp.length > 0 ? String(selectedMcp.length) : "None");
-  appendPresetStatusItem("Provider", providerName);
-  appendPresetStatusItem("Workflow", selectedWorkflowItems, `${selectedWorkflowItems.length}/4`);
+  appendPresetStatusItem("Sys prompts", configuredPrompts, String(configuredPrompts.length), openSystemPromptsModal);
+  appendPresetStatusItem("Skills", skillStatus, String(selectedSkills.length || activeSkillIds.size), openSkillsModal);
+  appendPresetStatusItem("Tools", selectedTools, String(selectedTools.length), openToolsModal);
+  appendPresetStatusItem("MCP", selectedMcp, selectedMcp.length > 0 ? String(selectedMcp.length) : "None", openMcpModal);
+  appendPresetStatusItem("Provider", providerName, null, openProvidersModal);
+  appendPresetStatusItem("Workflow", selectedWorkflowItems, `${selectedWorkflowItems.length}/4`, openWorkflowSettings);
 }
 
 function updateActivePresetSnapshot(patch) {
@@ -2881,32 +2894,72 @@ function openProvidersModal() {
   if (!settingsDialog.open) settingsDialog.showModal();
 }
 
+async function openSkillsModal() {
+  closeSkillEditor();
+  skillsSearchInput.value = "";
+  if (!skillsDialog.open) skillsDialog.showModal();
+  skillsStatus.textContent = "Loading skills from SQLite...";
+  skillsStatus.dataset.state = "";
+  try {
+    await loadSkills();
+    skillsStatus.textContent = "Skill selections are stored in SQLite.";
+    skillsStatus.dataset.state = "";
+  } catch (error) {
+    skillsStatus.textContent = error.message;
+    skillsStatus.dataset.state = "error";
+  }
+}
+
+async function openSystemPromptsModal() {
+  systemPromptEditor.hidden = true;
+  systemPromptsList.hidden = false;
+  saveSystemPromptButton.hidden = true;
+  if (!systemPromptsDialog.open) systemPromptsDialog.showModal();
+  try {
+    await loadSystemPrompts();
+  } catch (error) {
+    systemPromptsStatus.textContent = error.message;
+    systemPromptsStatus.dataset.state = "error";
+  }
+}
+
+function openToolsModal() {
+  if (!toolsDialog.open) toolsDialog.showModal();
+  renderToolPermissions();
+  toolPermissionsStatus.textContent = "Tool permissions are stored in the active preset.";
+  toolPermissionsStatus.dataset.state = "";
+}
+
+async function openMcpModal() {
+  if (!mcpDialog.open) mcpDialog.showModal();
+  closeMcpEditor();
+  await loadTools();
+}
+
 async function openPresetsModal() {
   closePresetDropdown();
   if (!presetsDialog.open) presetsDialog.showModal();
   await loadPresets();
 }
 
+async function openWorkflowSettings() {
+  await openPresetsModal();
+  if (activePresetId) openPresetEditor(activePresetId);
+}
+
 sidebarComponent.addEventListener("open-modal", async (event) => {
   if (event.detail.modal === "providers") openProvidersModal();
   if (event.detail.modal === "system-prompts") {
-    systemPromptEditor.hidden = true; systemPromptsList.hidden = false; saveSystemPromptButton.hidden = true;
-    systemPromptsDialog.showModal();
-    try { await loadSystemPrompts(); } catch (error) { systemPromptsStatus.textContent = error.message; systemPromptsStatus.dataset.state = "error"; }
+    await openSystemPromptsModal();
   }
   if (event.detail.modal === "skills") {
-    closeSkillEditor();
-    skillsSearchInput.value = "";
-    skillsDialog.showModal();
-    skillsStatus.textContent = "Loading skills from SQLite..."; skillsStatus.dataset.state = "";
-    try { await loadSkills(); skillsStatus.textContent = "Skill selections are stored in SQLite."; skillsStatus.dataset.state = ""; } catch (error) { skillsStatus.textContent = error.message; skillsStatus.dataset.state = "error"; }
+    await openSkillsModal();
   }
   if (event.detail.modal === "tools") {
-    toolsDialog.showModal(); renderToolPermissions();
-    toolPermissionsStatus.textContent = "Tool permissions are stored in the active preset."; toolPermissionsStatus.dataset.state = "";
+    openToolsModal();
   }
   if (event.detail.modal === "mcp") {
-    mcpDialog.showModal(); closeMcpEditor(); await loadTools();
+    await openMcpModal();
   }
 });
 
