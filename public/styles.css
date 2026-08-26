@@ -1642,12 +1642,44 @@ textarea:disabled {
 .presetEditorActions button { min-height: 36px; border: 1px solid var(--line); border-radius: 8px; background: var(--raised); padding: 0 14px; color: var(--text); }
 .presetEditorActions .primaryButton { background: var(--accent); color: #1b1a18; }
 
+.workflowDialog { width: min(1040px, calc(100vw - 32px)); }
+.workflowPanel { max-height: calc(100vh - 48px); grid-template-rows: auto minmax(0, 1fr) auto; overflow: hidden; }
+.workflowDiagramPanel { display: grid; min-height: 0; gap: 14px; overflow: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--field); padding: 16px; }
+.workflowDiagramHeading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.workflowDiagramHeading h3 { margin: 0; color: var(--text); font-size: .94rem; }
+.workflowDiagramHeading p { margin: 5px 0 0; color: var(--muted); font-size: .76rem; }
+.workflowEnabledCount { flex: 0 0 auto; border: 1px solid var(--line); border-radius: 999px; background: var(--raised); padding: 7px 10px; color: var(--muted); font-size: .7rem; font-weight: 750; }
+.workflowDiagramScroll { min-height: 0; overflow-x: auto; }
+.workflowDiagram { display: block; width: 100%; min-width: 780px; height: auto; }
+.workflowConnector line { stroke: var(--strong-line); stroke-dasharray: 5 5; stroke-width: 2; }
+.workflowConnector path { fill: var(--strong-line); }
+.workflowConnector.enabled line { stroke: #77a982; stroke-dasharray: none; }
+.workflowConnector.enabled path { fill: #77a982; }
+.workflowStep { cursor: pointer; outline: none; }
+.workflowStepCard { fill: var(--raised); stroke: var(--strong-line); stroke-width: 1.5; transition: fill 120ms ease, stroke 120ms ease, opacity 120ms ease; }
+.workflowStepNumber { fill: var(--field); stroke: var(--strong-line); stroke-width: 1; }
+.workflowStepNumberText { fill: var(--muted); font: 750 10px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.workflowStepTitle { fill: var(--text); font: 750 15px Inter, ui-sans-serif, system-ui, sans-serif; }
+.workflowStepDescription { fill: var(--muted); font: 500 12px Inter, ui-sans-serif, system-ui, sans-serif; }
+.workflowStepStateDot { fill: var(--faint); }
+.workflowStepStateText { fill: var(--muted); font: 700 11px Inter, ui-sans-serif, system-ui, sans-serif; }
+.workflowStep.enabled .workflowStepCard { fill: #1b2920; stroke: #567b5f; }
+.workflowStep.enabled .workflowStepStateDot { fill: #82bd8e; }
+.workflowStep.enabled .workflowStepStateText { fill: #aad5b2; }
+.workflowStep.disabled .workflowStepCard { opacity: .58; }
+.workflowStep:focus-visible .workflowStepCard { stroke: var(--accent); stroke-width: 2.5; }
+.workflowDialog .settingsFooter > div { display: flex; gap: 8px; }
+.workflowDialog .settingsFooter button { min-height: 36px; border: 1px solid var(--line); border-radius: 8px; background: var(--raised); padding: 0 14px; }
+.workflowDialog .settingsFooter .primaryButton { background: var(--accent); color: #1b1a18; }
+
 @media (max-width: 680px) {
   .presetRow { grid-template-columns: 1fr; }
   .presetActions { flex-wrap: wrap; }
   .presetFieldGrid, .presetToggleGrid, .presetMcpAddForm { grid-template-columns: 1fr; }
   .presetFieldWide { grid-column: auto; }
   .presetsToolbar { align-items: stretch; flex-direction: column; }
+  .workflowDiagramHeading { align-items: stretch; flex-direction: column; }
+  .workflowEnabledCount { align-self: flex-start; }
 }
 
 .providerSettings {

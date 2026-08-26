@@ -42,21 +42,6 @@ class PresetsModal extends BaseComponent {
             this.createElement("section", { class: "presetEditorSection", children: [
               this.createElement("div", { class: "presetSectionHeading", children: [
                 this.createElement("span", { children: [document.createTextNode("02")] }),
-                this.createElement("div", { children: [this.createElement("h3", { children: [document.createTextNode("Workflow")] }), this.createElement("p", { children: [document.createTextNode("Configure the workflow interface and processing modules.")] })] }),
-              ] }),
-              this.createElement("div", { class: "presetFieldGrid", children: [
-                this.createElement("label", { class: "presetField presetFieldWide", children: [this.createElement("span", { children: [document.createTextNode("Input source")] }), this.createElement("select", { id: "presetEditorInputSource", children: [this.createElement("option", { value: "microphone", children: [document.createTextNode("Microphone")] }), this.createElement("option", { value: "keyboard", children: [document.createTextNode("Keyboard")] })] })] }),
-              ] }),
-              this.createElement("div", { class: "presetToggleGrid", "aria-label": "Workflow modules", children: [
-                this.toggle("presetEffectComposer", "Composer", "Prompt composition stage"),
-                this.toggle("presetEffectTools", "Tools", "Local tool execution stage"),
-                this.toggle("presetEffectMcp", "MCP", "Connected MCP server stage"),
-                this.toggle("presetEffectValidation", "Validation", "Post-change validation stage"),
-              ] }),
-            ] }),
-            this.createElement("section", { class: "presetEditorSection", children: [
-              this.createElement("div", { class: "presetSectionHeading", children: [
-                this.createElement("span", { children: [document.createTextNode("03")] }),
                 this.createElement("div", { children: [this.createElement("h3", { children: [document.createTextNode("Tool permissions")] }), this.createElement("p", { children: [document.createTextNode("Choose which local capabilities this preset may use.")] })] }),
               ] }),
               this.createElement("div", { class: "presetToggleGrid", "aria-label": "Tool permissions", children: [
@@ -71,7 +56,7 @@ class PresetsModal extends BaseComponent {
             ] }),
             this.createElement("section", { class: "presetEditorSection", children: [
               this.createElement("div", { class: "presetSectionHeading", children: [
-                this.createElement("span", { children: [document.createTextNode("04")] }),
+                this.createElement("span", { children: [document.createTextNode("03")] }),
                 this.createElement("div", { children: [this.createElement("h3", { children: [document.createTextNode("Skills")] }), this.createElement("p", { children: [document.createTextNode("Choose which stored skills are enabled by this preset.")] })] }),
               ] }),
               this.createElement("label", { class: "presetSkillSearch", children: [
@@ -82,14 +67,14 @@ class PresetsModal extends BaseComponent {
             ] }),
             this.createElement("section", { class: "presetEditorSection", children: [
               this.createElement("div", { class: "presetSectionHeading", children: [
-                this.createElement("span", { children: [document.createTextNode("05")] }),
+                this.createElement("span", { children: [document.createTextNode("04")] }),
                 this.createElement("div", { children: [this.createElement("h3", { children: [document.createTextNode("System prompts")] }), this.createElement("p", { children: [document.createTextNode("Edit every instruction stored in the preset snapshot.")] })] }),
               ] }),
               this.createElement("div", { id: "presetSystemPrompts", class: "presetPromptList" }),
             ] }),
             this.createElement("section", { class: "presetEditorSection", children: [
               this.createElement("div", { class: "presetSectionHeading", children: [
-                this.createElement("span", { children: [document.createTextNode("06")] }),
+                this.createElement("span", { children: [document.createTextNode("05")] }),
                 this.createElement("div", { children: [this.createElement("h3", { children: [document.createTextNode("MCP configuration")] }), this.createElement("p", { children: [document.createTextNode("Manage the MCP servers stored with this preset in SQLite.")] })] }),
               ] }),
               this.createElement("div", { id: "presetMcpServerList", class: "presetMcpServerList" }),

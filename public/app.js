@@ -68,6 +68,7 @@ const systemPromptsModal = document.querySelector("system-prompts-modal");
 const skillsModal = document.querySelector("skills-modal");
 const toolsModal = document.querySelector("tools-modal");
 const mcpModal = document.querySelector("mcp-modal");
+const workflowModal = document.querySelector("workflow-modal");
 
 const workspaceMeta = document.querySelector("#workspaceMeta");
 const workspaceInput = document.querySelector("#workspaceInput");
@@ -92,7 +93,6 @@ const presetsDialogDescription = document.querySelector("#presetsDialogDescripti
 const backToPresetsButton = document.querySelector("#backToPresetsButton");
 const presetEditorName = document.querySelector("#presetEditorName");
 const presetEditorProvider = document.querySelector("#presetEditorProvider");
-const presetEditorInputSource = document.querySelector("#presetEditorInputSource");
 const presetSkillsSearch = document.querySelector("#presetSkillsSearch");
 const presetSkillsList = document.querySelector("#presetSkillsList");
 const presetSystemPrompts = document.querySelector("#presetSystemPrompts");
@@ -107,6 +107,12 @@ const presetMcpCwd = document.querySelector("#presetMcpCwd");
 const presetMcpStdioFields = [...document.querySelectorAll(".presetMcpStdioField")];
 const presetMcpStatus = document.querySelector("#presetMcpStatus");
 const savePresetEditButton = document.querySelector("#savePresetEditButton");
+const workflowDialog = document.querySelector("#workflowDialog");
+const workflowDialogDescription = document.querySelector("#workflowDialogDescription");
+const workflowInputSource = document.querySelector("#workflowInputSource");
+const workflowStatus = document.querySelector("#workflowStatus");
+const saveWorkflowButton = document.querySelector("#saveWorkflowButton");
+const workflowEffectInputs = [...document.querySelectorAll("[data-workflow-effect]")];
 const systemPromptsDialog = document.querySelector("#systemPromptsDialog");
 const skillsDialog = document.querySelector("#skillsDialog");
 const systemPromptsList = document.querySelector("#systemPromptsList");
@@ -673,13 +679,6 @@ function selectPresetProvider() {
   if (selected) editingPresetProviderSettings = providerSettingsFromRecord(selected);
 }
 
-const PRESET_EFFECT_INPUTS = {
-  composer: "presetEffectComposer",
-  tools: "presetEffectTools",
-  mcp: "presetEffectMcp",
-  validation: "presetEffectValidation",
-};
-
 const PRESET_TOOL_INPUTS = {
   list_files: "presetToolListFiles",
   read_file: "presetToolReadFile",
@@ -855,15 +854,10 @@ function openPresetEditor(configurationId) {
   const configuration = presetConfigurations.find((preset) => preset.id === configurationId);
   if (!configuration || presetMutationPending || runActive) return;
   const provider = { ...defaultProviderSettings(), ...(configuration.providerSettings || {}) };
-  const component = normalizeRigComponentState(configuration.componentState);
   const permissions = normalizeToolPermissions(configuration.toolPermissions);
   editingPresetId = configuration.id;
   presetEditorName.value = configuration.name;
   renderPresetProviderOptions(provider);
-  presetEditorInputSource.value = component.inputSource;
-  for (const [key, id] of Object.entries(PRESET_EFFECT_INPUTS)) {
-    document.querySelector(`#${id}`).checked = component.effects[key] !== false;
-  }
   for (const [key, id] of Object.entries(PRESET_TOOL_INPUTS)) {
     document.querySelector(`#${id}`).checked = permissions[key] === true;
   }
@@ -910,11 +904,7 @@ async function savePresetEdit() {
     [...presetSystemPrompts.querySelectorAll("textarea[data-prompt-key]")]
       .map((textarea) => [textarea.dataset.promptKey, textarea.value]),
   );
-  const componentState = normalizeRigComponentState({
-    ...current.componentState,
-    inputSource: presetEditorInputSource.value,
-    effects: Object.fromEntries(Object.entries(PRESET_EFFECT_INPUTS).map(([key, id]) => [key, document.querySelector(`#${id}`).checked])),
-  });
+  const componentState = normalizeRigComponentState(current.componentState);
   const toolPermissions = normalizeToolPermissions(
     Object.fromEntries(Object.entries(PRESET_TOOL_INPUTS).map(([key, id]) => [key, document.querySelector(`#${id}`).checked])),
   );
@@ -2942,9 +2932,60 @@ async function openPresetsModal() {
   await loadPresets();
 }
 
-async function openWorkflowSettings() {
-  await openPresetsModal();
-  if (activePresetId) openPresetEditor(activePresetId);
+function setWorkflowPending(pending) {
+  workflowInputSource.disabled = pending;
+  for (const input of workflowEffectInputs) input.disabled = pending;
+  saveWorkflowButton.disabled = pending;
+  saveWorkflowButton.textContent = pending ? "Saving…" : "Save workflow";
+}
+
+function openWorkflowSettings() {
+  const active = presetConfigurations.find((configuration) => configuration.id === activePresetId);
+  if (!active) return;
+  closePresetDropdown();
+  const component = normalizeRigComponentState(active.componentState);
+  workflowDialogDescription.textContent = `${active.name} · configure the active preset's processing stages`;
+  workflowInputSource.value = component.inputSource;
+  for (const input of workflowEffectInputs) input.checked = component.effects[input.dataset.workflowEffect] !== false;
+  workflowModal.syncDiagram();
+  workflowStatus.textContent = runActive
+    ? "Stop the active run before changing workflow settings."
+    : "Workflow settings are stored in the active preset.";
+  workflowStatus.dataset.state = runActive ? "error" : "";
+  setWorkflowPending(runActive);
+  if (!workflowDialog.open) workflowDialog.showModal();
+}
+
+async function saveWorkflowSettings() {
+  const index = presetConfigurations.findIndex((configuration) => configuration.id === activePresetId);
+  if (index < 0 || presetMutationPending || runActive) return;
+  const current = presetConfigurations[index];
+  const componentState = normalizeRigComponentState({
+    ...current.componentState,
+    inputSource: workflowInputSource.value,
+    effects: Object.fromEntries(workflowEffectInputs.map((input) => [input.dataset.workflowEffect, input.checked])),
+  });
+  const updated = { ...current, componentState, updatedAt: Date.now() };
+  const configurations = presetConfigurations.map((configuration, configurationIndex) =>
+    configurationIndex === index ? updated : configuration
+  );
+  setWorkflowPending(true);
+  workflowStatus.textContent = "Saving workflow...";
+  workflowStatus.dataset.state = "";
+  const saved = await savePresetConfigurations(configurations, activePresetId, {
+    syncRuntime: true,
+    successMessage: "Workflow updated.",
+  });
+  setWorkflowPending(false);
+  if (saved) {
+    workflowStatus.textContent = "Workflow saved to the active preset.";
+    workflowStatus.dataset.state = "success";
+    addEvent("Workflow updated", `${updated.name} · ${Object.values(componentState.effects).filter(Boolean).length}/4 stages`);
+    workflowDialog.close();
+  } else {
+    workflowStatus.textContent = presetsStatus.textContent || "Unable to save workflow.";
+    workflowStatus.dataset.state = "error";
+  }
 }
 
 sidebarComponent.addEventListener("open-modal", async (event) => {
@@ -2982,6 +3023,11 @@ mcpModal.addEventListener("show-mcp-editor", () => openMcpEditor());
 mcpModal.addEventListener("cancel-mcp-editor", closeMcpEditor);
 providersModal.addEventListener("save-provider-settings", saveProviderSettings);
 toolsModal.addEventListener("save-tool-permissions", saveToolPermissions);
+workflowModal.addEventListener("save-workflow", saveWorkflowSettings);
+workflowModal.addEventListener("workflow-draft-change", () => {
+  workflowStatus.textContent = "Unsaved workflow changes.";
+  workflowStatus.dataset.state = "";
+});
 presetsModal.addEventListener("create-preset", duplicateActivePreset);
 presetsModal.addEventListener("cancel-preset-edit", closePresetEditor);
 presetsModal.addEventListener("save-preset-edit", savePresetEdit);
