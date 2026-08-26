@@ -511,16 +511,24 @@ code {
   white-space: nowrap;
 }
 
+.presetStatusItem:nth-child(1) { width: 92px; }
+.presetStatusItem:nth-child(2) { width: 64px; }
+.presetStatusItem:nth-child(3) { width: 60px; }
+.presetStatusItem:nth-child(4) { width: 78px; }
+.presetStatusItem:nth-child(5) { width: 136px; }
+.presetStatusItem:nth-child(6) { width: 96px; }
 .presetStatusItem:last-child { border-right: 0; }
 .presetStatusItem:hover { background: rgba(255, 255, 255, .07); }
 .presetStatusItem:focus-visible { outline: 1px solid rgba(255, 255, 255, .65); outline-offset: -2px; }
 .presetStatusLabel { color: var(--faint); font-weight: 600; }
 .presetStatusValue { color: #d7d7d7; font-weight: 700; }
+.presetStatusItem .presetStatusValue { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .presetStatusEmpty { padding: 0 12px; color: var(--faint); font-size: .72rem; }
 
 dropdown-button { position: relative; display: block; flex: 0 0 auto; }
 .dropdownButtonTrigger { display: flex; width: auto; max-width: 220px; align-items: center; gap: 8px; padding: 0 10px; font-size: .78rem; font-weight: 700; }
 .presetStatusBar > dropdown-button .dropdownButtonTrigger {
+  width: 132px;
   height: 30px;
   border: 0;
   border-left: 1px solid rgba(255, 255, 255, .15);

@@ -588,10 +588,12 @@ function renderPresetStatusBar() {
   presetStatusItems.replaceChildren();
   const active = presetConfigurations.find((configuration) => configuration.id === activePresetId);
   if (!active) {
-    const empty = document.createElement("span");
-    empty.className = "presetStatusEmpty";
-    empty.textContent = "No active preset";
-    presetStatusItems.append(empty);
+    appendPresetStatusItem("Sys prompts", [], "0", openSystemPromptsModal);
+    appendPresetStatusItem("Skills", [], "0", openSkillsModal);
+    appendPresetStatusItem("Tools", [], "0", openToolsModal);
+    appendPresetStatusItem("MCP", [], "None", openMcpModal);
+    appendPresetStatusItem("Provider", [], "None", openProvidersModal);
+    appendPresetStatusItem("Workflow", [], "0/4", openWorkflowSettings);
     return;
   }
 
@@ -3084,6 +3086,19 @@ async function initialize() {
   const storedDefaultWorkspace = loadDefaultWorkspace();
   const needsDefaultWorkspace = !storedDefaultWorkspace;
   if (storedDefaultWorkspace) defaultWorkspace = storedDefaultWorkspace;
+  const localSidebarWidth = Number(localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY));
+  const localStreamWidth = Number(localStorage.getItem(STREAM_WIDTH_STORAGE_KEY));
+  const localFilesWidth = Number(localStorage.getItem(FILES_WIDTH_STORAGE_KEY));
+  sidebarWidth = Number.isFinite(localSidebarWidth) && localSidebarWidth > 0 ? localSidebarWidth : 344;
+  streamWidth = Number.isFinite(localStreamWidth) && localStreamWidth > 0 ? localStreamWidth : 360;
+  filesWidth = Number.isFinite(localFilesWidth) && localFilesWidth > 0 ? localFilesWidth : 300;
+  applySidebarState(localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === "true");
+  applyRightColumnState("files", localStorage.getItem(FILES_VISIBLE_STORAGE_KEY) !== "false");
+  applyRightColumnState("stream", localStorage.getItem(STREAM_VISIBLE_STORAGE_KEY) !== "false");
+  setSidebarWidth(sidebarWidth);
+  setStreamWidth(streamWidth);
+  setFilesWidth(filesWidth);
+  renderPresetDropdown();
   try {
     state = await loadUiState();
     sessions = Array.isArray(state.sessions) && state.sessions.length > 0
@@ -3103,23 +3118,11 @@ async function initialize() {
     sessions = [createSession("AI Harness Session", defaultWorkspace)];
     addEvent("UI state load failed", error.message, { persist: false });
   }
-  const localSidebarWidth = Number(localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY));
-  const localStreamWidth = Number(localStorage.getItem(STREAM_WIDTH_STORAGE_KEY));
-  const localFilesWidth = Number(localStorage.getItem(FILES_WIDTH_STORAGE_KEY));
-  sidebarWidth = Number.isFinite(localSidebarWidth) && localSidebarWidth > 0 ? localSidebarWidth : 344;
-  streamWidth = Number.isFinite(localStreamWidth) && localStreamWidth > 0 ? localStreamWidth : 360;
-  filesWidth = Number.isFinite(localFilesWidth) && localFilesWidth > 0 ? localFilesWidth : 300;
-  applySidebarState(localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === "true");
-  applyRightColumnState("files", localStorage.getItem(FILES_VISIBLE_STORAGE_KEY) !== "false");
-  applyRightColumnState("stream", localStorage.getItem(STREAM_VISIBLE_STORAGE_KEY) !== "false");
   const storedActiveSessionId = localStorage.getItem(ACTIVE_SESSION_STORAGE_KEY);
   activeSessionId = sessions.some((session) => session.id === storedActiveSessionId)
     ? storedActiveSessionId
     : sessions[0].id;
   localStorage.setItem(ACTIVE_SESSION_STORAGE_KEY, activeSessionId);
-  setSidebarWidth(sidebarWidth);
-  setStreamWidth(streamWidth);
-  setFilesWidth(filesWidth);
   renderProviderSettings();
   renderToolPermissions();
   renderRecents();
