@@ -170,6 +170,7 @@ const streamResizeHandle = document.querySelector("#streamResizeHandle");
 const toggleFilesColumnButton = document.querySelector("#toggleFilesColumnButton");
 const toggleStreamColumnButton = document.querySelector("#toggleStreamColumnButton");
 const presetDropdown = document.querySelector("#presetDropdown");
+const presetStatusBar = document.querySelector("#presetStatusBar");
 const filesResizeHandle = document.querySelector("#filesResizeHandle");
 const workspaceTreeElement = document.querySelector("#workspaceTree");
 const filesWorkspaceLabel = document.querySelector("#filesWorkspaceLabel");
@@ -479,6 +480,7 @@ async function saveSkillEdit() {
       : await persistNewSkill(name, content);
     skills = Array.isArray(result.skills) ? result.skills : await fetchSkills();
     renderSkills();
+    renderPresetStatusBar();
     send({ type: "reload_skills" });
     skillsStatus.textContent = editingSkillId ? `${name} updated.` : `${name} created.`;
     skillsStatus.dataset.state = "success";
@@ -500,6 +502,7 @@ async function saveSkills() {
   const selectedIds = new Set((response.skills || []).map((skill) => skill.id));
   skills = skills.map((skill) => ({ ...skill, selected: selectedIds.has(skill.id) }));
   renderSkills();
+  updateActivePresetSnapshot({ skillIds: selectedSkillIds });
   send({ type: "reload_skills" });
   skillsStatus.textContent = `${selectedSkillIds.length} skill${selectedSkillIds.length === 1 ? "" : "s"} selected`;
   skillsStatus.dataset.state = "success";
@@ -524,6 +527,93 @@ const persistUiState = createStateSaveQueue(
   saveUiState,
   (error) => addEvent("UI state save failed", error.message, { persist: false }),
 );
+
+const PRESET_STATUS_TOOL_LABELS = {
+  list_files: "List files",
+  read_file: "Read files",
+  write_file: "Write files",
+  search_files: "Search files",
+  curl: "Curl",
+  run_command: "Run commands",
+  chrome_devtools: "Chrome DevTools",
+};
+
+const PRESET_STATUS_WORKFLOW_LABELS = {
+  composer: "Composer",
+  tools: "Tools",
+  mcp: "MCP",
+  validation: "Validation",
+};
+
+function titleCaseIdentifier(value = "") {
+  return String(value)
+    .replaceAll(/[_-]+/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function appendPresetStatusItem(label, values, compactValue = null) {
+  const normalizedValues = Array.isArray(values) ? values.filter(Boolean) : [values].filter(Boolean);
+  const value = normalizedValues.length > 0 ? normalizedValues.join(", ") : "None";
+  const item = document.createElement("span");
+  item.className = "presetStatusItem";
+  item.title = `${label}: ${value}`;
+  item.setAttribute("aria-label", `${label}: ${value}`);
+
+  const labelElement = document.createElement("span");
+  labelElement.className = "presetStatusLabel";
+  labelElement.textContent = label;
+  const valueElement = document.createElement("span");
+  valueElement.className = "presetStatusValue";
+  valueElement.textContent = compactValue ?? value;
+  item.append(labelElement, valueElement);
+  presetStatusBar.append(item);
+}
+
+function renderPresetStatusBar() {
+  presetStatusBar.replaceChildren();
+  const active = presetConfigurations.find((configuration) => configuration.id === activePresetId);
+  if (!active) {
+    const empty = document.createElement("span");
+    empty.className = "presetStatusEmpty";
+    empty.textContent = "No active preset";
+    presetStatusBar.append(empty);
+    return;
+  }
+
+  const activeSkillIds = new Set((active.skillIds || []).map((id) => String(id)));
+  const selectedSkills = skills
+    .filter((skill) => skill.selected === true || activeSkillIds.has(String(skill.id)))
+    .map((skill) => skill.name);
+  const toolPermissions = normalizeToolPermissions(active.toolPermissions || storedToolPermissions);
+  const selectedTools = Object.entries(toolPermissions)
+    .filter(([, selected]) => selected === true)
+    .map(([name]) => PRESET_STATUS_TOOL_LABELS[name] || titleCaseIdentifier(name));
+  const selectedMcp = mcpBlocks(active.mcpConfig || toolsConfigContent)
+    .filter((block) => block.enabled)
+    .map((block) => block.label);
+  const component = normalizeRigComponentState(active.componentState);
+  const selectedWorkflowItems = Object.entries(component.effects)
+    .filter(([, selected]) => selected !== false)
+    .map(([name]) => PRESET_STATUS_WORKFLOW_LABELS[name] || titleCaseIdentifier(name));
+  const providerSnapshot = providerSettingsFromRecord(active.providerSettings || providerSettings);
+  const matchedProviderId = matchingProviderId(providers, providerSnapshot);
+  const matchedProvider = providers.find((provider) => String(provider.id) === matchedProviderId);
+  const providerName = matchedProvider?.name || titleCaseIdentifier(providerSnapshot.provider);
+
+  const skillStatus = selectedSkills.length > 0 ? selectedSkills : activeSkillIds.size > 0 ? `${activeSkillIds.size} selected` : [];
+  appendPresetStatusItem("Skills", skillStatus, String(selectedSkills.length || activeSkillIds.size));
+  appendPresetStatusItem("Tools", selectedTools, String(selectedTools.length));
+  appendPresetStatusItem("MCP", selectedMcp, selectedMcp.length > 0 ? String(selectedMcp.length) : "None");
+  appendPresetStatusItem("Provider", providerName);
+  appendPresetStatusItem("Workflow", selectedWorkflowItems, `${selectedWorkflowItems.length}/4`);
+}
+
+function updateActivePresetSnapshot(patch) {
+  const index = presetConfigurations.findIndex((configuration) => configuration.id === activePresetId);
+  if (index < 0) return;
+  presetConfigurations[index] = { ...presetConfigurations[index], ...patch };
+  renderPresetStatusBar();
+}
 
 function setPresetsStatus(message, state = "") {
   presetsStatus.textContent = message;
@@ -925,9 +1015,11 @@ function renderPresetDropdown() {
     { type: "separator" },
     { value: "manage-presets", label: "Manage presets…", action: true },
   ]);
+  renderPresetStatusBar();
 }
 
 async function loadPresetSummary() {
+  const skillsPromise = fetchSkills().catch(() => null);
   try {
     const result = await fetchRigConfigurations();
     presetConfigurations = Array.isArray(result.configurations) ? result.configurations : [];
@@ -938,6 +1030,8 @@ async function loadPresetSummary() {
     presetConfigurations = [];
     activePresetId = null;
   }
+  const storedSkills = await skillsPromise;
+  if (Array.isArray(storedSkills)) skills = storedSkills;
   renderPresetDropdown();
 }
 
@@ -2092,6 +2186,7 @@ function currentProviderSettings() {
 function applyActiveProviderSettings(settings) {
   providerSettings = { ...defaultProviderSettings(), ...(settings || {}) };
   workspaceMeta.textContent = `${providerSettings.provider} · ${providerSettings.model || "default model"}`;
+  updateActivePresetSnapshot({ providerSettings });
   send({ type: "provider_settings", ...providerSettings });
 }
 
@@ -2241,6 +2336,7 @@ function renderToolPermissions(settings = storedToolPermissions) {
 function saveToolPermissions() {
   const permissions = currentToolPermissions();
   storedToolPermissions = permissions;
+  updateActivePresetSnapshot({ toolPermissions: permissions });
   persistUiState({ toolPermissions: permissions });
   send({ type: "tool_permissions", permissions });
   toolPermissionsStatus.textContent = "Tool permissions saved to the active preset";
@@ -2335,6 +2431,8 @@ async function saveConfig() {
   saveConfigButton.disabled = true;
   try {
     const payload = await persistConfig(configInput.value);
+    toolsConfigContent = configInput.value;
+    updateActivePresetSnapshot({ mcpConfig: toolsConfigContent });
     setConfigStatus(`Saved ${payload.path}`, "success");
     addEvent("Config saved", `${payload.path} (${payload.bytes} bytes)`);
   } catch (error) {
@@ -2346,6 +2444,8 @@ async function saveConfig() {
 
 async function saveConfigContent(content) {
   const payload = await persistConfig(content);
+  toolsConfigContent = content;
+  updateActivePresetSnapshot({ mcpConfig: content });
   send({ type: "reload_tools" });
   configInput.value = content;
   return payload;

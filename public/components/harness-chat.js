@@ -12,7 +12,50 @@ class HarnessChat extends BaseComponent {
   render() {
     this.setAttribute("role", "main");
     this.appendChildren(this, [
-      this.createElement("header", { "class": "chatTopbar", children: [this.createElement("div", { "class": "columnVisibilityControls", "aria-label": "Chat controls", children: [this.createElement("dropdown-button", { "id": "presetDropdown", "placeholder": "Presets", "aria-label": "Select preset" }), this.createElement("button", { "id": "toggleFilesColumnButton", "class": "columnToggleButton", "type": "button", "aria-label": "Hide workspace column", "aria-pressed": "true", "title": "Hide workspace column", children: [workspaceExplorerIcon()] }), this.createElement("button", { "id": "toggleStreamColumnButton", "class": "columnToggleButton", "type": "button", "aria-label": "Hide stream column", "aria-pressed": "true", "title": "Hide stream column", children: [this.createElement("span", { "aria-hidden": "true", children: [document.createTextNode("◉")] })] })] })] }),
+      this.createElement("header", {
+        class: "chatTopbar",
+        children: [
+          this.createElement("div", {
+            class: "columnVisibilityControls",
+            "aria-label": "Chat controls",
+            children: [
+              this.createElement("div", {
+                id: "presetStatusBar",
+                class: "presetStatusBar",
+                role: "status",
+                "aria-live": "polite",
+                "aria-label": "Active preset status",
+              }),
+              this.createElement("dropdown-button", {
+                id: "presetDropdown",
+                placeholder: "Presets",
+                "aria-label": "Select preset",
+              }),
+              this.createElement("button", {
+                id: "toggleFilesColumnButton",
+                class: "columnToggleButton",
+                type: "button",
+                "aria-label": "Hide workspace column",
+                "aria-pressed": "true",
+                title: "Hide workspace column",
+                children: [workspaceExplorerIcon()],
+              }),
+              this.createElement("button", {
+                id: "toggleStreamColumnButton",
+                class: "columnToggleButton",
+                type: "button",
+                "aria-label": "Hide stream column",
+                "aria-pressed": "true",
+                title: "Hide stream column",
+                children: [this.createElement("span", {
+                  "aria-hidden": "true",
+                  children: [document.createTextNode("◉")],
+                })],
+              }),
+            ],
+          }),
+        ],
+      }),
       this.createElement("section", { "id": "messages", "class": "messages", "aria-live": "polite", 
         children: [
           this.createElement("div", { "id": "emptyState", "class": "emptyState", 

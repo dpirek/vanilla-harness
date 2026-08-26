@@ -481,17 +481,53 @@ code {
   pointer-events: auto;
 }
 
-.columnVisibilityControls { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+.columnVisibilityControls { display: flex; width: 100%; min-width: 0; align-items: center; gap: 6px; margin-left: auto; }
 .columnVisibilityControls > .columnToggleButton,
 .dropdownButtonTrigger { display: grid; height: 32px; place-items: center; border: 1px solid var(--line); border-radius: 8px; background: #151515; padding: 0; color: var(--muted); font-size: 1rem; }
-.columnVisibilityControls > .columnToggleButton { width: 32px; }
+.columnVisibilityControls > .columnToggleButton { width: 32px; flex: 0 0 32px; }
 .columnVisibilityControls > .columnToggleButton:hover,
 .columnVisibilityControls > .columnToggleButton[aria-pressed="true"],
 .dropdownButtonTrigger:hover,
 .dropdownButtonTrigger[aria-expanded="true"] { background: #242424; color: var(--text); }
 .workspaceExplorerIcon { display: block; width: 20px; height: 20px; }
 
-dropdown-button { position: relative; display: block; }
+.presetStatusBar {
+  display: flex;
+  min-width: 0;
+  height: 32px;
+  flex: 1 1 auto;
+  align-items: center;
+  overflow-x: auto;
+  border: 1px solid rgba(255, 255, 255, .15);
+  border-radius: 8px;
+  background: rgba(10, 10, 10, .32);
+  color: var(--muted);
+  scrollbar-width: none;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.presetStatusBar::-webkit-scrollbar { display: none; }
+
+.presetStatusItem {
+  display: inline-flex;
+  min-width: 0;
+  height: 100%;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 5px;
+  padding: 0 10px;
+  border-right: 1px solid rgba(255, 255, 255, .1);
+  font-size: .68rem;
+  white-space: nowrap;
+}
+
+.presetStatusItem:last-child { border-right: 0; }
+.presetStatusLabel { color: var(--faint); font-weight: 600; }
+.presetStatusValue { color: #d7d7d7; font-weight: 700; }
+.presetStatusEmpty { padding: 0 12px; color: var(--faint); font-size: .72rem; }
+
+dropdown-button { position: relative; display: block; flex: 0 0 auto; }
 .dropdownButtonTrigger { display: flex; width: auto; max-width: 220px; align-items: center; gap: 8px; padding: 0 10px; font-size: .78rem; font-weight: 700; }
 .dropdownButtonLabel { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dropdownButtonCaret { display: block; width: 12px; height: 12px; flex: 0 0 12px; color: var(--muted); transition: transform 120ms ease; }
