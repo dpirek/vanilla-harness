@@ -1,7 +1,6 @@
 import HarnessSidebar from "./components/harness-sidebar.js";
 import HarnessChat from "./components/harness-chat.js";
 import WorkspacePanel from "./components/workspace-panel.js";
-import StreamPanel from "./components/stream-panel.js";
 import ColumnResizeHandle from "./components/column-resize-handle.js";
 import { mountAppShell } from "./components/app-shell.js";
 import { codeLanguageLabel, renderFilePreview } from "./lib/file-utils.js";
@@ -15,7 +14,7 @@ import {
 } from "./lib/settings.js";
 import { normalizeRigComponentState } from "./lib/rig-presets.js";
 import { CONFIG_TEMPLATES, mcpBlocks, quoteToml, replaceToolBlock, setToolBlockEnabled, updateToolBlock } from "./lib/mcp-config.js";
-import { appendEvent, describeAgentEvent, renderEventList } from "./lib/event-rendering.js";
+import { describeAgentEvent } from "./lib/agent-events.js";
 import { readFileAsDataUrl, renderImagePreviews as renderImagePreviewList } from "./lib/image-attachments.js";
 import { normalizeSkillName, skillDraft, syncSkillContentName, validateSkillContent } from "./lib/skill-content.js";
 import { clearSessionHistory, createSession, promptHistoryFromSessions, titleFromPrompt } from "./lib/sessions.js";
@@ -59,7 +58,6 @@ const appShell = mountAppShell();
 const sidebarComponent = document.querySelector("harness-sidebar");
 const chatComponent = document.querySelector("harness-chat");
 const workspaceComponent = document.querySelector("workspace-panel");
-const streamComponent = document.querySelector("stream-panel");
 const workspacePickerModal = document.querySelector("workspace-picker-modal");
 const createWorkspaceModal = document.querySelector("create-workspace-modal");
 const providersModal = document.querySelector("providers-modal");
@@ -73,7 +71,6 @@ const workflowModal = document.querySelector("workflow-modal");
 const workspaceMeta = document.querySelector("#workspaceMeta");
 const workspaceInput = document.querySelector("#workspaceInput");
 const messages = document.querySelector("#messages");
-const eventList = document.querySelector("#eventList");
 const promptInput = document.querySelector("#promptInput");
 const sendButton = document.querySelector("#sendButton");
 const microphoneButton = document.querySelector("#microphoneButton");
@@ -172,9 +169,7 @@ const providerModelsStatus = document.querySelector("#providerModelsStatus");
 const toolPermissionInputs = [...document.querySelectorAll("[data-tool-permission]")];
 const sidebarToggleButton = document.querySelector("#sidebarToggleButton");
 const sidebarResizeHandle = document.querySelector("#sidebarResizeHandle");
-const streamResizeHandle = document.querySelector("#streamResizeHandle");
 const toggleFilesColumnButton = document.querySelector("#toggleFilesColumnButton");
-const toggleStreamColumnButton = document.querySelector("#toggleStreamColumnButton");
 const presetDropdown = document.querySelector("#presetDropdown");
 const presetStatusItems = document.querySelector("#presetStatusItems");
 const filesResizeHandle = document.querySelector("#filesResizeHandle");
@@ -281,16 +276,13 @@ function updateImagePreview(workspace, node) {
   });
 }
 
-const MIN_STREAM_WIDTH = 260;
 const MIN_SIDEBAR_WIDTH = 220;
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const ACTIVE_SESSION_STORAGE_KEY = "ai-harness.activeSessionId";
 const SIDEBAR_COLLAPSED_STORAGE_KEY = "ai-harness.sidebarCollapsed";
 const SIDEBAR_WIDTH_STORAGE_KEY = "ai-harness.sidebarWidth";
-const STREAM_WIDTH_STORAGE_KEY = "ai-harness.streamWidth";
 const FILES_WIDTH_STORAGE_KEY = "ai-harness.filesWidth";
 const FILES_VISIBLE_STORAGE_KEY = "ai-harness.filesVisible";
-const STREAM_VISIBLE_STORAGE_KEY = "ai-harness.streamVisible";
 
 let toolsConfigContent = "";
 let systemPrompts = [];
@@ -534,7 +526,6 @@ let editingPresetSkillIds = new Set();
 let editingPresetMcpConfig = "";
 let presetMutationPending = false;
 let sidebarWidth = 344;
-let streamWidth = 360;
 let filesWidth = 300;
 const persistUiState = createStateSaveQueue(
   saveUiState,
@@ -1168,22 +1159,17 @@ function toggleSidebar() {
   applySidebarState(collapsed);
 }
 
-function applyRightColumnState(column, visible) {
-  const isFiles = column === "files";
-  const className = isFiles ? "files-collapsed" : "stream-collapsed";
-  const button = isFiles ? toggleFilesColumnButton : toggleStreamColumnButton;
-  const label = isFiles ? "workspace" : "stream";
-  appShell.classList.toggle(className, !visible);
-  button.setAttribute("aria-pressed", String(visible));
-  button.title = `${visible ? "Hide" : "Show"} ${label} column`;
-  button.setAttribute("aria-label", button.title);
+function applyFilesColumnState(visible) {
+  appShell.classList.toggle("files-collapsed", !visible);
+  toggleFilesColumnButton.setAttribute("aria-pressed", String(visible));
+  toggleFilesColumnButton.title = `${visible ? "Hide" : "Show"} workspace column`;
+  toggleFilesColumnButton.setAttribute("aria-label", toggleFilesColumnButton.title);
 }
 
-function toggleRightColumn(column) {
-  const isFiles = column === "files";
-  const visible = appShell.classList.contains(isFiles ? "files-collapsed" : "stream-collapsed");
-  localStorage.setItem(isFiles ? FILES_VISIBLE_STORAGE_KEY : STREAM_VISIBLE_STORAGE_KEY, String(visible));
-  applyRightColumnState(column, visible);
+function toggleFilesColumn() {
+  const visible = appShell.classList.contains("files-collapsed");
+  localStorage.setItem(FILES_VISIBLE_STORAGE_KEY, String(visible));
+  applyFilesColumnState(visible);
 }
 
 function setSidebarWidth(width) {
@@ -1217,42 +1203,6 @@ function startSidebarResize(event) {
   sidebarResizeHandle.addEventListener("pointercancel", stop);
 }
 
-function clampStreamWidth(width) {
-  return Math.max(width, MIN_STREAM_WIDTH);
-}
-
-function setStreamWidth(width) {
-  const clamped = clampStreamWidth(width);
-  appShell.style.setProperty("--stream-width", `${clamped}px`);
-  streamResizeHandle.setAttribute("aria-valuemin", String(MIN_STREAM_WIDTH));
-  streamResizeHandle.setAttribute("aria-valuenow", String(clamped));
-  streamWidth = clamped;
-  localStorage.setItem(STREAM_WIDTH_STORAGE_KEY, String(clamped));
-}
-
-function startStreamResize(event) {
-  if (event.button !== 0) return;
-  event.preventDefault();
-  appShell.classList.add("resizing-column");
-  streamResizeHandle.classList.add("is-resizing");
-  streamResizeHandle.setPointerCapture(event.pointerId);
-
-  const move = (moveEvent) => {
-    setStreamWidth(window.innerWidth - moveEvent.clientX - 4);
-  };
-  const stop = () => {
-    appShell.classList.remove("resizing-column");
-    streamResizeHandle.classList.remove("is-resizing");
-    streamResizeHandle.removeEventListener("pointermove", move);
-    streamResizeHandle.removeEventListener("pointerup", stop);
-    streamResizeHandle.removeEventListener("pointercancel", stop);
-  };
-
-  streamResizeHandle.addEventListener("pointermove", move);
-  streamResizeHandle.addEventListener("pointerup", stop);
-  streamResizeHandle.addEventListener("pointercancel", stop);
-}
-
 function setFilesWidth(width) {
   const clamped = Math.max(width, 220);
   appShell.style.setProperty("--files-width", `${clamped}px`);
@@ -1269,8 +1219,7 @@ function startFilesResize(event) {
   filesResizeHandle.classList.add("is-resizing");
   filesResizeHandle.setPointerCapture(event.pointerId);
   const move = (moveEvent) => {
-    const visibleStreamWidth = appShell.classList.contains("stream-collapsed") ? 0 : streamWidth + 8;
-    setFilesWidth(window.innerWidth - moveEvent.clientX - visibleStreamWidth - 4);
+    setFilesWidth(window.innerWidth - moveEvent.clientX - 4);
   };
   const stop = () => {
     appShell.classList.remove("resizing-column"); filesResizeHandle.classList.remove("is-resizing");
@@ -2084,7 +2033,7 @@ function renderRecents() {
       localStorage.setItem(ACTIVE_SESSION_STORAGE_KEY, activeSessionId);
       renderRecents();
       renderMessages();
-      renderEvents();
+      renderSessionActivity();
       renderWorkspace();
       loadWorkspaceTree();
       addEvent("Opened recent chat", session.title);
@@ -2118,7 +2067,7 @@ function renderRecents() {
         send({ type: "reset", sessionId: session.id });
         renderRecents();
         renderMessages();
-        renderEvents();
+        renderSessionActivity();
         renderWorkspace();
         loadWorkspaceTree();
       } catch (error) {
@@ -2143,7 +2092,7 @@ async function startNewChat() {
     renderRecents();
     renderMessages();
     renderWorkspace();
-    renderEvents();
+    renderSessionActivity();
     loadWorkspaceTree();
     addEvent("New chat started");
   } catch (error) {
@@ -2153,18 +2102,8 @@ async function startNewChat() {
   }
 }
 
-function renderEvent({ title, detail, timestamp }) {
-  appendEvent(eventList, { title, detail, timestamp });
-}
-
-function renderEvents() {
-  renderEventList(eventList, activeSession()?.events || []);
-  renderSessionActivity();
-}
-
 function addEvent(title, detail, { persist = true } = {}) {
   const event = { title, detail, timestamp: Date.now() };
-  renderEvent(event);
   const session = activeSession();
   if (!persist || !session) return;
   session.events ||= [];
@@ -2832,7 +2771,7 @@ chatComponent.addEventListener("images-selected", async (event) => addImages(eve
 chatComponent.addEventListener("toggle-microphone", toggleMicrophone);
 chatComponent.addEventListener("prompt-edited", resetPromptHistoryCursor);
 chatComponent.addEventListener("navigate-prompt-history", (event) => navigatePromptHistory(event.detail.direction));
-chatComponent.addEventListener("toggle-column", (event) => toggleRightColumn(event.detail.column));
+chatComponent.addEventListener("toggle-files-column", toggleFilesColumn);
 sidebarComponent.addEventListener("new-chat", startNewChat);
 sidebarComponent.addEventListener("toggle-sidebar", toggleSidebar);
 presetDropdown.addEventListener("dropdown-select", async (event) => {
@@ -2852,10 +2791,6 @@ sidebarResizeHandle.addEventListener("column-resize-key", (event) => {
   setSidebarWidth(sidebarWidth + (event.detail.key === "ArrowLeft" ? -24 : 24));
 });
 
-streamResizeHandle.addEventListener("column-resize-start", (event) => startStreamResize(event.detail.sourceEvent));
-streamResizeHandle.addEventListener("column-resize-key", (event) => {
-  setStreamWidth(streamWidth + (event.detail.key === "ArrowLeft" ? 24 : -24));
-});
 filesResizeHandle.addEventListener("column-resize-start", (event) => startFilesResize(event.detail.sourceEvent));
 filesResizeHandle.addEventListener("column-resize-key", (event) => {
   setFilesWidth(filesWidth + (event.detail.key === "ArrowLeft" ? 24 : -24));
@@ -2872,7 +2807,6 @@ workspacePickerDialog.addEventListener("cancel", (event) => {
   if (selectingDefaultWorkspace) event.preventDefault();
 });
 window.addEventListener("resize", () => {
-  setStreamWidth(streamWidth);
   setFilesWidth(filesWidth);
 });
 
@@ -3067,17 +3001,8 @@ chatComponent.addEventListener("reset-chat", () => {
   }
   messages.replaceChildren();
   messages.append(emptyState);
-  renderEvents();
+  renderSessionActivity();
   send({ type: "reset", sessionId: activeSessionId });
-});
-
-streamComponent.addEventListener("clear-stream", () => {
-  const session = activeSession();
-  if (session) {
-    session.events = [];
-    saveSessions();
-  }
-  renderEvents();
 });
 
 async function initialize() {
@@ -3087,16 +3012,12 @@ async function initialize() {
   const needsDefaultWorkspace = !storedDefaultWorkspace;
   if (storedDefaultWorkspace) defaultWorkspace = storedDefaultWorkspace;
   const localSidebarWidth = Number(localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY));
-  const localStreamWidth = Number(localStorage.getItem(STREAM_WIDTH_STORAGE_KEY));
   const localFilesWidth = Number(localStorage.getItem(FILES_WIDTH_STORAGE_KEY));
   sidebarWidth = Number.isFinite(localSidebarWidth) && localSidebarWidth > 0 ? localSidebarWidth : 344;
-  streamWidth = Number.isFinite(localStreamWidth) && localStreamWidth > 0 ? localStreamWidth : 360;
   filesWidth = Number.isFinite(localFilesWidth) && localFilesWidth > 0 ? localFilesWidth : 300;
   applySidebarState(localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === "true");
-  applyRightColumnState("files", localStorage.getItem(FILES_VISIBLE_STORAGE_KEY) !== "false");
-  applyRightColumnState("stream", localStorage.getItem(STREAM_VISIBLE_STORAGE_KEY) !== "false");
+  applyFilesColumnState(localStorage.getItem(FILES_VISIBLE_STORAGE_KEY) !== "false");
   setSidebarWidth(sidebarWidth);
-  setStreamWidth(streamWidth);
   setFilesWidth(filesWidth);
   renderPresetDropdown();
   try {
@@ -3127,7 +3048,7 @@ async function initialize() {
   renderToolPermissions();
   renderRecents();
   renderMessages();
-  renderEvents();
+  renderSessionActivity();
   renderWorkspace();
   resizePromptInput();
   await loadPresetSummary();

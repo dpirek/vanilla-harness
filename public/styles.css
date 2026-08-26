@@ -14,7 +14,6 @@
   --danger: #ff7066;
   --sidebar-width: 344px;
   --sidebar-collapsed-width: 60px;
-  --stream-width: 360px;
   --files-width: 300px;
   --chat-content-width: 1080px;
   --chat-gutter: clamp(18px, 4vw, 56px);
@@ -65,7 +64,7 @@ code {
 
 .app {
   display: grid;
-  grid-template-columns: var(--sidebar-width) 8px minmax(360px, 1fr) 8px var(--files-width) 8px var(--stream-width);
+  grid-template-columns: var(--sidebar-width) 8px minmax(360px, 1fr) 8px var(--files-width);
   height: 100vh;
   background: var(--bg);
 }
@@ -76,21 +75,14 @@ code {
 .chat { grid-column: 3; }
 .filesResizeHandle { grid-column: 4; }
 .filesColumn { grid-column: 5; }
-.streamResizeHandle { grid-column: 6; }
-.streamColumn { grid-column: 7; }
 
 .app.sidebar-collapsed {
-  grid-template-columns: var(--sidebar-collapsed-width) 8px minmax(360px, 1fr) 8px var(--files-width) 8px var(--stream-width);
+  grid-template-columns: var(--sidebar-collapsed-width) 8px minmax(360px, 1fr) 8px var(--files-width);
 }
 
-.app.files-collapsed { grid-template-columns: var(--sidebar-width) 8px minmax(360px, 1fr) 0 0 8px var(--stream-width); }
-.app.sidebar-collapsed.files-collapsed { grid-template-columns: var(--sidebar-collapsed-width) 8px minmax(360px, 1fr) 0 0 8px var(--stream-width); }
-.app.stream-collapsed { grid-template-columns: var(--sidebar-width) 8px minmax(360px, 1fr) 8px var(--files-width) 0 0; }
-.app.sidebar-collapsed.stream-collapsed { grid-template-columns: var(--sidebar-collapsed-width) 8px minmax(360px, 1fr) 8px var(--files-width) 0 0; }
-.app.files-collapsed.stream-collapsed { grid-template-columns: var(--sidebar-width) 8px minmax(360px, 1fr) 0 0 0 0; }
-.app.sidebar-collapsed.files-collapsed.stream-collapsed { grid-template-columns: var(--sidebar-collapsed-width) 8px minmax(360px, 1fr) 0 0 0 0; }
-.app.files-collapsed .filesColumn, .app.files-collapsed .filesResizeHandle,
-.app.stream-collapsed .streamColumn, .app.stream-collapsed .streamResizeHandle { display: none; }
+.app.files-collapsed { grid-template-columns: var(--sidebar-width) 8px minmax(360px, 1fr) 0 0; }
+.app.sidebar-collapsed.files-collapsed { grid-template-columns: var(--sidebar-collapsed-width) 8px minmax(360px, 1fr) 0 0; }
+.app.files-collapsed .filesColumn, .app.files-collapsed .filesResizeHandle { display: none; }
 
 .sidebar {
   display: flex;
@@ -165,8 +157,7 @@ code {
 }
 
 .sidebarActions,
-.chatActions,
-.streamHeader {
+.chatActions {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -473,7 +464,7 @@ code {
 .presetStatusBar {
   display: flex;
   min-width: 0;
-  max-width: calc(100% - 76px);
+  max-width: calc(100% - 38px);
   height: 32px;
   flex: 0 1 auto;
   align-items: center;
@@ -1267,24 +1258,6 @@ textarea:disabled {
   border-color: #555;
 }
 
-.streamColumn {
-  display: flex;
-  min-width: 0;
-  min-height: 0;
-  flex-direction: column;
-  background: #050505;
-  color: var(--text);
-}
-
-.streamPanelBody {
-  display: flex;
-  min-width: 0;
-  min-height: 0;
-  flex: 1;
-  flex-direction: column;
-  overflow: hidden;
-}
-
 .filesColumn {
   position: relative;
   display: flex;
@@ -1457,41 +1430,6 @@ textarea:disabled {
 .app.resizing-column * {
   cursor: col-resize;
   user-select: none;
-}
-
-.streamHeader {
-  justify-content: space-between;
-  border-bottom: 1px solid var(--line);
-  padding: 18px 16px;
-  color: var(--muted);
-}
-
-.streamHeader h2 {
-  margin: 0;
-  color: #f1f1f1;
-  font-size: 1rem;
-  line-height: 1.2;
-}
-
-.streamHeader span {
-  display: block;
-  margin-top: 4px;
-  font-size: 0.82rem;
-}
-
-.streamHeader button {
-  min-height: 34px;
-  border: 1px solid #2f2f2f;
-  border-radius: 999px;
-  background: #151515;
-  padding: 0 12px;
-  color: var(--text);
-  font-size: 0.82rem;
-}
-
-.streamHeader button:hover {
-  background: #242424;
-  border-color: #444;
 }
 
 .settingsDialog {
@@ -2431,221 +2369,6 @@ textarea:disabled {
   color: var(--danger);
 }
 
-.eventList {
-  flex: 1;
-  min-height: 0;
-  margin: 0;
-  padding: 8px 16px 18px;
-  overflow: auto;
-  list-style: none;
-}
-
-.eventList li {
-  border-bottom: 1px solid #222;
-}
-
-.eventList details {
-  min-width: 0;
-}
-
-.eventList summary {
-  display: grid;
-  grid-template-columns: 20px minmax(0, 1fr) auto 12px;
-  align-items: center;
-  gap: 7px;
-  min-height: 38px;
-  cursor: pointer;
-  list-style: none;
-}
-
-.eventList summary::-webkit-details-marker {
-  display: none;
-}
-
-.eventList summary:hover .eventTitle {
-  color: #fff;
-}
-
-.eventList time {
-  color: var(--faint);
-  font-size: 0.76rem;
-  text-align: right;
-  white-space: nowrap;
-}
-
-.eventList .eventTitle {
-  min-width: 0;
-  overflow: hidden;
-  color: #d9d9d9;
-  font-size: 0.82rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.eventIcon {
-  display: grid;
-  width: 20px;
-  height: 20px;
-  place-items: center;
-  border-radius: 5px;
-  background: #20242a;
-  color: #9ecbff;
-  font-family: ui-monospace, monospace;
-  font-size: 0.75rem;
-  font-weight: 800;
-}
-
-.eventChevron {
-  color: var(--faint);
-  font-size: 1rem;
-  transition: transform 120ms ease;
-}
-
-.eventList details[open] .eventChevron {
-  transform: rotate(90deg);
-}
-
-.eventList pre {
-  max-height: 180px;
-  margin: 0 0 9px 27px;
-  overflow: auto;
-  border-radius: 6px;
-  background: #080808;
-  padding: 8px;
-  color: #bdbdbd;
-  font-size: 0.76rem;
-  line-height: 1.4;
-  white-space: pre-wrap;
-}
-
-.eventActions {
-  display: flex;
-  justify-content: flex-end;
-  margin: 0 0 10px 27px;
-}
-
-.eventDetailButton {
-  border: 1px solid #30343b;
-  border-radius: 999px;
-  background: #14171b;
-  color: #d8dde6;
-  padding: 6px 10px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-}
-
-.eventDetailButton:hover,
-.eventDetailButton:focus-visible {
-  border-color: #4c6f8a;
-  background: #1a2229;
-  color: #fff;
-  outline: none;
-}
-
-.eventPromptModal {
-  width: min(920px, calc(100vw - 32px));
-  max-height: min(84vh, 860px);
-  border: 1px solid #30343b;
-  border-radius: 14px;
-  background: #101316;
-  color: #ececec;
-  padding: 0;
-  box-shadow: 0 28px 90px #000d, inset 0 1px #ffffff12;
-}
-
-.eventPromptModal::backdrop {
-  background: #050708c7;
-  backdrop-filter: blur(4px);
-}
-
-.eventPromptModalPanel {
-  display: flex;
-  max-height: min(84vh, 860px);
-  flex-direction: column;
-  padding: 24px;
-}
-
-.eventPromptModalHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  border-bottom: 1px solid #262a31;
-  padding-bottom: 16px;
-}
-
-.eventPromptModalHeader h2,
-.eventPromptModalSection h3,
-.eventPromptModalBody p {
-  margin: 0;
-}
-
-.eventPromptModalHeader h2 {
-  color: #f3f3f3;
-  font-size: 1.35rem;
-}
-
-.eventPromptModalClose {
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
-  color: #fff;
-  font-size: 1.8rem;
-  line-height: 1;
-}
-
-.eventPromptModalClose:hover,
-.eventPromptModalClose:focus-visible {
-  background: #24282e;
-  outline: none;
-}
-
-.eventPromptModalContent {
-  display: flex;
-  min-height: 0;
-  flex-direction: column;
-  gap: 16px;
-  overflow-y: auto;
-  padding-top: 18px;
-}
-
-.eventPromptModalSection {
-  overflow: hidden;
-  border: 1px solid #2d3239;
-  border-radius: 12px;
-  background: #15191e;
-}
-
-.eventPromptModalSection h3 {
-  border-bottom: 1px solid #2b3037;
-  background: #1b2026;
-  padding: 12px 14px;
-  color: #eef1f5;
-  font-size: 0.92rem;
-}
-
-.eventPromptModalBody {
-  padding: 14px;
-}
-
-.eventPromptModalBody > * + * {
-  margin-top: 12px;
-}
-
-.eventPromptModalBody p {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  color: #d5dae3;
-  line-height: 1.55;
-}
-
-@media (max-width: 760px) {
-  .eventPromptModalPanel {
-    padding: 20px;
-  }
-}
-
 /* Warm graphite palette used by the alternate light.html interface. */
 :root {
   --bg: #151412;
@@ -2673,8 +2396,7 @@ body,
   background: var(--bg);
 }
 
-.sidebar,
-.streamColumn {
+.sidebar {
   background: var(--sidebar);
   color: var(--text);
 }
@@ -2690,11 +2412,9 @@ body,
 .navIcon,
 .textButton,
 textarea,
-.streamHeader h2,
 .toolTable tbody th,
 .skillName,
-.toolRow strong,
-.eventList .eventTitle {
+.toolRow strong {
   color: var(--text);
 }
 
@@ -2719,7 +2439,6 @@ textarea,
 .composer,
 .imagePreview,
 .filesHeader button,
-.streamHeader button,
 .systemPromptRow button,
 .providerTableToolbar button,
 .providerTable button,
@@ -2728,15 +2447,13 @@ textarea,
 .toggleButton,
 .settingsTemplates button,
 .settingsFooter button,
-.primaryButton,
-.eventDetailButton {
+.primaryButton {
   border-color: var(--line);
 }
 
 .columnVisibilityControls button,
 .workspacePicker,
 .resetFab,
-.streamHeader button,
 .systemPromptRow button,
 .providerTableToolbar button,
 .providerTable button,
@@ -2744,21 +2461,17 @@ textarea,
 .toolsListHeader button,
 .toggleButton,
 .settingsTemplates button,
-.settingsFooter button,
-.eventDetailButton {
+.settingsFooter button {
   background: var(--raised);
 }
 
 .columnVisibilityControls button:hover,
 .columnVisibilityControls button[aria-pressed="true"],
-.streamHeader button:hover,
 .providerModelActions button:hover,
 .settingsTemplates button:hover,
 .settingsFooter button:hover,
 .primaryButton:hover,
-.toolsListHeader button:hover,
-.eventDetailButton:hover,
-.eventDetailButton:focus-visible {
+.toolsListHeader button:hover {
   border-color: var(--strong-line);
   background: var(--surface-hover);
   color: var(--text);
@@ -2798,8 +2511,7 @@ textarea,
 .createWorkspaceDialog,
 .workspacePickerDialog,
 .fileEditorDialog,
-.settingsDialog,
-.eventPromptModal {
+.settingsDialog {
   border-color: var(--line);
   background: var(--panel);
   color: var(--text);
@@ -2808,8 +2520,7 @@ textarea,
 .createWorkspaceDialog::backdrop,
 .workspacePickerDialog::backdrop,
 .fileEditorDialog::backdrop,
-.settingsDialog::backdrop,
-.eventPromptModal::backdrop {
+.settingsDialog::backdrop {
   background: rgba(15, 14, 13, 0.74);
 }
 
@@ -2819,8 +2530,7 @@ textarea,
 .providerSettings select,
 .toolsAddPanel input,
 .toolsAddPanel select,
-.configInput,
-.eventList pre {
+.configInput {
   border-color: var(--line);
   background: var(--field);
 }
@@ -2840,23 +2550,20 @@ textarea,
 .toolsListPanel,
 .toolPermissions,
 .toolsAddPanel,
-.emptyTools,
-.eventPromptModalSection {
+.emptyTools {
   border-color: var(--line);
 }
 
 .fileEditorPreviewHeader,
 .toolTable thead th,
-.skillTable thead th,
-.eventPromptModalSection h3 {
+.skillTable thead th {
   border-color: var(--line);
   background: var(--raised);
 }
 
 .toolPermissions,
 .toolsAddPanel,
-.toolRow,
-.eventPromptModalSection {
+.toolRow {
   background: var(--field);
 }
 
@@ -2873,9 +2580,7 @@ textarea,
 .skillTable th,
 .skillTable td,
 .mcpListHeader,
-.toolRow,
-.eventList li,
-.eventPromptModalHeader {
+.toolRow {
   border-color: var(--line);
 }
 
@@ -2888,18 +2593,6 @@ textarea,
   background: var(--raised);
 }
 
-.eventIcon {
-  background: var(--raised);
-  color: #b9b5b0;
-}
-
-.eventDetailButton,
-.eventPromptModalBody p,
-.eventPromptModalSection h3,
-.eventPromptModalHeader h2 {
-  color: var(--text);
-}
-
 .columnResizeHandle::before {
   background: var(--sidebar-line);
 }
@@ -2908,24 +2601,16 @@ textarea,
   .app,
   .app.sidebar-collapsed,
   .app.files-collapsed,
-  .app.stream-collapsed,
-  .app.files-collapsed.stream-collapsed,
-  .app.sidebar-collapsed.files-collapsed,
-  .app.sidebar-collapsed.stream-collapsed,
-  .app.sidebar-collapsed.files-collapsed.stream-collapsed {
+  .app.sidebar-collapsed.files-collapsed {
     grid-template-columns: 1fr;
-    grid-template-rows: minmax(0, 1fr) 320px;
-    overflow: auto;
+    grid-template-rows: minmax(0, 1fr);
   }
 
   .sidebar {
     display: none;
   }
 
-  .chat,
-  .streamColumn {
-    grid-column: 1;
-  }
+  .chat { grid-column: 1; }
 
   .chatTopbar {
     top: 12px;
@@ -2955,12 +2640,6 @@ textarea,
 
   .columnResizeHandle {
     display: none;
-  }
-
-  .streamColumn {
-    min-height: 320px;
-    border-top: 1px solid var(--sidebar-line);
-    border-left: 0;
   }
 
   .filesColumn { display: none; }

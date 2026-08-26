@@ -46,18 +46,6 @@ class HarnessChat extends BaseComponent {
                 title: "Hide workspace column",
                 children: [workspaceExplorerIcon()],
               }),
-              this.createElement("button", {
-                id: "toggleStreamColumnButton",
-                class: "columnToggleButton",
-                type: "button",
-                "aria-label": "Hide stream column",
-                "aria-pressed": "true",
-                title: "Hide stream column",
-                children: [this.createElement("span", {
-                  "aria-hidden": "true",
-                  children: [document.createTextNode("◉")],
-                })],
-              }),
             ],
           }),
         ],
@@ -113,8 +101,7 @@ class HarnessChat extends BaseComponent {
         event.preventDefault(); this.emit("navigate-prompt-history", { direction: event.key === "ArrowUp" ? -1 : 1 });
       }
     });
-    this.querySelector("#toggleFilesColumnButton").addEventListener("click", () => this.emit("toggle-column", { column: "files" }));
-    this.querySelector("#toggleStreamColumnButton").addEventListener("click", () => this.emit("toggle-column", { column: "stream" }));
+    this.querySelector("#toggleFilesColumnButton").addEventListener("click", () => this.emit("toggle-files-column"));
     this.querySelector("#resetButton").addEventListener("click", () => this.emit("reset-chat"));
   }
 
