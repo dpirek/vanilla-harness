@@ -1,3 +1,5 @@
+import { contextUsageForTurn } from "./model-context.js";
+
 function humanizeToolName(name = "tool") {
   return String(name).replace(/__/g, " · ").replace(/_/g, " ");
 }
@@ -196,7 +198,9 @@ function sessionActivities(events = [], now = Date.now()) {
         detail.serverResponse?.usage || detail.usage,
       );
       if (item) {
+        item.contextUsage = contextUsageForTurn(detail, item.usage);
         item.modelTurn = {
+          model: String(detail.inputPrompt?.model || detail.serverResponse?.model || detail.model || ""),
           input: formatModelTurnInput(detail.inputPrompt),
           output: formatModelTurnOutput(detail.serverResponse),
         };

@@ -8,6 +8,11 @@ import {
   sessionActivities,
   sessionActivityRuns,
 } from "../public/lib/session-activity.js";
+import {
+  contextUsageForTurn,
+  formatContextPercentage,
+  modelContextWindow,
+} from "../public/lib/model-context.js";
 
 test("session activity tracks the current model and tool steps", () => {
   const events = [
@@ -58,6 +63,7 @@ test("model turns retain expandable input prompt and output text", () => {
         type: "turn",
         turn: 1,
         inputPrompt: {
+          model: "gpt-5.1-codex",
           instructions: "Inspect the selected workspace.",
           input: [{ role: "user", content: [{ type: "input_text", text: "Create report.md" }] }],
         },
@@ -72,12 +78,54 @@ test("model turns retain expandable input prompt and output text", () => {
 
   const turn = activity.items.find((item) => item.key === "turn:1");
   assert.deepEqual(turn.usage, { inputTokens: 42, outputTokens: 9, totalTokens: 51 });
+  assert.deepEqual(turn.contextUsage, {
+    model: "gpt-5.1-codex",
+    usedTokens: 51,
+    contextWindow: 400_000,
+    percentage: 0.01275,
+  });
   assert.equal(turn.modelTurn.input, "Instructions\nInspect the selected workspace.\n\nUser\nCreate report.md");
   assert.equal(turn.modelTurn.output, "I will create the report.");
   assert.deepEqual(turn.details.map(({ title, meta }) => ({ title, meta })), [
     { title: "Input prompt", meta: "42 tokens" },
     { title: "Model output", meta: "9 tokens" },
   ]);
+});
+
+test("model context usage reports context fullness for known models", () => {
+  assert.equal(modelContextWindow("gpt-5.1-codex"), 400_000);
+  assert.equal(modelContextWindow("gpt-5.6-sol"), 1_050_000);
+  assert.equal(modelContextWindow("openai/gpt-5.6-terra"), 1_050_000);
+  assert.equal(modelContextWindow("gpt-5.6-luna"), 1_050_000);
+  assert.equal(modelContextWindow("custom-model"), null);
+  assert.equal(formatContextPercentage(0.01275), "<0.1% context");
+  assert.equal(formatContextPercentage(6.25), "6.3% context");
+  assert.equal(formatContextPercentage(82.6), "83% context");
+  assert.deepEqual(contextUsageForTurn({
+    inputPrompt: { model: "gpt-5.1-codex" },
+  }, {
+    inputTokens: 90_000,
+    outputTokens: 10_000,
+    totalTokens: 100_000,
+  }), {
+    model: "gpt-5.1-codex",
+    usedTokens: 100_000,
+    contextWindow: 400_000,
+    percentage: 25,
+  });
+  assert.deepEqual(contextUsageForTurn({
+    inputPrompt: { model: "openai/gpt-5.6-terra" },
+  }, {
+    inputTokens: 3_272,
+    outputTokens: 26,
+    totalTokens: 3_298,
+  }), {
+    model: "openai/gpt-5.6-terra",
+    usedTokens: 3_298,
+    contextWindow: 1_050_000,
+    percentage: 0.314095,
+  });
+  assert.equal(formatContextPercentage(0.314095), "0.3% context");
 });
 
 test("prompt and completed tools expose expandable details", () => {

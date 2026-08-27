@@ -19,6 +19,7 @@ import { readFileAsDataUrl, renderImagePreviews as renderImagePreviewList } from
 import { normalizeSkillName, skillDraft, syncSkillContentName, validateSkillContent } from "./lib/skill-content.js";
 import { clearSessionHistory, createSession, promptHistoryFromSessions, titleFromPrompt } from "./lib/sessions.js";
 import { formatStepDuration, formatTokenCount, sessionActivityRuns } from "./lib/session-activity.js";
+import { formatContextPercentage } from "./lib/model-context.js";
 import { createStateSaveQueue } from "./lib/state-save-queue.js";
 import { loadDefaultWorkspace, saveDefaultWorkspace } from "./lib/workspace-preferences.js";
 import { shouldRefreshWorkspaceForAgentEvent } from "./lib/workspace-refresh.js";
@@ -1947,8 +1948,13 @@ function updateSessionActivityCard(card, activity, { active = false } = {}) {
     if (task.usage) {
       const tokens = document.createElement("span");
       tokens.className = "sessionTaskTokens";
-      tokens.textContent = `${formatTokenCount(task.usage.inputTokens)} input · ${formatTokenCount(task.usage.outputTokens)} output`;
-      tokens.title = `${formatTokenCount(task.usage.totalTokens)} total tokens`;
+      const contextLabel = task.contextUsage
+        ? ` · ${formatContextPercentage(task.contextUsage.percentage)}`
+        : "";
+      tokens.textContent = `${formatTokenCount(task.usage.inputTokens)} input · ${formatTokenCount(task.usage.outputTokens)} output${contextLabel}`;
+      tokens.title = task.contextUsage
+        ? `${formatTokenCount(task.contextUsage.usedTokens)} of ${formatTokenCount(task.contextUsage.contextWindow)} context tokens used${task.contextUsage.model ? ` · ${task.contextUsage.model}` : ""}`
+        : `${formatTokenCount(task.usage.totalTokens)} total tokens`;
       content.append(tokens);
     }
     const duration = document.createElement("span");
