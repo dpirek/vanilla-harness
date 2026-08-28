@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import http from "node:http";
@@ -8,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { createApiRouter } from "./api/index.js";
 import { createModelClient } from "./lib/openai.js";
 import { CodingAgent, resolveDisabledSteps } from "./lib/agent.js";
+import { serveStatic } from "./lib/response.js";
 import { createTools } from "./lib/tools/index.js";
 import { loadMcpTools } from "./lib/mcp.js";
 import {
@@ -59,76 +58,10 @@ if (uiStateStore.getMcpConfig() === undefined) {
   }
 }
 
-const CONTENT_TYPES = {
-  ".avif": "image/avif",
-  ".bmp": "image/bmp",
-  ".css": "text/css; charset=utf-8",
-  ".gif": "image/gif",
-  ".html": "text/html; charset=utf-8",
-  ".ico": "image/x-icon",
-  ".jpeg": "image/jpeg",
-  ".jpg": "image/jpeg",
-  ".js": "text/javascript; charset=utf-8",
-  ".json": "application/json; charset=utf-8",
-  ".png": "image/png",
-  ".svg": "image/svg+xml; charset=utf-8",
-  ".webp": "image/webp",
-};
-
 const WEBSOCKET_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 const MAX_WEBSOCKET_TEXT_BYTES = 40 * 1024 * 1024;
 const providerSettings = new Map();
 const toolPermissions = new Map();
-
-function json(res, status, payload) {
-  const body = JSON.stringify(payload);
-  res.writeHead(status, {
-    "content-type": "application/json; charset=utf-8",
-    "content-length": Buffer.byteLength(body),
-  });
-  res.end(body);
-}
-
-function resolvePublicPath(urlPath) {
-  const decoded = decodeURIComponent(urlPath);
-  const target = decoded === "/" ? "/index.html" : decoded;
-  const absolute = path.resolve(publicDir, `.${target}`);
-  const relative = path.relative(publicDir, absolute);
-  if (relative.startsWith("..") || path.isAbsolute(relative)) return null;
-  return absolute;
-}
-
-async function serveStatic(req, res) {
-  const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
-  if (url.pathname === "/favicon.ico") {
-    res.writeHead(302, { location: "/logo.svg" });
-    res.end();
-    return;
-  }
-  const filePath = resolvePublicPath(url.pathname);
-  if (!filePath) {
-    json(res, 403, { ok: false, error: "Path is outside public directory." });
-    return;
-  }
-
-  try {
-    const stat = await fs.stat(filePath);
-    if (stat.isDirectory()) {
-      json(res, 404, { ok: false, error: "Not found." });
-      return;
-    }
-    const contentType = CONTENT_TYPES[path.extname(filePath)] || "application/octet-stream";
-    res.writeHead(200, {
-      "content-type": contentType,
-      "content-length": stat.size,
-      "cache-control": "no-store",
-    });
-    res.end(await fs.readFile(filePath));
-  } catch (error) {
-    if (error.code === "ENOENT") json(res, 404, { ok: false, error: "Not found." });
-    else json(res, 500, { ok: false, error: error.message });
-  }
-}
 
 function sendFrame(socket, payload) {
   if (socket.destroyed) return;
@@ -572,7 +505,7 @@ const handleApiRequest = createApiRouter({ uiStateStore, defaultWorkspace, resol
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
   if (await handleApiRequest(req, res, url)) return;
-  await serveStatic(req, res);
+  await serveStatic(req, res, publicDir);
 });
 
 server.on("upgrade", (req, socket) => {
