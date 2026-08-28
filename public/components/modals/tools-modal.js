@@ -43,7 +43,7 @@ class ToolsModal extends BaseComponent {
             children: [
               this.createElement("div", { children: [
                 this.createElement("h2", { children: [document.createTextNode("Tools")] }),
-                this.createElement("p", { children: [document.createTextNode("Choose which built-in workspace tools the model can call")] }),
+                this.createElement("p", { children: [document.createTextNode("Choose which built-in workspace tools the active preset can call without an additional prompt")] }),
               ] }),
               this.createElement("button", {
                 id: "closeToolsButton",
@@ -58,13 +58,6 @@ class ToolsModal extends BaseComponent {
             class: "toolPermissions",
             "aria-label": "Local tool permissions",
             children: [
-              this.createElement("div", {
-                class: "toolPermissionsHeader",
-                children: [
-                  this.createElement("h3", { children: [document.createTextNode("Allowed Tool Calls")] }),
-                  this.createElement("p", { children: [document.createTextNode("Enabled tools are authorized to run without an additional prompt.")] }),
-                ],
-              }),
               this.createElement("div", {
                 class: "toolTableWrap",
                 children: [this.createElement("table", {

@@ -1800,29 +1800,7 @@ textarea:disabled {
 }
 
 .toolPermissions {
-  display: grid;
-  gap: 12px;
-  border: 1px solid #242424;
-  border-radius: 8px;
-  background: #080808;
-  padding: 14px;
-}
-
-.toolPermissionsHeader {
-  display: grid;
-  gap: 3px;
-}
-
-.toolPermissions h3 {
-  margin: 0;
-  color: #f2f2f2;
-  font-size: 0.96rem;
-}
-
-.toolPermissions p {
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.82rem;
+  min-width: 0;
 }
 
 .toolTableWrap {
@@ -2549,7 +2527,6 @@ textarea,
 .toolTableWrap,
 .skillTableWrap,
 .toolsListPanel,
-.toolPermissions,
 .toolsAddPanel,
 .emptyTools {
   border-color: var(--line);
@@ -2562,7 +2539,6 @@ textarea,
   background: var(--raised);
 }
 
-.toolPermissions,
 .toolsAddPanel,
 .toolRow {
   background: var(--field);
