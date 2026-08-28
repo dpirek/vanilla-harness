@@ -440,8 +440,13 @@ function openSkillEditor(skillId = null) {
     : "New skills are stored in SQLite.";
   skillsStatus.dataset.state = "";
   setSkillEditorPending(false);
-  if (skill) skillEditorContent.focus();
-  else skillEditorName.focus();
+  if (skill) {
+    skillEditorContent.focus();
+    skillEditorContent.setSelectionRange(0, 0);
+    skillEditorContent.scrollTop = 0;
+  } else {
+    skillEditorName.focus();
+  }
 }
 
 function closeSkillEditor({ preserveStatus = false } = {}) {

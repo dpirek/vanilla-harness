@@ -2114,6 +2114,7 @@ textarea:disabled {
 
 .skillEditorField textarea {
   min-height: 430px;
+  overflow-y: auto;
   resize: vertical;
   tab-size: 2;
 }
