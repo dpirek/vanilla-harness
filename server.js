@@ -27,36 +27,22 @@ const defaultWorkspace = path.resolve(process.env.AI_HARNESS_WORKSPACE || proces
 const configPath = path.join(runtimeRoot, ".ai-harness/config.toml");
 const databaseDir = path.join(runtimeRoot, "db");
 const uiStateDatabasePath = path.join(databaseDir, "ui-state.sqlite");
-const legacyUiStateDatabasePath = path.join(runtimeRoot, ".ai-harness/ui-state.sqlite");
 
 const defaultPort = Number(process.env.PORT || 3000);
 await fs.mkdir(databaseDir, { recursive: true });
-let databaseExists = true;
+const connections = new Set();
+let storeClosed = false;
 
-try {
-  await fs.access(uiStateDatabasePath);
-} catch {
-  databaseExists = false;
-}
-
-if (!databaseExists) {
-  for (const suffix of ["", "-wal", "-shm"]) {
+async function initializeUiStateStore(databasePath, initialMcpConfigPath) {
+  const store = createUiStateStore(databasePath);
+  if (store.getMcpConfig() === undefined) {
     try {
-      await fs.rename(`${legacyUiStateDatabasePath}${suffix}`, `${uiStateDatabasePath}${suffix}`);
+      store.setMcpConfig(await fs.readFile(initialMcpConfigPath, "utf8"));
     } catch (error) {
       if (error.code !== "ENOENT") throw error;
     }
   }
-}
-
-const uiStateStore = createUiStateStore(uiStateDatabasePath);
-
-if (uiStateStore.getMcpConfig() === undefined) {
-  try {
-    uiStateStore.setMcpConfig(await fs.readFile(configPath, "utf8"));
-  } catch (error) {
-    if (error.code !== "ENOENT") throw error;
-  }
+  return store;
 }
 
 async function resolveWorkspace(requested) {
@@ -127,39 +113,7 @@ async function createAgentSession({
   });
 }
 
-const handleWebSocket = createWebSocketHandler({
-  createAgentSession,
-  getRigConfigurations: () => uiStateStore.getRigConfigurations(),
-  normalizeToolPermissions,
-  resolveWorkspace,
-});
-
-const handleApiRequest = createApiRouter({ uiStateStore, defaultWorkspace, resolveWorkspace });
-
-const server = http.createServer(async (req, res) => {
-  const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
-  if (await handleApiRequest(req, res, url)) return;
-  await serveStatic(req, res, publicDir);
-});
-
-attachWebSocketServer(server, handleWebSocket);
-
-const connections = new Set();
-let storeClosed = false;
-
-server.on("connection", (socket) => {
-  connections.add(socket);
-  socket.on("error", (error) => {
-    // Browser refreshes and closed WebSockets commonly reset the TCP stream.
-    // Keep those disconnects from becoming unhandled process-level errors.
-    if (!["ECONNRESET", "EPIPE"].includes(error.code)) {
-      console.error("Client socket error:", error);
-    }
-  });
-  socket.on("close", () => connections.delete(socket));
-});
-
-export function startServer({ port = defaultPort, host } = {}) {
+function startServer({ port = defaultPort, host } = {}) {
   if (server.listening) {
     const address = server.address();
     const activePort = typeof address === "object" ? address.port : port;
@@ -181,19 +135,35 @@ export function startServer({ port = defaultPort, host } = {}) {
   });
 }
 
-export async function stopServer() {
-  if (server.listening) {
-    const closed = new Promise((resolve, reject) => {
-      server.close((error) => error ? reject(error) : resolve());
-    });
-    for (const socket of connections) socket.destroy();
-    await closed;
-  }
-  if (!storeClosed) {
-    uiStateStore.close();
-    storeClosed = true;
-  }
-}
+const handleWebSocket = createWebSocketHandler({
+  createAgentSession,
+  getRigConfigurations: () => uiStateStore.getRigConfigurations(),
+  normalizeToolPermissions,
+  resolveWorkspace,
+});
 
-const isMainModule = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
-if (isMainModule) await startServer();
+const uiStateStore = await initializeUiStateStore(uiStateDatabasePath, configPath);
+
+const server = http.createServer(async (req, res) => {
+  const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
+  const handleApiRequest = createApiRouter({ uiStateStore, defaultWorkspace, resolveWorkspace });
+
+  if (await handleApiRequest(req, res, url)) return;
+  await serveStatic(req, res, publicDir);
+});
+
+attachWebSocketServer(server, handleWebSocket);
+
+server.on("connection", (socket) => {
+  connections.add(socket);
+  socket.on("error", (error) => {
+    // Browser refreshes and closed WebSockets commonly reset the TCP stream.
+    // Keep those disconnects from becoming unhandled process-level errors.
+    if (!["ECONNRESET", "EPIPE"].includes(error.code)) {
+      console.error("Client socket error:", error);
+    }
+  });
+  socket.on("close", () => connections.delete(socket));
+});
+
+await startServer();
