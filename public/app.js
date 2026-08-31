@@ -2032,12 +2032,18 @@ function renderRecents() {
     row.className = "recentRow";
     const button = document.createElement("button");
     button.type = "button";
-    button.title = session.title || "New chat";
+    const title = session.title || "New chat";
+    button.title = title;
+    button.setAttribute("aria-label", title);
     button.className = session.id === activeSessionId ? "active" : "";
+    const icon = document.createElement("span");
+    icon.className = "navIcon recentIcon";
+    icon.setAttribute("aria-hidden", "true");
+    icon.textContent = Array.from(title.trim())[0]?.toLocaleUpperCase() || "N";
     const label = document.createElement("span");
     label.className = "navLabel";
-    label.textContent = session.title || "New chat";
-    button.append(label);
+    label.textContent = title;
+    button.append(icon, label);
     button.addEventListener("click", () => {
       if (runActive || microphoneState !== "idle" || session.id === activeSessionId) return;
       activeSessionId = session.id;

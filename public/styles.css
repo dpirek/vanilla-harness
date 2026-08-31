@@ -223,6 +223,7 @@ code {
 }
 
 .recentIcon {
+  display: none;
   border: 1px solid #333;
   color: #bdbdbd;
   font-size: 0.95rem;
@@ -388,7 +389,14 @@ code {
 .app.sidebar-collapsed #newChatButton .navLabel { display: none; }
 
 .app.sidebar-collapsed .recentIcon {
+  display: inline-grid;
+  width: 100%;
+  height: 100%;
+  padding: 4px;
   border: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .app.sidebar-collapsed .recentsList {
@@ -396,15 +404,7 @@ code {
 }
 
 .app.sidebar-collapsed .recentsList .navLabel {
-  display: block;
-  width: 32px;
-  overflow: hidden;
-  color: #d9d9d9;
-  font-size: 0.58rem;
-  font-weight: 700;
-  line-height: 1;
-  text-align: center;
-  text-overflow: clip;
+  display: none;
 }
 
 .app.sidebar-collapsed .recentRow {
