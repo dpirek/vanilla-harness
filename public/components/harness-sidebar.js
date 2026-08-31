@@ -50,7 +50,10 @@ class HarnessSidebar extends BaseComponent {
         children: [
           this.createElement("div", {
             class: "brand",
-            children: [this.createElement("img", { src: "/logo.svg", alt: "", "aria-hidden": "true" })],
+            children: [
+              this.createElement("img", { src: "/logo.svg", alt: "", "aria-hidden": "true" }),
+              this.createElement("span", { class: "brandName", textContent: "Vanilla" }),
+            ],
           }),
           sidebarToggle,
         ],
