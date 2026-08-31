@@ -361,8 +361,8 @@ code {
 
 .app.sidebar-collapsed .sidebarSection {
   gap: 9px;
-  padding: 8px 9px 0 15px;
-  justify-items: start;
+  padding: 8px 9px;
+  justify-items: center;
 }
 
 .app.sidebar-collapsed .sidebarSection {
@@ -1401,7 +1401,6 @@ textarea:disabled {
   z-index: 8;
   min-width: 8px;
   cursor: col-resize;
-  background: #000;
 }
 
 .columnResizeHandle::before {
@@ -1414,12 +1413,18 @@ textarea:disabled {
   background: var(--sidebar-line);
 }
 
+.sidebarResizeHandle::before,
+.filesResizeHandle::before {
+  opacity: 0;
+}
+
 .columnResizeHandle:hover::before,
 .columnResizeHandle:focus-visible::before,
 .columnResizeHandle.is-resizing::before {
   left: 2px;
   width: 3px;
   background: #555;
+  opacity: 1;
 }
 
 .columnResizeHandle:focus-visible {
