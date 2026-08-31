@@ -504,9 +504,9 @@ code {
 
 .presetStatusItem:nth-child(1) { width: 92px; }
 .presetStatusItem:nth-child(2) { width: 64px; }
-.presetStatusItem:nth-child(3) { width: 60px; }
-.presetStatusItem:nth-child(4) { width: 78px; }
-.presetStatusItem:nth-child(5) { width: 136px; }
+.presetStatusItem:nth-child(3) { width: auto; max-width: 84px; }
+.presetStatusItem:nth-child(4) { width: auto; max-width: 96px; }
+.presetStatusItem:nth-child(5) { width: auto; max-width: 136px; }
 .presetStatusItem:nth-child(6) { width: 96px; }
 .presetStatusItem:last-child { border-right: 0; }
 .presetStatusItem:hover { background: rgba(255, 255, 255, .07); }
@@ -1276,10 +1276,17 @@ textarea:disabled {
   border-bottom: 1px solid var(--line);
   padding: 14px 16px;
 }
+.filesHeaderTitle { min-width: 0; }
 .filesHeader h2 { margin: 0; font-size: 1rem; }
 .filesHeader span { display: block; max-width: 210px; margin-top: 4px; overflow: hidden; color: var(--muted); font-size: .76rem; text-overflow: ellipsis; white-space: nowrap; }
+.workspacePathRow { display: flex; min-width: 0; align-items: center; gap: 4px; margin-top: 4px; }
+.filesHeader .workspacePathRow span { margin-top: 0; }
 .filesHeaderActions { display: flex; gap: 6px; }
 .filesHeader button { min-width: 34px; height: 34px; border: 1px solid #333; border-radius: 8px; padding: 0 9px; }
+.filesHeader .workspacePathCopyButton { display: inline-grid; width: 22px; min-width: 22px; height: 22px; flex: 0 0 22px; place-items: center; border: 0; padding: 0; color: var(--muted); }
+.workspacePathCopyButton:hover:not(:disabled), .workspacePathCopyButton:focus-visible { background: var(--surface-hover); color: var(--text); }
+.workspacePathCopyButton.is-copied { color: #7bd99a; }
+.workspacePathCopyButton .copyIcon { width: 14px; height: 14px; }
 .filesHeader button .workspaceExplorerIcon { width: 18px; height: 18px; }
 .filesHeader button:disabled { cursor: not-allowed; opacity: .45; }
 .filesHeader #refreshFilesButton { width: 34px; padding: 0; font-size: 1.25rem; }

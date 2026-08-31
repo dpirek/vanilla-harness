@@ -176,6 +176,7 @@ const presetStatusItems = document.querySelector("#presetStatusItems");
 const filesResizeHandle = document.querySelector("#filesResizeHandle");
 const workspaceTreeElement = document.querySelector("#workspaceTree");
 const filesWorkspaceLabel = document.querySelector("#filesWorkspaceLabel");
+const copyWorkspacePathButton = document.querySelector("#copyWorkspacePathButton");
 const selectWorkspaceRootButton = document.querySelector("#selectWorkspaceRootButton");
 const createWorkspaceButton = document.querySelector("#createWorkspaceButton");
 const createWorkspaceDialog = document.querySelector("#createWorkspaceDialog");
@@ -229,6 +230,7 @@ let openProvidersAfterWorkspaceSelection = false;
 let previewingFilePath = null;
 let filePreviewClipboardValue = null;
 let filePreviewStatusTimer = null;
+let workspacePathCopyStatusTimer = null;
 let editingMcpBlock = null;
 
 function setFilePreviewClipboardValue(value, label = "source") {
@@ -1278,10 +1280,30 @@ async function copyFilePreviewSource() {
   }
 }
 
+async function copyWorkspacePath() {
+  const path = filesWorkspaceLabel.textContent.trim();
+  if (!path || copyWorkspacePathButton.disabled) return;
+  window.clearTimeout(workspacePathCopyStatusTimer);
+  try {
+    await copyTextToClipboard(path);
+    copyWorkspacePathButton.classList.add("is-copied");
+    copyWorkspacePathButton.title = "Copied workspace path";
+    copyWorkspacePathButton.setAttribute("aria-label", "Copied workspace path");
+    workspacePathCopyStatusTimer = window.setTimeout(() => {
+      copyWorkspacePathButton.classList.remove("is-copied");
+      copyWorkspacePathButton.title = "Copy workspace path";
+      copyWorkspacePathButton.setAttribute("aria-label", "Copy workspace path");
+    }, 1800);
+  } catch (error) {
+    addEvent("Workspace path copy failed", error.message, { persist: false });
+  }
+}
+
 async function loadWorkspaceTree() {
   const loadId = ++workspaceTreeLoadId;
   const selectedWorkspace = activeSession()?.workspace || defaultWorkspace;
   filesWorkspaceLabel.textContent = selectedWorkspace;
+  copyWorkspacePathButton.disabled = false;
   workspaceTreeElement.innerHTML = '<p class="workspaceTreeStatus">Loading files…</p>';
   selectWorkspaceRootButton.disabled = true;
   try {
@@ -2771,6 +2793,7 @@ chatComponent.addEventListener("submit-prompt", () => {
 });
 
 workspaceComponent.addEventListener("workspace-change", saveActiveWorkspace);
+workspaceComponent.addEventListener("copy-workspace-path", copyWorkspacePath);
 copyFilePreviewButton.addEventListener("click", copyFilePreviewSource);
 fileEditorDialog.addEventListener("close", () => {
   previewingFilePath = null;
