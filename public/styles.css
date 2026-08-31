@@ -99,7 +99,7 @@ code {
   align-items: center;
   justify-content: space-between;
   gap: 14px;
-  padding: 18px 20px 12px;
+  padding: 18px 12px 12px;
 }
 
 .brand {
@@ -361,7 +361,7 @@ code {
 
 .app.sidebar-collapsed .sidebarSection {
   gap: 9px;
-  padding: 8px 12px 0;
+  padding: 8px 9px 0 15px;
   justify-items: start;
 }
 
