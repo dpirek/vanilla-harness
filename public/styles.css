@@ -529,6 +529,7 @@ dropdown-button { position: relative; display: block; flex: 0 0 auto; }
 }
 .presetStatusBar > dropdown-button .dropdownButtonTrigger:hover,
 .presetStatusBar > dropdown-button .dropdownButtonTrigger[aria-expanded="true"] { background: rgba(255, 255, 255, .07); color: #d7d7d7; }
+.presetStatusBar > dropdown-button .dropdownButtonCaret { margin-left: auto; }
 .dropdownButtonLabel { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dropdownButtonCaret { display: block; width: 12px; height: 12px; flex: 0 0 12px; color: var(--muted); transition: transform 120ms ease; }
 .dropdownButtonTrigger[aria-expanded="true"] .dropdownButtonCaret { transform: rotate(180deg); }
