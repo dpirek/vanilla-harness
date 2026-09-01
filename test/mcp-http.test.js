@@ -143,7 +143,21 @@ test("loopback MCP URLs support the stateless 2026 protocol", async () => {
         jsonrpc: "2.0",
         id: message.id,
         result: {
-          tools: [{ name: "ping", inputSchema: { type: "object", properties: {} } }],
+          tools: [{
+            name: "ping",
+            inputSchema: {
+              type: "object",
+              properties: {
+                mode: { oneOf: [{ const: "fast" }, { const: "safe" }] },
+              },
+              oneOf: [{ required: ["mode"] }],
+              anyOf: [{ required: [] }],
+              allOf: [{ additionalProperties: false }],
+              enum: [{}],
+              const: {},
+              not: { required: ["invalid"] },
+            },
+          }],
         },
       }));
       return;
@@ -161,6 +175,12 @@ test("loopback MCP URLs support the stateless 2026 protocol", async () => {
       env: { MCP_TOKEN: "secret-token" },
       autoApprove: true,
       approve: async () => { throw new Error("Approval callback should not run."); },
+    });
+    assert.deepEqual(tools[0].parameters, {
+      type: "object",
+      properties: {
+        mode: { oneOf: [{ const: "fast" }, { const: "safe" }] },
+      },
     });
     assert.deepEqual(await tools[0].execute({}), { ok: true });
   } finally {
