@@ -1570,7 +1570,7 @@ textarea:disabled {
 .presetField { display: grid; min-width: 0; gap: 7px; color: var(--muted); font-size: .76rem; font-weight: 700; }
 .presetFieldWide { grid-column: 1 / -1; }
 .presetField input, .presetField select { width: 100%; height: 40px; min-width: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--raised); padding: 0 11px; color: var(--text); font: inherit; font-weight: 500; }
-.presetField input:focus, .presetField select:focus, .presetPromptField textarea:focus, .presetMcpAddForm input:focus, .presetMcpAddForm select:focus { border-color: var(--accent); outline: 2px solid color-mix(in srgb, var(--accent) 16%, transparent); }
+.presetField input:focus, .presetField select:focus, .presetPromptField textarea:focus, .presetMcpAddForm input:focus, .presetMcpAddForm select:focus, .presetMcpAddForm textarea:focus { border-color: var(--accent); outline: 2px solid color-mix(in srgb, var(--accent) 16%, transparent); }
 .presetToggleGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .presetToggle { display: flex; min-width: 0; align-items: center; gap: 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--raised); padding: 11px 12px; cursor: pointer; }
 .presetToggle:has(input:checked) { border-color: var(--strong-line); background: var(--selected); }
@@ -1602,7 +1602,9 @@ textarea:disabled {
 .presetMcpAddForm { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .presetMcpAddForm label { display: grid; min-width: 0; gap: 7px; color: var(--muted); font-size: .74rem; font-weight: 700; }
 .presetMcpAddForm label[hidden], .presetMcpStdioField[hidden] { display: none; }
-.presetMcpAddForm input, .presetMcpAddForm select { width: 100%; height: 39px; min-width: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--raised); padding: 0 10px; color: var(--text); font: 500 .76rem ui-monospace, SFMono-Regular, Menlo, monospace; }
+.presetMcpAddForm input, .presetMcpAddForm select, .presetMcpAddForm textarea { width: 100%; min-width: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--raised); color: var(--text); font: 500 .76rem ui-monospace, SFMono-Regular, Menlo, monospace; }
+.presetMcpAddForm input, .presetMcpAddForm select { height: 39px; padding: 0 10px; }
+.presetMcpAddForm textarea { min-height: 68px; resize: vertical; padding: 9px 10px; line-height: 1.4; }
 .presetMcpAddForm > button { align-self: end; min-height: 39px; border: 1px solid var(--line); border-radius: 8px; background: var(--accent); color: #1b1a18; font-weight: 750; }
 .presetMcpStatus { min-height: 18px; margin: 0; color: var(--muted); font-size: .73rem; }
 .presetMcpStatus[data-state="success"] { color: #9bc7a3; }
@@ -1764,7 +1766,8 @@ textarea:disabled {
 .providerSettings input,
 .providerSettings select,
 .toolsAddPanel input,
-.toolsAddPanel select {
+.toolsAddPanel select,
+.toolsAddPanel textarea {
   width: 100%;
   min-height: 40px;
   border: 1px solid #333;
@@ -1773,6 +1776,13 @@ textarea:disabled {
   color: #ececec;
   padding: 0 11px;
   outline: 0;
+}
+
+.toolsAddPanel textarea {
+  min-height: 72px;
+  resize: vertical;
+  padding: 10px 11px;
+  font: 500 0.78rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 .providerSettings select,
@@ -1787,7 +1797,8 @@ textarea:disabled {
 .providerSettings input:focus,
 .providerSettings select:focus,
 .toolsAddPanel input:focus,
-.toolsAddPanel select:focus {
+.toolsAddPanel select:focus,
+.toolsAddPanel textarea:focus {
   border-color: #555;
 }
 

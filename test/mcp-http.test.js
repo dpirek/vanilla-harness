@@ -31,7 +31,7 @@ async function startMcpServer(handler) {
   };
 }
 
-function config(url) {
+function config(url, headers = "") {
   return `[mcp]
 auto_approve = false
 
@@ -39,6 +39,7 @@ auto_approve = false
 server_label = "local"
 server_url = "${url}"
 require_approval = "always"
+${headers}
 `;
 }
 
@@ -128,6 +129,8 @@ test("loopback MCP URLs use local Streamable HTTP with legacy session fallback",
 
 test("loopback MCP URLs support the stateless 2026 protocol", async () => {
   const mcp = await startMcpServer((req, res, message) => {
+    assert.equal(req.headers.authorization, "Bearer secret-token");
+    assert.equal(req.headers["x-tenant"], "docs");
     assert.equal(req.headers["mcp-protocol-version"], "2026-07-28");
     assert.equal(req.headers["mcp-method"], message.method);
     assert.equal(
@@ -152,7 +155,10 @@ test("loopback MCP URLs support the stateless 2026 protocol", async () => {
 
   try {
     const tools = await loadMcpTools({
-      configContent: config(mcp.url),
+      configContent: config(mcp.url, `[mcp.servers.headers]
+"Authorization" = "Bearer \${MCP_TOKEN}"
+"X-Tenant" = "docs"`),
+      env: { MCP_TOKEN: "secret-token" },
       autoApprove: true,
       approve: async () => { throw new Error("Approval callback should not run."); },
     });
@@ -164,10 +170,13 @@ test("loopback MCP URLs support the stateless 2026 protocol", async () => {
 
 test("non-loopback MCP URLs remain provider-managed remote tools", async () => {
   const tools = await loadMcpTools({
-    configContent: config("https://example.com/mcp"),
+    configContent: config("https://example.com/mcp", `[mcp.servers.headers]
+"Authorization" = "Bearer \${MCP_TOKEN}"`),
+    env: { MCP_TOKEN: "remote-secret" },
     autoApprove: true,
   });
   assert.equal(tools[0].type, "mcp");
   assert.equal(tools[0].server_url, "https://example.com/mcp");
   assert.equal(tools[0].require_approval, "never");
+  assert.deepEqual(tools[0].headers, { Authorization: "Bearer remote-secret" });
 });

@@ -38,6 +38,7 @@ class McpModal extends BaseComponent {
             ] }),
             element("label", { children: [element("span", { children: [text("Label")] }), element("input", { id: "toolLabelInput", type: "text", placeholder: "docs" })] }),
             element("label", { class: "remoteToolField", children: [element("span", { children: [text("Server URL")] }), element("input", { id: "toolUrlInput", type: "url", placeholder: "https://example.com/mcp" })] }),
+            element("label", { class: "remoteToolField", children: [element("span", { children: [text("HTTP headers (one per line)")] }), element("textarea", { id: "toolHeadersInput", rows: "3", spellcheck: "false", placeholder: "Authorization: Bearer ${MCP_TOKEN}" })] }),
             element("label", { class: "stdioToolField", children: [element("span", { children: [text("Command")] }), element("input", { id: "toolCommandInput", type: "text", placeholder: "node" })] }),
             element("label", { class: "stdioToolField", children: [element("span", { children: [text("Args")] }), element("input", { id: "toolArgsInput", type: "text", placeholder: "/absolute/path/to/server.js" })] }),
             element("label", { class: "stdioToolField", children: [element("span", { children: [text("CWD")] }), element("input", { id: "toolCwdInput", type: "text", placeholder: "/absolute/path/to/server" })] }),

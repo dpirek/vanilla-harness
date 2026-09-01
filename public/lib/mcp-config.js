@@ -42,6 +42,57 @@ function tomlStringArray(content, key) {
   return [...match[1].matchAll(/"((?:\\.|[^"\\])*)"/g)].map((entry) => unquoteToml(entry[1]));
 }
 
+function tomlHeaders(content) {
+  const lines = content.split("\n");
+  const start = lines.findIndex((line) => /^\s*\[mcp\.servers\.headers\]\s*$/.test(line));
+  if (start < 0) return {};
+  const headers = {};
+  for (let index = start + 1; index < lines.length; index += 1) {
+    const line = lines[index].trim();
+    if (!line) continue;
+    if (line.startsWith("[")) break;
+    const match = line.match(/^(?:"((?:\\.|[^"\\])*)"|([A-Za-z_][A-Za-z0-9_-]*))\s*=\s*"((?:\\.|[^"\\])*)"\s*$/);
+    if (!match) continue;
+    headers[unquoteToml(match[1] ?? match[2])] = unquoteToml(match[3]);
+  }
+  return headers;
+}
+
+function parseHttpHeaders(content = "") {
+  const headers = {};
+  const names = new Set();
+  content.split(/\r?\n/).forEach((rawLine, index) => {
+    const line = rawLine.trim();
+    if (!line) return;
+    const separator = line.indexOf(":");
+    const name = separator < 0 ? "" : line.slice(0, separator).trim();
+    const value = separator < 0 ? "" : line.slice(separator + 1).trim();
+    if (!/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(name) || !value) {
+      throw new Error(`Invalid HTTP header on line ${index + 1}. Use Header-Name: value.`);
+    }
+    const normalizedName = name.toLowerCase();
+    if (names.has(normalizedName)) {
+      throw new Error(`Duplicate HTTP header "${name}" on line ${index + 1}.`);
+    }
+    names.add(normalizedName);
+    headers[name] = value;
+  });
+  return headers;
+}
+
+function formatHttpHeaders(headers = {}) {
+  return Object.entries(headers).map(([name, value]) => `${name}: ${value}`).join("\n");
+}
+
+function httpHeadersToml(content = "") {
+  const headers = parseHttpHeaders(content);
+  const entries = Object.entries(headers);
+  if (!entries.length) return "";
+  return `[mcp.servers.headers]\n${entries
+    .map(([name, value]) => `"${quoteToml(name)}" = "${quoteToml(value)}"`)
+    .join("\n")}`;
+}
+
 function blockEnd(lines, start, type, label) {
   for (let index = start + 1; index < lines.length; index += 1) {
     const line = stripTomlComment(lines[index]).trim();
@@ -81,6 +132,7 @@ function mcpBlocks(content) {
         ? tomlString(uncommented, "server_url") || tomlString(uncommented, "connector_id") || "remote MCP server"
         : tomlString(uncommented, "command") || "stdio MCP server",
       url: isRemote ? tomlString(uncommented, "server_url") : "",
+      headers: isRemote ? tomlHeaders(uncommented) : {},
       command: isRemote ? "" : tomlString(uncommented, "command"),
       args: isRemote ? [] : tomlStringArray(uncommented, "args"),
       cwd: isRemote ? "" : tomlString(uncommented, "cwd"),
@@ -128,6 +180,29 @@ function updateToolBlock(content, block, replacement) {
   if (block.type === "remote") {
     patchAssignment("server_label");
     patchAssignment("server_url", { after: "server_label" });
+
+    const tableRange = (source) => {
+      const start = source.findIndex((line) => /^\s*\[mcp\.servers\.headers\]\s*$/.test(stripTomlComment(line)));
+      if (start < 0) return null;
+      let end = source.length;
+      for (let index = start + 1; index < source.length; index += 1) {
+        if (stripTomlComment(source[index]).trim().startsWith("[")) {
+          end = index;
+          break;
+        }
+      }
+      return { start, end };
+    };
+    const currentHeaders = tableRange(lines);
+    if (currentHeaders) lines.splice(currentHeaders.start, currentHeaders.end - currentHeaders.start);
+    const replacementHeaders = tableRange(replacementLines);
+    if (replacementHeaders) {
+      const nextHeaders = replacementLines
+        .slice(replacementHeaders.start, replacementHeaders.end)
+        .map((line) => line.trim() ? `${commentPrefix}${stripTomlComment(line).trim()}` : line);
+      if (lines.length && lines.at(-1).trim()) lines.push("");
+      lines.push(...nextHeaders);
+    }
   } else {
     const headerPrefix = lines[0].match(/^(\s*(?:#\s*)?)/)?.[1] || commentPrefix;
     lines[0] = `${headerPrefix}[mcp_servers.${replacementBlock.label}]`;
@@ -154,4 +229,14 @@ function quoteToml(value) {
   return String(value || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
 
-export { CONFIG_TEMPLATES, mcpBlocks, quoteToml, replaceToolBlock, setToolBlockEnabled, updateToolBlock };
+export {
+  CONFIG_TEMPLATES,
+  formatHttpHeaders,
+  httpHeadersToml,
+  mcpBlocks,
+  parseHttpHeaders,
+  quoteToml,
+  replaceToolBlock,
+  setToolBlockEnabled,
+  updateToolBlock,
+};

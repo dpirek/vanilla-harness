@@ -13,7 +13,16 @@ import {
   providerSettingsFromRecord,
 } from "./lib/settings.js";
 import { normalizeRigComponentState } from "./lib/rig-presets.js";
-import { CONFIG_TEMPLATES, mcpBlocks, quoteToml, replaceToolBlock, setToolBlockEnabled, updateToolBlock } from "./lib/mcp-config.js";
+import {
+  CONFIG_TEMPLATES,
+  formatHttpHeaders,
+  httpHeadersToml,
+  mcpBlocks,
+  quoteToml,
+  replaceToolBlock,
+  setToolBlockEnabled,
+  updateToolBlock,
+} from "./lib/mcp-config.js";
 import { describeAgentEvent } from "./lib/agent-events.js";
 import { readFileAsDataUrl, renderImagePreviews as renderImagePreviewList } from "./lib/image-attachments.js";
 import { normalizeSkillName, skillDraft, syncSkillContentName, validateSkillContent } from "./lib/skill-content.js";
@@ -99,6 +108,8 @@ const presetMcpType = document.querySelector("#presetMcpType");
 const presetMcpLabel = document.querySelector("#presetMcpLabel");
 const presetMcpUrlField = document.querySelector("#presetMcpUrlField");
 const presetMcpUrl = document.querySelector("#presetMcpUrl");
+const presetMcpHeadersField = document.querySelector("#presetMcpHeadersField");
+const presetMcpHeaders = document.querySelector("#presetMcpHeaders");
 const presetMcpCommand = document.querySelector("#presetMcpCommand");
 const presetMcpArgs = document.querySelector("#presetMcpArgs");
 const presetMcpCwd = document.querySelector("#presetMcpCwd");
@@ -144,6 +155,7 @@ const toolPermissionsStatus = document.querySelector("#toolPermissionsStatus");
 const toolTypeSelect = document.querySelector("#toolTypeSelect");
 const toolLabelInput = document.querySelector("#toolLabelInput");
 const toolUrlInput = document.querySelector("#toolUrlInput");
+const toolHeadersInput = document.querySelector("#toolHeadersInput");
 const toolCommandInput = document.querySelector("#toolCommandInput");
 const toolArgsInput = document.querySelector("#toolArgsInput");
 const toolCwdInput = document.querySelector("#toolCwdInput");
@@ -773,6 +785,7 @@ function setPresetMcpStatus(message, state = "") {
 function renderPresetMcpTypeFields() {
   const remote = presetMcpType.value === "remote";
   presetMcpUrlField.hidden = !remote;
+  presetMcpHeadersField.hidden = !remote;
   for (const field of presetMcpStdioFields) field.hidden = remote;
 }
 
@@ -828,7 +841,15 @@ function addPresetMcpServer() {
       presetMcpUrl.focus();
       return;
     }
-    snippet = `[[mcp.servers]]\nserver_label = "${quoteToml(label)}"\nserver_url = "${quoteToml(url)}"\nrequire_approval = "never"`;
+    let headers;
+    try {
+      headers = httpHeadersToml(presetMcpHeaders.value);
+    } catch (error) {
+      setPresetMcpStatus(error.message, "error");
+      presetMcpHeaders.focus();
+      return;
+    }
+    snippet = `[[mcp.servers]]\nserver_label = "${quoteToml(label)}"\nserver_url = "${quoteToml(url)}"\nrequire_approval = "never"${headers ? `\n\n${headers}` : ""}`;
   } else {
     const command = presetMcpCommand.value.trim();
     if (!command) {
@@ -844,6 +865,7 @@ function addPresetMcpServer() {
   editingPresetMcpConfig = `${prefix}${prefix ? "\n\n" : ""}${snippet}\n`;
   presetMcpLabel.value = "";
   presetMcpUrl.value = "";
+  presetMcpHeaders.value = "";
   presetMcpCommand.value = "";
   presetMcpArgs.value = "";
   presetMcpCwd.value = "";
@@ -868,6 +890,7 @@ function openPresetEditor(configurationId) {
   renderPresetPromptEditors(configuration.systemPrompts || {});
   editingPresetMcpConfig = configuration.mcpConfig || "";
   presetMcpType.value = "remote";
+  presetMcpHeaders.value = "";
   renderPresetMcpTypeFields();
   renderPresetMcpServers();
   setPresetMcpStatus("Loaded from this preset's SQLite record.");
@@ -2443,10 +2466,11 @@ function toolSnippet() {
   if (toolTypeSelect.value === "remote") {
     const url = toolUrlInput.value.trim();
     if (!url) throw new Error("Server URL is required.");
+    const headers = httpHeadersToml(toolHeadersInput.value);
     return `[[mcp.servers]]
 server_label = "${quoteToml(label)}"
 server_url = "${quoteToml(url)}"
-require_approval = "never"`;
+require_approval = "never"${headers ? `\n\n${headers}` : ""}`;
   }
 
   const command = toolCommandInput.value.trim();
@@ -2486,6 +2510,7 @@ function clearMcpEditor() {
   toolTypeSelect.disabled = false;
   toolLabelInput.value = "";
   toolUrlInput.value = "";
+  toolHeadersInput.value = "";
   toolCommandInput.value = "";
   toolArgsInput.value = "";
   toolCwdInput.value = "";
@@ -2503,6 +2528,7 @@ function openMcpEditor(block = null) {
     toolTypeSelect.disabled = true;
     toolLabelInput.value = block.label;
     toolUrlInput.value = block.url;
+    toolHeadersInput.value = formatHttpHeaders(block.headers);
     toolCommandInput.value = block.command;
     toolArgsInput.value = block.args.join(" ");
     toolCwdInput.value = block.cwd;

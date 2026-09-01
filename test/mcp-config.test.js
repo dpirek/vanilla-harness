@@ -1,12 +1,23 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { mcpBlocks, replaceToolBlock, updateToolBlock } from "../public/lib/mcp-config.js";
+import {
+  formatHttpHeaders,
+  httpHeadersToml,
+  mcpBlocks,
+  parseHttpHeaders,
+  replaceToolBlock,
+  updateToolBlock,
+} from "../public/lib/mcp-config.js";
 
 const configuration = `[[mcp.servers]]
 server_label = "docs"
 server_url = "https://example.com/mcp"
 require_approval = "always"
+
+[mcp.servers.headers]
+"Authorization" = "Bearer \${MCP_TOKEN}"
+"X-API-Key" = "key:with:colons"
 
 [mcp_servers.local]
 command = "node"
@@ -24,6 +35,10 @@ test("MCP blocks expose values used by the edit form", () => {
     { label: remote.label, type: remote.type, url: remote.url },
     { label: "docs", type: "remote", url: "https://example.com/mcp" },
   );
+  assert.deepEqual(remote.headers, {
+    Authorization: "Bearer ${MCP_TOKEN}",
+    "X-API-Key": "key:with:colons",
+  });
   assert.deepEqual(
     { label: stdio.label, type: stdio.type, command: stdio.command, args: stdio.args, cwd: stdio.cwd },
     { label: "local", type: "stdio", command: "node", args: ["server.js", "--stdio"], cwd: "/workspace" },
@@ -57,10 +72,37 @@ test("editing an MCP server preserves its additional settings", () => {
   const updated = updateToolBlock(configuration, remote, `[[mcp.servers]]
 server_label = "reference"
 server_url = "https://reference.example.com/mcp"
-require_approval = "always"`);
+require_approval = "always"
+
+[mcp.servers.headers]
+"Authorization" = "Bearer replacement"
+"X-Tenant" = "docs"`);
 
   assert.match(updated, /server_label = "reference"/);
   assert.match(updated, /server_url = "https:\/\/reference\.example\.com\/mcp"/);
   assert.match(updated, /require_approval = "always"/);
+  assert.match(updated, /"Authorization" = "Bearer replacement"/);
+  assert.match(updated, /"X-Tenant" = "docs"/);
+  assert.doesNotMatch(updated, /X-API-Key/);
   assert.match(updated, /\[mcp_servers\.local\]/);
+});
+
+test("HTTP header helpers accept bearer tokens and serialize TOML", () => {
+  const input = "Authorization: Bearer ${MCP_TOKEN}\nX-API-Key: key:with:colons";
+  assert.deepEqual(parseHttpHeaders(input), {
+    Authorization: "Bearer ${MCP_TOKEN}",
+    "X-API-Key": "key:with:colons",
+  });
+  assert.equal(formatHttpHeaders(parseHttpHeaders(input)), input);
+  assert.equal(httpHeadersToml(input), `[mcp.servers.headers]
+"Authorization" = "Bearer \${MCP_TOKEN}"
+"X-API-Key" = "key:with:colons"`);
+});
+
+test("HTTP header helpers reject malformed and duplicate headers", () => {
+  assert.throws(() => parseHttpHeaders("Authorization Bearer token"), /line 1/);
+  assert.throws(
+    () => parseHttpHeaders("Authorization: Bearer one\nauthorization: Bearer two"),
+    /Duplicate HTTP header/,
+  );
 });
