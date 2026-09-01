@@ -2187,6 +2187,11 @@ textarea:disabled {
   padding: 0 14px;
 }
 
+.mcpEditorActions .primaryButton {
+  background: var(--accent);
+  color: #1b1a18;
+}
+
 .toolsListPanel {
   display: grid;
   overflow: hidden;
