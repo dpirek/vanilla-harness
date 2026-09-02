@@ -1,38 +1,60 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { activateEnvironmentPreset } from "../lib/env-config.js";
+import { applyEnvironmentSettings, environmentDisablesFileAccess } from "../lib/env-config.js";
 
-test("environment preset activates a preset by name", () => {
-  const configurations = [
-    { id: "one", name: "Default" },
-    { id: "two", name: "Review", selected: true },
-  ];
-  let activatedId = null;
-  const store = {
-    getRigConfigurations: () => ({ configurations, activeConfigurationId: "two" }),
-    setRigConfigurations(items, id) {
-      assert.equal(items, configurations);
-      activatedId = id;
-      return { configurations: items, activeConfigurationId: id };
+function createStore() {
+  const configurations = [{
+    id: "active", name: "Current",
+    providerSettings: { provider: "openai", model: "old", baseUrl: "", apiKey: "" },
+    componentState: { inputSource: "microphone", modelDisplay: "engine", effects: { composer: true, tools: true, mcp: true, validation: true } },
+    systemPrompts: { agent_instructions: "old" },
+    toolPermissions: { read_file: true, run_command: true },
+    skillIds: [], mcpConfig: "",
+  }];
+  let saved;
+  return {
+    getRigConfigurations: () => ({ configurations, activeConfigurationId: "active" }),
+    getSkills: () => [{ id: "skill-id", name: "Browser" }],
+    setRigConfigurations(items, activeConfigurationId) {
+      saved = { configurations: items, activeConfigurationId };
+      return saved;
     },
+    saved: () => saved,
   };
+}
 
-  activateEnvironmentPreset(store, "default");
-  assert.equal(activatedId, "one");
+test("environment settings override individual active preset fields", () => {
+  const store = createStore();
+  applyEnvironmentSettings(store, {
+    AI_PROVIDER: "custom", AI_MODEL: "model-1", AI_BASE_URL: "https://example.test/v1",
+    AI_HARNESS_TOOL_READ_FILE: "false", AI_HARNESS_WORKFLOW_VALIDATION: "off",
+    AI_HARNESS_AGENT_INSTRUCTIONS: "from env", AI_HARNESS_SKILLS: "browser",
+  });
+  const active = store.saved().configurations[0];
+  assert.equal(active.providerSettings.provider, "custom");
+  assert.equal(active.providerSettings.model, "model-1");
+  assert.equal(active.providerSettings.baseUrl, "https://example.test/v1");
+  assert.equal(active.toolPermissions.read_file, false);
+  assert.equal(active.toolPermissions.run_command, true);
+  assert.equal(active.componentState.effects.validation, false);
+  assert.equal(active.systemPrompts.agent_instructions, "from env");
+  assert.deepEqual(active.skillIds, ["skill-id"]);
 });
 
-test("environment preset accepts an id and rejects an unknown selector", () => {
-  const store = {
-    getRigConfigurations: () => ({
-      configurations: [{ id: "preset-id", name: "Default" }],
-      activeConfigurationId: "preset-id",
-    }),
-    setRigConfigurations() {
-      throw new Error("already active preset should not be rewritten");
-    },
-  };
+test("environment settings reject invalid booleans and unknown skills", () => {
+  assert.throws(() => applyEnvironmentSettings(createStore(), { AI_HARNESS_TOOL_READ_FILE: "sometimes" }), /must be true or false/);
+  assert.throws(() => applyEnvironmentSettings(createStore(), { AI_HARNESS_SKILLS: "missing" }), /unknown skill/);
+});
 
-  assert.equal(activateEnvironmentPreset(store, "preset-id").activeConfigurationId, "preset-id");
-  assert.throws(() => activateEnvironmentPreset(store, "missing"), /does not match/);
+test("file access is disabled only when every file tool flag is false", () => {
+  const disabled = {
+    AI_HARNESS_TOOL_LIST_FILES: "false",
+    AI_HARNESS_TOOL_READ_FILE: "0",
+    AI_HARNESS_TOOL_WRITE_FILE: "no",
+    AI_HARNESS_TOOL_SEARCH_FILES: "off",
+  };
+  assert.equal(environmentDisablesFileAccess(disabled), true);
+  assert.equal(environmentDisablesFileAccess({ ...disabled, AI_HARNESS_TOOL_READ_FILE: "true" }), false);
+  assert.equal(environmentDisablesFileAccess({}), false);
 });

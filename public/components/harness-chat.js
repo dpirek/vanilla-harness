@@ -41,6 +41,7 @@ class HarnessChat extends BaseComponent {
               this.createElement("button", {
                 id: "toggleFilesColumnButton",
                 class: "columnToggleButton",
+                hidden: "",
                 type: "button",
                 "aria-label": "Hide workspace column",
                 "aria-pressed": "true",

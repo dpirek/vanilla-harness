@@ -1,3 +1,4 @@
 /db/
 .env
+.env.disabled
 .DS_Store

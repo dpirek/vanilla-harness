@@ -2669,6 +2669,8 @@ async function loadHealth(initialHealth = null) {
   try {
     const health = initialHealth || await fetchHealth();
     presetStatusBar.hidden = health.environmentFileDetected === true;
+    toggleFilesColumnButton.hidden = health.fileAccessDisabledByEnvironment === true;
+    if (health.fileAccessDisabledByEnvironment === true) applyFilesColumnState(false);
     defaultWorkspace = health.workspaceConfiguredByEnvironment
       ? health.workspace
       : loadDefaultWorkspace() || health.workspace || ".";
@@ -3084,6 +3086,7 @@ async function initialize() {
     // loadHealth reports the unavailable server after the local UI is restored.
   }
   const environmentWorkspaceConfigured = initialHealth?.workspaceConfiguredByEnvironment === true;
+  const fileAccessDisabledByEnvironment = initialHealth?.fileAccessDisabledByEnvironment === true;
   const storedDefaultWorkspace = environmentWorkspaceConfigured
     ? initialHealth.workspace
     : loadDefaultWorkspace();
@@ -3094,7 +3097,9 @@ async function initialize() {
   sidebarWidth = Number.isFinite(localSidebarWidth) && localSidebarWidth > 0 ? localSidebarWidth : 344;
   filesWidth = Number.isFinite(localFilesWidth) && localFilesWidth > 0 ? localFilesWidth : 300;
   applySidebarState(localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === "true");
-  applyFilesColumnState(localStorage.getItem(FILES_VISIBLE_STORAGE_KEY) !== "false");
+  applyFilesColumnState(fileAccessDisabledByEnvironment
+    ? false
+    : localStorage.getItem(FILES_VISIBLE_STORAGE_KEY) !== "false");
   setSidebarWidth(sidebarWidth);
   setFilesWidth(filesWidth);
   renderPresetDropdown();
@@ -3131,14 +3136,6 @@ async function initialize() {
   resizePromptInput();
   await loadPresetSummary();
   await loadHealth(initialHealth);
-  if (!needsDefaultWorkspace) {
-    try {
-      await provisionConversationWorkspaces(defaultWorkspace);
-      renderWorkspace();
-    } catch (error) {
-      addEvent("Conversation workspace setup failed", error.message, { persist: false });
-    }
-  }
   await loadWorkspaceTree();
   if (needsDefaultWorkspace) {
     openProvidersAfterWorkspaceSelection = shouldOpenProvidersModal;

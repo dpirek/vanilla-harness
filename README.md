@@ -44,9 +44,10 @@ The application can be configured through the UI or with environment variables:
 | `PORT` | Web server port | `3000` |
 | `AI_HARNESS_WORKSPACE` | Workspace root; takes precedence over the browser's saved workspace | Current directory |
 | `AI_HARNESS_DATA_DIR` | Directory containing the local `db/` data directory | Current directory |
-| `AI_HARNESS_PRESET` | Preset ID or name activated when a `.env` file is present | Current preset |
 | `AI_PROVIDER` | Default provider: `openai`, `ollama`, or `custom` | `openai` |
 | `AI_MODEL` | Default model override | Provider default |
+| `AI_BASE_URL` | Provider base URL override applied to the runtime configuration | Stored value |
+| `AI_API_KEY` | Provider API key override applied to the runtime configuration | Stored value |
 | `OPENAI_API_KEY` | OpenAI API key fallback | — |
 | `OPENAI_MODEL` | Default OpenAI model | `gpt-5.1-codex` |
 | `OPENAI_BASE_URL` | Alternate OpenAI API base URL | OpenAI API |
@@ -62,7 +63,7 @@ Example:
 AI_HARNESS_WORKSPACE=/path/to/project PORT=4000 npm start
 ```
 
-The server automatically loads a `.env` file from the project root. When that file is present, `AI_HARNESS_PRESET` selects the startup preset by ID or name and the preset bar is hidden in the web UI. Existing shell environment variables take precedence over values in `.env`.
+The server automatically loads a `.env` file from the project root. When that file is present, its individual provider, tool, skill, prompt, MCP, and workflow settings override the active stored configuration, and the preset bar is hidden in the web UI. See `.env.example` for every supported setting. Existing shell environment variables take precedence over values in `.env`.
 
 ## Local data
 

@@ -465,6 +465,7 @@ code {
 .columnVisibilityControls > .columnToggleButton,
 .dropdownButtonTrigger { display: grid; height: 32px; place-items: center; border: 1px solid var(--line); border-radius: 8px; background: #151515; padding: 0; color: var(--muted); font-size: 1rem; }
 .columnVisibilityControls > .columnToggleButton { width: 32px; flex: 0 0 32px; margin-left: auto; }
+.columnVisibilityControls > .columnToggleButton[hidden] { display: none; }
 .columnVisibilityControls > .columnToggleButton:hover,
 .columnVisibilityControls > .columnToggleButton[aria-pressed="true"],
 .dropdownButtonTrigger:hover,

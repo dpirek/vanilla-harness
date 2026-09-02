@@ -19,11 +19,17 @@ import {
   normalizeProvider,
   resolveProviderApiKey,
 } from "./lib/provider-config.js";
-import { activateEnvironmentPreset, loadEnvironmentFile } from "./lib/env-config.js";
+import {
+  applyEnvironmentSettings,
+  environmentDisablesFileAccess,
+  loadEnvironmentFile,
+} from "./lib/env-config.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const environmentFilePath = path.join(__dirname, ".env");
 const environmentFileDetected = loadEnvironmentFile(environmentFilePath);
+const fileAccessDisabledByEnvironment = environmentFileDetected
+  && environmentDisablesFileAccess(process.env);
 const publicDir = path.join(__dirname, "public");
 const runtimeRoot = path.resolve(process.env.AI_HARNESS_DATA_DIR || process.cwd());
 const defaultWorkspace = path.resolve(process.env.AI_HARNESS_WORKSPACE || process.cwd());
@@ -147,7 +153,7 @@ const handleWebSocket = createWebSocketHandler({
 
 const uiStateStore = await initializeUiStateStore(uiStateDatabasePath, configPath);
 if (environmentFileDetected) {
-  activateEnvironmentPreset(uiStateStore, process.env.AI_HARNESS_PRESET);
+  applyEnvironmentSettings(uiStateStore, process.env, __dirname);
 }
 
 const server = http.createServer(async (req, res) => {
@@ -157,6 +163,7 @@ const server = http.createServer(async (req, res) => {
     defaultWorkspace,
     resolveWorkspace,
     environmentFileDetected,
+    fileAccessDisabledByEnvironment,
   });
 
   if (await handleApiRequest(req, res, url)) return;

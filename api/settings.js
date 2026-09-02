@@ -12,7 +12,12 @@ import {
 } from "../public/lib/skill-content.js";
 import { json, methodNotAllowed, readRequestBody } from "./http.js";
 
-export function createSettingsApiHandlers({ uiStateStore, defaultWorkspace, environmentFileDetected = false }) {
+export function createSettingsApiHandlers({
+  uiStateStore,
+  defaultWorkspace,
+  environmentFileDetected = false,
+  fileAccessDisabledByEnvironment = false,
+}) {
   async function handleHealthApi(req, res) {
     const envProvider = normalizeProvider(process.env.AI_PROVIDER);
     const storedSettings = uiStateStore.getSelectedProvider() || {};
@@ -29,6 +34,7 @@ export function createSettingsApiHandlers({ uiStateStore, defaultWorkspace, envi
       workspace: defaultWorkspace,
       workspaceConfiguredByEnvironment: Boolean(process.env.AI_HARNESS_WORKSPACE?.trim()),
       environmentFileDetected,
+      fileAccessDisabledByEnvironment,
     });
   }
 
