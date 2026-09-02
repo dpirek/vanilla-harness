@@ -86,6 +86,32 @@ public/            Vanilla JavaScript UI, components, styles, and browser servic
 db/                Local runtime state (ignored by Git)
 ```
 
+## Example how to embed as web component:
+
+```JavaScript
+(async () => {
+    await import("http://localhost:3000/components/ai-harness-app.js");
+
+    const harness = document.createElement("ai-harness-app");
+    harness.theme = "light";
+    harness.hideLeftColumn = false;
+    harness.hideRightColumn = false;
+
+    Object.assign(harness.style, {
+      position: "fixed",
+      inset: "0",
+      width: "100vw",
+      height: "100vh",
+      zIndex: "2147483647",
+    });
+
+    document.body.append(harness);
+
+    // Remove later with:
+    window.removeInjectedHarness = () => harness.remove();
+  })();
+```
+
 ## Security notes
 
 The agent can read files, write files, make HTTP requests, run commands, and call MCP servers within the selected workspace. Enabled tools and MCP servers are automatically approved, so only enable capabilities and connect servers you trust.
