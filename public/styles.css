@@ -1,4 +1,5 @@
-:root {
+:root,
+:host {
   color-scheme: dark;
   --bg: #000000;
   --sidebar: #050505;
@@ -26,6 +27,76 @@
 html,
 body {
   height: 100%;
+}
+
+:host {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-width: 320px;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+/* Theme override scoped to the ai-harness-app shadow host only. */
+:host([theme="light"]) {
+  color-scheme: light;
+  --bg: #f5f4f2;
+  --sidebar: #ebe9e5;
+  --sidebar-line: #d8d4ce;
+  --surface: #ffffff;
+  --surface-hover: #ebe8e3;
+  --bubble: #e7e4df;
+  --text: #24211e;
+  --muted: #6f6962;
+  --faint: #8f8880;
+  --line: #d5d0c9;
+  --accent: #24211e;
+  --danger: #b42318;
+  --panel: #faf9f7;
+  --field: #ffffff;
+  --raised: #efede9;
+  --selected: #e4e0da;
+  --strong-line: #bbb5ad;
+}
+
+:host([theme="light"]) .app,
+:host([theme="light"]) .chat,
+:host([theme="light"]) .columnResizeHandle {
+  background: var(--bg);
+  color: var(--text);
+}
+
+:host([theme="light"]) .brand img,
+:host([theme="light"]) .sidebarToggleLogo {
+  filter: brightness(0) saturate(100%);
+}
+
+:host([theme="light"]) .sidebarToggle {
+  color: #24211e;
+  outline: 1px solid #c9c3bb;
+  outline-offset: -1px;
+}
+
+:host([theme="light"]) .sidebarToggle:hover,
+:host([theme="light"]) .sidebarToggle:focus-visible {
+  background: #ddd9d3;
+  color: #11100f;
+}
+
+:host([theme="light"]) .sendButton {
+  border: 1px solid #24211e;
+  background: #24211e;
+  color: #ffffff;
+}
+
+:host([theme="light"]) .sendButton:hover:not(:disabled),
+:host([theme="light"]) .sendButton:focus-visible {
+  background: #403b36;
+  color: #ffffff;
 }
 
 body {
@@ -83,6 +154,26 @@ code {
 .app.files-collapsed { grid-template-columns: var(--sidebar-width) 8px minmax(360px, 1fr) 0 0; }
 .app.sidebar-collapsed.files-collapsed { grid-template-columns: var(--sidebar-collapsed-width) 8px minmax(360px, 1fr) 0 0; }
 .app.files-collapsed .filesColumn, .app.files-collapsed .filesResizeHandle { display: none; }
+
+/* Public ai-harness-app column visibility properties. */
+:host([hide-left-column]) .sidebar,
+:host([hide-left-column]) .sidebarResizeHandle,
+:host([hide-right-column]) .filesColumn,
+:host([hide-right-column]) .filesResizeHandle,
+:host([hide-right-column]) #toggleFilesColumnButton { display: none; }
+:host([hide-left-column]) .app {
+  grid-template-columns: 0 0 minmax(360px, 1fr) 8px var(--files-width);
+}
+:host([hide-right-column]) .app {
+  grid-template-columns: var(--sidebar-width) 8px minmax(360px, 1fr) 0 0;
+}
+:host([hide-right-column]) .app.sidebar-collapsed {
+  grid-template-columns: var(--sidebar-collapsed-width) 8px minmax(360px, 1fr) 0 0;
+}
+:host([hide-left-column][hide-right-column]) .app,
+:host([hide-left-column][hide-right-column]) .app.sidebar-collapsed {
+  grid-template-columns: 0 0 minmax(360px, 1fr) 0 0;
+}
 
 .sidebar {
   display: flex;
@@ -2390,7 +2481,8 @@ textarea:disabled {
 }
 
 /* Warm graphite palette used by the alternate light.html interface. */
-:root {
+:root,
+:host {
   --bg: #151412;
   --sidebar: #1c1b19;
   --sidebar-line: #2c2a27;

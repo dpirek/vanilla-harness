@@ -41,8 +41,8 @@ class AppShellContent extends BaseComponent {
 
 customElements.define("app-shell-content", AppShellContent);
 
-function mountAppShell() {
-  const appShell = document.querySelector("#appShell");
+function mountAppShell(root = document) {
+  const appShell = root.querySelector("#appShell");
   if (!appShell) throw new Error("Application shell mount point is missing.");
   appShell.replaceChildren(document.createElement("app-shell-content"));
   return appShell;
