@@ -86,31 +86,75 @@ public/            Vanilla JavaScript UI, components, styles, and browser servic
 db/                Local runtime state (ignored by Git)
 ```
 
-## Example how to embed as web component:
+## Web component embedding
 
-```JavaScript
-(async () => {
-    await import("http://localhost:3000/components/ai-harness-app.js");
+The complete interface is available as the `<ai-harness-app>` custom element. It mounts the real application directly in an open Shadow DOM; it does not use an iframe. Load the component module and give the element an explicit size:
 
-    const harness = document.createElement("ai-harness-app");
-    harness.theme = "light";
-    harness.hideLeftColumn = false;
-    harness.hideRightColumn = false;
+```html
+<script type="module" src="/components/ai-harness-app.js"></script>
 
-    Object.assign(harness.style, {
-      position: "fixed",
-      inset: "0",
-      width: "100vw",
-      height: "100vh",
-      zIndex: "2147483647",
-    });
-
-    document.body.append(harness);
-
-    // Remove later with:
-    window.removeInjectedHarness = () => harness.remove();
-  })();
+<ai-harness-app
+  theme="dark"
+  style="display: block; width: 100%; height: 700px"
+></ai-harness-app>
 ```
+
+The component supports these reflected attributes and JavaScript properties:
+
+| Attribute | Property | Values | Purpose |
+| --- | --- | --- | --- |
+| `theme` | `theme` | `dark`, `light` | Selects the component-scoped color theme |
+| `hide-left-column` | `hideLeftColumn` | Boolean | Hides the conversation sidebar and its resize handle |
+| `hide-right-column` | `hideRightColumn` | Boolean | Hides the workspace browser, resize handle, and toggle button |
+
+Boolean attributes are enabled by their presence:
+
+```html
+<ai-harness-app
+  theme="light"
+  hide-left-column
+  hide-right-column
+  style="display: block; width: 100%; height: 100vh"
+></ai-harness-app>
+```
+
+Properties can be changed at runtime:
+
+```js
+const harness = document.querySelector("ai-harness-app");
+harness.theme = "light";
+harness.hideLeftColumn = true;
+harness.hideRightColumn = false;
+
+harness.addEventListener("harness-load", () => {
+  console.log("AI Harness module loaded");
+});
+```
+
+To inject a full-screen instance from the browser DevTools Console on a page served by Vanilla Harness:
+
+```js
+(async () => {
+  await import("/components/ai-harness-app.js");
+
+  const harness = document.createElement("ai-harness-app");
+  harness.theme = "dark";
+  Object.assign(harness.style, {
+    position: "fixed",
+    inset: "0",
+    width: "100vw",
+    height: "100vh",
+    zIndex: "2147483647",
+  });
+  document.body.append(harness);
+
+  window.removeInjectedHarness = () => harness.remove();
+})();
+```
+
+Open [http://localhost:3000/web-component-demo.html](http://localhost:3000/web-component-demo.html) for an interactive example of the theme and column properties.
+
+The current component is same-origin: its modules, stylesheet, `/api` requests, and WebSocket connection are resolved against the page serving Vanilla Harness. Embedding it on an unrelated origin requires serving the frontend from that origin or adding configurable server URLs and corresponding CORS support.
 
 ## Security notes
 
