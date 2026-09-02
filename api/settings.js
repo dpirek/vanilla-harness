@@ -27,6 +27,7 @@ export function createSettingsApiHandlers({ uiStateStore, defaultWorkspace, envi
       hasApiKey: Boolean(storedSettings.apiKey),
       approveAll: true,
       workspace: defaultWorkspace,
+      workspaceConfiguredByEnvironment: Boolean(process.env.AI_HARNESS_WORKSPACE?.trim()),
       environmentFileDetected,
     });
   }

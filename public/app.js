@@ -2665,11 +2665,13 @@ async function saveTool() {
   }
 }
 
-async function loadHealth() {
+async function loadHealth(initialHealth = null) {
   try {
-    const health = await fetchHealth();
+    const health = initialHealth || await fetchHealth();
     presetStatusBar.hidden = health.environmentFileDetected === true;
-    defaultWorkspace = loadDefaultWorkspace() || health.workspace || ".";
+    defaultWorkspace = health.workspaceConfiguredByEnvironment
+      ? health.workspace
+      : loadDefaultWorkspace() || health.workspace || ".";
     let changed = false;
     for (const session of sessions) {
       if (!session.workspace || session.workspace === ".") {
@@ -3075,7 +3077,16 @@ chatComponent.addEventListener("reset-chat", () => {
 async function initialize() {
   let state = {};
   let shouldOpenProvidersModal = false;
-  const storedDefaultWorkspace = loadDefaultWorkspace();
+  let initialHealth = null;
+  try {
+    initialHealth = await fetchHealth();
+  } catch {
+    // loadHealth reports the unavailable server after the local UI is restored.
+  }
+  const environmentWorkspaceConfigured = initialHealth?.workspaceConfiguredByEnvironment === true;
+  const storedDefaultWorkspace = environmentWorkspaceConfigured
+    ? initialHealth.workspace
+    : loadDefaultWorkspace();
   const needsDefaultWorkspace = !storedDefaultWorkspace;
   if (storedDefaultWorkspace) defaultWorkspace = storedDefaultWorkspace;
   const localSidebarWidth = Number(localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY));
@@ -3094,7 +3105,7 @@ async function initialize() {
         ...session,
         messages: Array.isArray(session.messages) ? session.messages : [],
         events: Array.isArray(session.events) ? session.events : [],
-        workspace: session.workspace || defaultWorkspace,
+        workspace: environmentWorkspaceConfigured ? defaultWorkspace : session.workspace || defaultWorkspace,
       }))
       : [createSession("AI Harness Session", defaultWorkspace)];
     providerSettings = { ...defaultProviderSettings(), ...(state.providerSettings || {}) };
@@ -3119,7 +3130,7 @@ async function initialize() {
   renderWorkspace();
   resizePromptInput();
   await loadPresetSummary();
-  await loadHealth();
+  await loadHealth(initialHealth);
   if (!needsDefaultWorkspace) {
     try {
       await provisionConversationWorkspaces(defaultWorkspace);

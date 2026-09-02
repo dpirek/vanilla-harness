@@ -42,7 +42,7 @@ The application can be configured through the UI or with environment variables:
 | Variable | Purpose | Default |
 | --- | --- | --- |
 | `PORT` | Web server port | `3000` |
-| `AI_HARNESS_WORKSPACE` | Initial workspace available to the agent | Current directory |
+| `AI_HARNESS_WORKSPACE` | Workspace root; takes precedence over the browser's saved workspace | Current directory |
 | `AI_HARNESS_DATA_DIR` | Directory containing the local `db/` data directory | Current directory |
 | `AI_HARNESS_PRESET` | Preset ID or name activated when a `.env` file is present | Current preset |
 | `AI_PROVIDER` | Default provider: `openai`, `ollama`, or `custom` | `openai` |
