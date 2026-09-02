@@ -191,16 +191,23 @@ function sessionActivities(events = [], now = Date.now()) {
         { title: "Images", text: detail.images ? `${detail.images} attached` : "" },
       ]);
     } else if (type === "turn_start") {
-      add(`Model turn ${detail.turn}`, "running", event, `turn:${detail.turn}`);
+      const model = String(detail.model || "").trim();
+      add(`Model turn ${detail.turn}${model ? ` (${model})` : ""}`, "running", event, `turn:${detail.turn}`);
     } else if (type === "turn") {
+      const model = String(detail.inputPrompt?.model || detail.serverResponse?.model || detail.model || "").trim();
       const item = setUsage(
-        finish((candidate) => candidate.key === `turn:${detail.turn}`, event),
+        finish(
+          (candidate) => candidate.key === `turn:${detail.turn}`,
+          event,
+          "completed",
+          `Model turn ${detail.turn}${model ? ` (${model})` : ""}`,
+        ),
         detail.serverResponse?.usage || detail.usage,
       );
       if (item) {
         item.contextUsage = contextUsageForTurn(detail, item.usage);
         item.modelTurn = {
-          model: String(detail.inputPrompt?.model || detail.serverResponse?.model || detail.model || ""),
+          model,
           input: formatModelTurnInput(detail.inputPrompt),
           output: formatModelTurnOutput(detail.serverResponse),
         };

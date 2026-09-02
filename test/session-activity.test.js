@@ -19,8 +19,8 @@ test("session activity tracks the current model and tool steps", () => {
     { title: "Prompt sent", timestamp: 1 },
     { detail: { type: "composer_start" }, timestamp: 2 },
     { detail: { type: "composer_complete" }, timestamp: 3 },
-    { detail: { type: "turn_start", turn: 1 }, timestamp: 4 },
-    { detail: { type: "turn", turn: 1 }, timestamp: 5 },
+    { detail: { type: "turn_start", turn: 1, model: "gpt-5.6-sol" }, timestamp: 4 },
+    { detail: { type: "turn", turn: 1, model: "gpt-5.6-sol" }, timestamp: 5 },
     { detail: { type: "tool_start", name: "read_file" }, timestamp: 6 },
   ];
 
@@ -29,7 +29,7 @@ test("session activity tracks the current model and tool steps", () => {
   assert.deepEqual(activity.items.map(({ label, status }) => ({ label, status })), [
     { label: "Send prompt", status: "completed" },
     { label: "Prompt refined", status: "completed" },
-    { label: "Model turn 1", status: "completed" },
+    { label: "Model turn 1 (gpt-5.6-sol)", status: "completed" },
     { label: "Run read file", status: "running" },
   ]);
   assert.deepEqual(activity.items.map((item) => item.durationMs), [1, 1, 1, 4]);
@@ -77,6 +77,7 @@ test("model turns retain expandable input prompt and output text", () => {
   ]);
 
   const turn = activity.items.find((item) => item.key === "turn:1");
+  assert.equal(turn.label, "Model turn 1 (gpt-5.1-codex)");
   assert.deepEqual(turn.usage, { inputTokens: 42, outputTokens: 9, totalTokens: 51 });
   assert.deepEqual(turn.contextUsage, {
     model: "gpt-5.1-codex",
