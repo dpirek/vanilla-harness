@@ -2668,6 +2668,7 @@ async function saveTool() {
 async function loadHealth() {
   try {
     const health = await fetchHealth();
+    presetStatusBar.hidden = health.environmentFileDetected === true;
     defaultWorkspace = loadDefaultWorkspace() || health.workspace || ".";
     let changed = false;
     for (const session of sessions) {

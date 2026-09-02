@@ -19,8 +19,11 @@ import {
   normalizeProvider,
   resolveProviderApiKey,
 } from "./lib/provider-config.js";
+import { activateEnvironmentPreset, loadEnvironmentFile } from "./lib/env-config.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const environmentFilePath = path.join(__dirname, ".env");
+const environmentFileDetected = loadEnvironmentFile(environmentFilePath);
 const publicDir = path.join(__dirname, "public");
 const runtimeRoot = path.resolve(process.env.AI_HARNESS_DATA_DIR || process.cwd());
 const defaultWorkspace = path.resolve(process.env.AI_HARNESS_WORKSPACE || process.cwd());
@@ -143,10 +146,18 @@ const handleWebSocket = createWebSocketHandler({
 });
 
 const uiStateStore = await initializeUiStateStore(uiStateDatabasePath, configPath);
+if (environmentFileDetected) {
+  activateEnvironmentPreset(uiStateStore, process.env.AI_HARNESS_PRESET);
+}
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
-  const handleApiRequest = createApiRouter({ uiStateStore, defaultWorkspace, resolveWorkspace });
+  const handleApiRequest = createApiRouter({
+    uiStateStore,
+    defaultWorkspace,
+    resolveWorkspace,
+    environmentFileDetected,
+  });
 
   if (await handleApiRequest(req, res, url)) return;
   await serveStatic(req, res, publicDir);

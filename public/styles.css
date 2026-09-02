@@ -464,7 +464,7 @@ code {
 .columnVisibilityControls { display: flex; width: 100%; min-width: 0; align-items: center; justify-content: flex-start; gap: 6px; margin-left: auto; }
 .columnVisibilityControls > .columnToggleButton,
 .dropdownButtonTrigger { display: grid; height: 32px; place-items: center; border: 1px solid var(--line); border-radius: 8px; background: #151515; padding: 0; color: var(--muted); font-size: 1rem; }
-.columnVisibilityControls > .columnToggleButton { width: 32px; flex: 0 0 32px; }
+.columnVisibilityControls > .columnToggleButton { width: 32px; flex: 0 0 32px; margin-left: auto; }
 .columnVisibilityControls > .columnToggleButton:hover,
 .columnVisibilityControls > .columnToggleButton[aria-pressed="true"],
 .dropdownButtonTrigger:hover,
@@ -486,6 +486,7 @@ code {
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
 }
+.presetStatusBar[hidden] { display: none; }
 
 .presetStatusItems {
   display: flex;

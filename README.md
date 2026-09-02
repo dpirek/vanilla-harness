@@ -44,6 +44,7 @@ The application can be configured through the UI or with environment variables:
 | `PORT` | Web server port | `3000` |
 | `AI_HARNESS_WORKSPACE` | Initial workspace available to the agent | Current directory |
 | `AI_HARNESS_DATA_DIR` | Directory containing the local `db/` data directory | Current directory |
+| `AI_HARNESS_PRESET` | Preset ID or name activated when a `.env` file is present | Current preset |
 | `AI_PROVIDER` | Default provider: `openai`, `ollama`, or `custom` | `openai` |
 | `AI_MODEL` | Default model override | Provider default |
 | `OPENAI_API_KEY` | OpenAI API key fallback | — |
@@ -60,6 +61,8 @@ Example:
 ```bash
 AI_HARNESS_WORKSPACE=/path/to/project PORT=4000 npm start
 ```
+
+The server automatically loads a `.env` file from the project root. When that file is present, `AI_HARNESS_PRESET` selects the startup preset by ID or name and the preset bar is hidden in the web UI. Existing shell environment variables take precedence over values in `.env`.
 
 ## Local data
 

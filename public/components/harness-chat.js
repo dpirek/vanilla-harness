@@ -22,6 +22,7 @@ class HarnessChat extends BaseComponent {
               this.createElement("div", {
                 id: "presetStatusBar",
                 class: "presetStatusBar",
+                hidden: "",
                 role: "group",
                 "aria-live": "polite",
                 "aria-label": "Active preset settings",
