@@ -25,6 +25,7 @@ import {
 } from "./lib/mcp-config.js";
 import { describeAgentEvent } from "./lib/agent-events.js";
 import { readFileAsDataUrl, renderImagePreviews as renderImagePreviewList } from "./lib/image-attachments.js";
+import { randomUuid } from "./lib/ids.js";
 import { normalizeSkillName, skillDraft, syncSkillContentName, validateSkillContent } from "./lib/skill-content.js";
 import { clearSessionHistory, createSession, promptHistoryFromSessions, titleFromPrompt } from "./lib/sessions.js";
 import { formatStepDuration, formatTokenCount, sessionActivityRuns } from "./lib/session-activity.js";
@@ -1148,7 +1149,7 @@ async function duplicateActivePreset() {
   if (!active) return;
   const duplicate = {
     ...structuredClone(active),
-    id: crypto.randomUUID(),
+    id: randomUuid(),
     name: `Copy of ${active.name}`,
     updatedAt: Date.now(),
     selected: true,
@@ -2362,7 +2363,7 @@ function applyActiveProviderSettings(settings) {
 
 function providerFormRecord(existing = {}) {
   return {
-    id: existing.id || crypto.randomUUID(),
+    id: existing.id || randomUuid(),
     name: providerNameInput.value.trim() || `${providerSelect.value} provider`,
     type: providerSelect.value,
     model: providerModelInput.value.trim(),

@@ -1,6 +1,8 @@
+import { randomUuid } from "./ids.js";
+
 function createSession(title = "New chat", workspace = ".") {
   return {
-    id: crypto.randomUUID(),
+    id: randomUuid(),
     title,
     messages: [],
     events: [],
