@@ -37,7 +37,7 @@ const configPath = path.join(runtimeRoot, ".ai-harness/config.toml");
 const databaseDir = path.join(runtimeRoot, "db");
 const uiStateDatabasePath = path.join(databaseDir, "ui-state.sqlite");
 
-const defaultPort = Number(process.env.PORT || 3000);
+const defaultPort = Number(process.env.PORT || 8010);
 await fs.mkdir(databaseDir, { recursive: true });
 const connections = new Set();
 let storeClosed = false;
