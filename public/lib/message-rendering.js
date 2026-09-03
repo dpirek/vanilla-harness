@@ -155,10 +155,17 @@ function safeLinkHref(value = "") {
   return href;
 }
 
+function safeImageSrc(value = "") {
+  const src = safeLinkHref(value);
+  if (!src || /^(?:mailto:|#|\?)/i.test(src)) return "";
+  return src;
+}
+
 function nextInlineToken(value, cursor) {
   const patterns = [
     ["escape", /\\([\\`*_[\]{}()#+.!~>-])/g],
     ["code", /`([^`\n]+)`/g],
+    ["image", /!\[([^\]\n]*)\]\(([^\s)]+)(?:\s+"([^"]*)")?\)/g],
     ["link", /\[([^\]\n]+)\]\(([^\s)]+)(?:\s+"([^"]*)")?\)/g],
     ["strong", /\*\*([^*\n]+)\*\*|__([^_\n]+)__/g],
     ["strike", /~~([^~\n]+)~~/g],
@@ -194,6 +201,23 @@ function appendInlineMarkdown(container, text, options = {}) {
       code.className = "inlineCode";
       code.textContent = match[1];
       container.append(code);
+    } else if (type === "image") {
+      const sourceSrc = safeImageSrc(match[2]);
+      const resolution = sourceSrc && options.resolveLink
+        ? options.resolveLink(sourceSrc)
+        : { href: sourceSrc };
+      const src = safeImageSrc(typeof resolution === "string" ? resolution : resolution?.href);
+      if (!sourceSrc || !src) {
+        container.append(document.createTextNode(match[0]));
+      } else {
+        const image = document.createElement("img");
+        image.className = "markdownImage";
+        image.src = src;
+        image.alt = match[1].replace(/[`*_~]/g, "").trim();
+        image.loading = "lazy";
+        if (match[3]) image.title = match[3];
+        container.append(image);
+      }
     } else if (type === "link") {
       const sourceHref = safeLinkHref(match[2]);
       const resolution = sourceHref && options.resolveLink
@@ -296,4 +320,4 @@ function appendMarkdown(container, markdown, options = {}) {
   }
 }
 
-export { appendMarkdown, appendMessageText, markdownBlocks, safeLinkHref };
+export { appendMarkdown, appendMessageText, markdownBlocks, safeImageSrc, safeLinkHref };

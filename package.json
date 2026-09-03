@@ -3,10 +3,14 @@
   "version": "1.0.0",
   "description": "",
   "main": "server.js",
+  "bin": {
+    "vanilla-harness": "./cli.js"
+  },
   "directories": {
     "lib": "lib"
   },
   "scripts": {
+    "cli": "node cli.js",
     "test": "node --test",
     "start": "node server.js"
   },

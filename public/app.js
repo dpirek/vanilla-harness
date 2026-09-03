@@ -29,6 +29,7 @@ import { normalizeSkillName, skillDraft, syncSkillContentName, validateSkillCont
 import { clearSessionHistory, createSession, promptHistoryFromSessions, titleFromPrompt } from "./lib/sessions.js";
 import { formatStepDuration, formatTokenCount, sessionActivityRuns } from "./lib/session-activity.js";
 import { formatContextPercentage } from "./lib/model-context.js";
+import { filterCommandOptions, parsePromptCommand } from "./lib/prompt-commands.js";
 import { createStateSaveQueue } from "./lib/state-save-queue.js";
 import { loadDefaultWorkspace, saveDefaultWorkspace } from "./lib/workspace-preferences.js";
 import { shouldRefreshWorkspaceForAgentEvent } from "./lib/workspace-refresh.js";
@@ -548,6 +549,8 @@ let editingPresetMcpConfig = "";
 let presetMutationPending = false;
 let sidebarWidth = 344;
 let filesWidth = 300;
+let promptCommandRequestId = 0;
+const promptModelCache = new Map();
 const persistUiState = createStateSaveQueue(
   saveUiState,
   (error) => addEvent("UI state save failed", error.message, { persist: false }),
@@ -2181,6 +2184,166 @@ function send(payload) {
   socketService?.send(payload);
 }
 
+function promptCommandOption(id, label, description, selected, action = {}) {
+  return {
+    id: String(id),
+    label,
+    description,
+    selected,
+    toggle: ["skill", "tool", "mcp", "workflow"].includes(action.type),
+    action,
+  };
+}
+
+async function promptCommandOptions(command) {
+  if (command === "model") {
+    const key = JSON.stringify([providerSettings.provider, providerSettings.baseUrl, providerSettings.apiKey]);
+    let models = promptModelCache.get(key);
+    if (!models) {
+      try {
+        const payload = await fetchProviderModels(providerSettings);
+        models = payload.models || [];
+        promptModelCache.set(key, models);
+      } catch {
+        models = [];
+      }
+    }
+    return [...new Set([providerSettings.model, ...models].filter(Boolean))].map((model) =>
+      promptCommandOption(model, model, titleCaseIdentifier(providerSettings.provider), model === providerSettings.model, { type: "model", value: model })
+    );
+  }
+  if (command === "provider") {
+    return providers.map((provider) => promptCommandOption(
+      provider.id,
+      provider.name,
+      `${provider.type} · ${provider.model || "default model"}`,
+      provider.selected === true,
+      { type: "provider", value: provider.id },
+    ));
+  }
+  if (command === "preset") {
+    return presetConfigurations.map((preset) => promptCommandOption(
+      preset.id, preset.name, presetMeta(preset), preset.id === activePresetId, { type: "preset", value: preset.id },
+    ));
+  }
+  if (command === "prompts") {
+    if (!systemPrompts.length) systemPrompts = await fetchSystemPrompts();
+    return systemPrompts.map((prompt) => ({
+      id: prompt.key,
+      label: prompt.title,
+      description: String(prompt.content || "").trim().split(/\r?\n/)[0] || "Empty prompt",
+      action: { type: "prompt", value: prompt.key },
+    }));
+  }
+  if (command === "skills") {
+    if (!skills.length) skills = await fetchSkills();
+    return skills.map((skill) => promptCommandOption(
+      skill.id, skill.name, summarizeSkillContent(skill.content), skill.selected === true, { type: "skill", value: skill.id },
+    ));
+  }
+  if (command === "tools") {
+    return Object.entries(storedToolPermissions).map(([name, enabled]) => promptCommandOption(
+      name, PRESET_STATUS_TOOL_LABELS[name] || titleCaseIdentifier(name), "Workspace tool", enabled, { type: "tool", value: name },
+    ));
+  }
+  if (command === "mcp") {
+    if (!toolsConfigContent) toolsConfigContent = (await fetchConfig()).content || "";
+    return mcpBlocks(toolsConfigContent).map((block) => promptCommandOption(
+      block.index, block.label, `${block.type} · ${block.detail}`, block.enabled, { type: "mcp", value: block.index },
+    ));
+  }
+  if (command === "workflow") {
+    const active = presetConfigurations.find((preset) => preset.id === activePresetId);
+    const component = normalizeRigComponentState(active?.componentState);
+    return Object.entries(component.effects).map(([name, enabled]) => promptCommandOption(
+      name, PRESET_STATUS_WORKFLOW_LABELS[name] || titleCaseIdentifier(name), "Workflow stage", enabled, { type: "workflow", value: name },
+    ));
+  }
+  return [];
+}
+
+async function showPromptCommandOptions({ command, query }) {
+  const requestId = ++promptCommandRequestId;
+  chatComponent.setCommandMenu([], { label: `/${command}`, emptyMessage: "Loading…" });
+  try {
+    const options = filterCommandOptions(await promptCommandOptions(command), query);
+    if (requestId !== promptCommandRequestId) return;
+    chatComponent.setCommandMenu(options, { label: `/${command}`, emptyMessage: "No matching options" });
+  } catch (error) {
+    if (requestId !== promptCommandRequestId) return;
+    chatComponent.setCommandMenu([], { label: `/${command}`, emptyMessage: error.message });
+  }
+}
+
+async function selectPromptCommand(item) {
+  const { type, value } = item.action || {};
+  if (type === "model") {
+    const next = { ...providerSettings, model: value };
+    providers = providers.map((provider) => provider.selected ? { ...provider, model: value } : provider);
+    persistUiState(providers.length ? { providers } : { providerSettings: next });
+    applyActiveProviderSettings(next);
+  } else if (type === "provider") {
+    const selected = providers.find((provider) => String(provider.id) === String(value));
+    if (!selected) return;
+    providers = providers.map((provider) => ({ ...provider, selected: provider.id === selected.id }));
+    editingProviderId = selected.id;
+    persistUiState({ providers });
+    applyActiveProviderSettings(providerSettingsFromRecord(selected));
+  } else if (type === "preset") {
+    await activatePreset(value);
+  } else if (type === "prompt") {
+    await openSystemPromptsModal();
+    const prompt = systemPrompts.find((entry) => entry.key === value);
+    if (prompt) {
+      editingSystemPromptKey = prompt.key;
+      systemPromptEditorTitle.textContent = prompt.title;
+      systemPromptContent.value = prompt.content;
+      systemPromptsList.hidden = true;
+      systemPromptEditor.hidden = false;
+      saveSystemPromptButton.hidden = false;
+      systemPromptContent.focus();
+    }
+  } else if (type === "skill") {
+    const next = skills.map((skill) => String(skill.id) === String(value) ? { ...skill, selected: !skill.selected } : skill);
+    const selectedIds = next.filter((skill) => skill.selected).map((skill) => skill.id);
+    await persistSelectedSkills(selectedIds);
+    skills = next;
+    updateActivePresetSnapshot({ skillIds: selectedIds });
+    send({ type: "reload_skills" });
+  } else if (type === "tool") {
+    storedToolPermissions = { ...storedToolPermissions, [value]: !storedToolPermissions[value] };
+    updateActivePresetSnapshot({ toolPermissions: storedToolPermissions });
+    persistUiState({ toolPermissions: storedToolPermissions });
+    send({ type: "tool_permissions", permissions: storedToolPermissions });
+  } else if (type === "mcp") {
+    const block = mcpBlocks(toolsConfigContent).find((entry) => entry.index === Number(value));
+    if (block) {
+      toolsConfigContent = setToolBlockEnabled(toolsConfigContent, block, !block.enabled);
+      await saveConfigContent(toolsConfigContent);
+    }
+  } else if (type === "workflow") {
+    const index = presetConfigurations.findIndex((preset) => preset.id === activePresetId);
+    if (index >= 0) {
+      const active = presetConfigurations[index];
+      const componentState = normalizeRigComponentState(active.componentState);
+      componentState.effects[value] = !componentState.effects[value];
+      const configurations = presetConfigurations.map((preset, presetIndex) => presetIndex === index
+        ? { ...preset, componentState, updatedAt: Date.now() }
+        : preset);
+      await savePresetConfigurations(configurations, activePresetId, { syncRuntime: true, successMessage: "Workflow updated." });
+    }
+  }
+
+  const isToggle = ["skill", "tool", "mcp", "workflow"].includes(type);
+  if (isToggle) {
+    const parsed = parsePromptCommand(promptInput.value);
+    await showPromptCommandOptions({ command: parsed?.command?.name || type, query: parsed?.query || "" });
+  } else {
+    chatComponent.closeCommandMenu({ clearPrompt: true });
+    promptInput.focus();
+  }
+}
+
 function currentProviderSettings() {
   return {
     provider: providerSelect.value,
@@ -2841,6 +3004,14 @@ workspacePickerModal.addEventListener("create-workspace", openCreateWorkspaceDia
 createWorkspaceModal.addEventListener("create-workspace-confirm", createAndSelectWorkspace);
 chatComponent.addEventListener("images-selected", async (event) => addImages(event.detail.files));
 chatComponent.addEventListener("toggle-microphone", toggleMicrophone);
+chatComponent.addEventListener("prompt-command-query", (event) => showPromptCommandOptions(event.detail));
+chatComponent.addEventListener("prompt-command-select", async (event) => {
+  try {
+    await selectPromptCommand(event.detail.item);
+  } catch (error) {
+    chatComponent.setCommandMenu([], { label: "Command failed", emptyMessage: error.message });
+  }
+});
 chatComponent.addEventListener("prompt-edited", resetPromptHistoryCursor);
 chatComponent.addEventListener("navigate-prompt-history", (event) => navigatePromptHistory(event.detail.direction));
 chatComponent.addEventListener("toggle-files-column", toggleFilesColumn);

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { markdownBlocks, safeLinkHref } from "../public/lib/message-rendering.js";
+import { markdownBlocks, safeImageSrc, safeLinkHref } from "../public/lib/message-rendering.js";
 
 test("markdown messages split into semantic block types", () => {
   const blocks = markdownBlocks(`# Result
@@ -41,4 +41,12 @@ test("markdown links allow web destinations and reject executable URLs", () => {
   assert.equal(safeLinkHref("javascript:alert(1)"), "");
   assert.equal(safeLinkHref("data:text/html,unsafe"), "");
   assert.equal(safeLinkHref("//example.com/unsafe"), "");
+});
+
+test("markdown images allow web and relative sources but reject non-image URL schemes", () => {
+  assert.equal(safeImageSrc("https://example.com/chart.png"), "https://example.com/chart.png");
+  assert.equal(safeImageSrc("./screenshots/chart.png"), "./screenshots/chart.png");
+  assert.equal(safeImageSrc("mailto:team@example.com"), "");
+  assert.equal(safeImageSrc("javascript:alert(1)"), "");
+  assert.equal(safeImageSrc("#preview"), "");
 });

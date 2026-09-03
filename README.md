@@ -86,6 +86,21 @@ public/            Vanilla JavaScript UI, components, styles, and browser servic
 db/                Local runtime state (ignored by Git)
 ```
 
+## Terminal interface
+
+Run the terminal UI against the same presets, conversations, tools, MCP servers, prompts, and
+skills used by the web interface:
+
+```bash
+npm run cli
+```
+
+Use `npm run cli -- --help` for commands, `--workspace <path>` to select a workspace, or
+`--prompt "..."` for a single non-interactive request. Browser-only image preview, microphone
+capture, drag-and-drop, and layout controls are intentionally omitted; workspace files, uploads,
+editing, chat history, provider configuration, presets, workflow settings, and agent events are
+available as terminal commands.
+
 ## Web component embedding
 
 The complete interface is available as the `<ai-harness-app>` custom element. It mounts the real application directly in an open Shadow DOM; it does not use an iframe. Load the component module and give the element an explicit size:
