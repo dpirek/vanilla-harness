@@ -140,6 +140,7 @@ test("SQLite is the sole skill store and removes the legacy source column", asyn
       id: "alternate-preset",
       name: "Alternate preset",
       skillIds: ["legacy-skill"],
+      subAgents: [{ name: "reviewer", url: "http://localhost:3001/" }],
       selected: true,
     };
     store.setRigConfigurations(
@@ -155,6 +156,10 @@ test("SQLite is the sole skill store and removes the legacy source column", asyn
     assert.deepEqual(
       store.getRigConfigurations().configurations.find((configuration) => configuration.selected).skillIds,
       ["legacy-skill"],
+    );
+    assert.deepEqual(
+      store.getRigConfigurations().configurations.find((configuration) => configuration.selected).subAgents,
+      [{ name: "reviewer", url: "http://localhost:3001" }],
     );
     store.close();
     store = null;
@@ -176,6 +181,7 @@ test("SQLite is the sole skill store and removes the legacy source column", asyn
     database.close();
     assert.deepEqual(columns, ["id", "name", "content", "selected", "updated_at"]);
     assert.ok(presetColumns.includes("skill_ids"));
+    assert.ok(presetColumns.includes("sub_agents"));
     assert.equal(legacyPresetTable, undefined);
     assert.equal(legacyLayoutTable, undefined);
     assert.equal(legacyToolPermissionsTable, undefined);

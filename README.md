@@ -10,6 +10,7 @@ The application supports:
 - Workspace-scoped file listing, reading, searching, and writing
 - Approval-gated shell commands and file changes
 - MCP servers and configurable skills
+- Asynchronous task delegation to one or more A2A Agent Workers
 - Persistent conversations, skills, and settings in SQLite
 - Image attachments and optional microphone transcription
 
@@ -56,12 +57,25 @@ The application can be configured through the UI or with environment variables:
 | `CUSTOM_AI_BASE_URL` | Custom provider base URL | `http://localhost:8000/v1` |
 | `CUSTOM_AI_API_KEY` | Custom provider API key fallback | — |
 | `CUSTOM_AI_MODEL` | Default custom-provider model | `custom-model` |
+| `AI_HARNESS_PUBLIC_URL` | Public harness origin used for Agent Worker callbacks | Local server URL |
 
 Example:
 
 ```bash
 AI_HARNESS_WORKSPACE=/path/to/project PORT=4000 npm start
 ```
+
+### Sub-agents
+
+Use the **Sub-agents** button in the active preset bar to add named Agent Worker URLs. Worker
+configuration is stored in that preset and is copied when the preset is duplicated. Enable the
+`delegate_to_sub_agent` capability under **Tools** to allow the model to use those workers.
+
+The tool sends the worker a fresh user message at `POST /a2a`, including a unique callback token.
+The parent agent waits for the authenticated result at `POST /api/sub-agents/callback`, then continues
+with the returned text. Workers may be inspected without exposing callback tokens at
+`GET /api/sub-agents`. If a worker cannot reach the harness at its local address, set
+`AI_HARNESS_PUBLIC_URL` to the externally reachable origin.
 
 The server automatically loads a `.env` file from the project root. When that file is present, its individual provider, tool, skill, prompt, MCP, and workflow settings override the active stored configuration, and the preset bar is hidden in the web UI. See `.env.example` for every supported setting. Existing shell environment variables take precedence over values in `.env`.
 

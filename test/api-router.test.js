@@ -34,6 +34,8 @@ test("API router delegates every registered endpoint and falls through for unkno
     "/api/rig-configurations",
     "/api/system-prompts",
     "/api/skills",
+    "/api/sub-agents",
+    "/api/sub-agents/callback",
     "/api/workspace-tree",
     "/api/workspace-folder",
     "/api/workspace-upload",

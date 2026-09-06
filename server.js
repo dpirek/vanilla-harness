@@ -8,6 +8,7 @@ import { CodingAgent } from "./lib/agent.js";
 import { serveStatic } from "./lib/response.js";
 import { createTools } from "./lib/tools/index.js";
 import { loadMcpTools } from "./lib/mcp.js";
+import { SubAgentManager } from "./lib/sub-agents.js";
 import {
   createUiStateStore,
   normalizeStoredToolPermissions as normalizeToolPermissions,
@@ -41,6 +42,22 @@ const defaultPort = Number(process.env.PORT || 8010);
 await fs.mkdir(databaseDir, { recursive: true });
 const connections = new Set();
 let storeClosed = false;
+let server;
+
+const subAgentManager = new SubAgentManager({
+  callbackUrl() {
+    const address = server?.address();
+    const localPort = typeof address === "object" ? address.port : defaultPort;
+    const baseUrl = process.env.AI_HARNESS_PUBLIC_URL?.trim() || `http://127.0.0.1:${localPort}`;
+    return new URL("/api/sub-agents/callback", baseUrl).href;
+  },
+});
+
+function syncSubAgentWorkers(rigConfigurations) {
+  subAgentManager.setWorkers(rigConfigurations.configurations.find(
+    (configuration) => configuration.id === rigConfigurations.activeConfigurationId,
+  )?.subAgents || []);
+}
 
 async function initializeUiStateStore(databasePath, initialMcpConfigPath) {
   const store = createUiStateStore(databasePath);
@@ -97,8 +114,19 @@ async function createAgentSession({
   // Enabling a built-in tool in the web Tools settings is the user's
   // authorization to execute it. Disabled tools are not exposed to the model.
   const disabled = new Set(disabledSteps);
-  const localTools = disabled.has("tools") ? [] : createTools({ root, approve: async () => true })
-    .filter((tool) => toolPermissions[tool.name] === true);
+  const rigConfigurations = uiStateStore.getRigConfigurations();
+  const activeConfiguration = rigConfigurations.configurations.find(
+    (configuration) => configuration.id === rigConfigurations.activeConfigurationId,
+  );
+  subAgentManager.setWorkers(activeConfiguration?.subAgents || []);
+  const localTools = disabled.has("tools") ? [] : createTools({
+    root,
+    approve: async () => true,
+    subAgentManager,
+  }).filter((tool) => (
+    toolPermissions[tool.name] === true &&
+    (tool.name !== "delegate_to_sub_agent" || subAgentManager.listWorkers().length > 0)
+  ));
   const mcpTools = disabled.has("mcp") ? [] : await loadMcpTools({
       root,
       configContent: uiStateStore.getMcpConfig() || "",
@@ -155,8 +183,10 @@ const uiStateStore = await initializeUiStateStore(uiStateDatabasePath, configPat
 if (environmentFileDetected) {
   applyEnvironmentSettings(uiStateStore, process.env, __dirname);
 }
+const initialRigConfigurations = uiStateStore.getRigConfigurations();
+syncSubAgentWorkers(initialRigConfigurations);
 
-const server = http.createServer(async (req, res) => {
+server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
   const handleApiRequest = createApiRouter({
     uiStateStore,
@@ -164,6 +194,8 @@ const server = http.createServer(async (req, res) => {
     resolveWorkspace,
     environmentFileDetected,
     fileAccessDisabledByEnvironment,
+    subAgentManager,
+    onRigConfigurationsChanged: syncSubAgentWorkers,
   });
 
   if (await handleApiRequest(req, res, url)) return;

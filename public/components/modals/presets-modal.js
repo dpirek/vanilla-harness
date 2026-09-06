@@ -52,6 +52,7 @@ class PresetsModal extends BaseComponent {
                 this.toggle("presetToolCurl", "HTTP requests", "Request HTTP and HTTPS URLs"),
                 this.toggle("presetToolRunCommand", "Run commands", "Execute shell commands"),
                 this.toggle("presetToolChromeDevTools", "Chrome DevTools", "Browse and inspect rendered pages"),
+                this.toggle("presetToolDelegateToSubAgent", "Sub-agent delegation", "Run tasks on configured Agent Workers"),
               ] }),
             ] }),
             this.createElement("section", { class: "presetEditorSection", children: [

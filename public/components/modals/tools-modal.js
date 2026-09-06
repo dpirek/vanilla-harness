@@ -8,6 +8,7 @@ const TOOL_ROWS = [
   ["Curl", "Fetch HTTP or HTTPS URLs for API and web inspection.", "curl"],
   ["Run commands", "Run shell commands in the workspace.", "run_command"],
   ["Chrome DevTools", "Browse pages, inspect source, run JavaScript, and save screenshots.", "chrome_devtools"],
+  ["Sub-agent delegation", "Delegate self-contained tasks to configured asynchronous Agent Workers.", "delegate_to_sub_agent"],
 ];
 
 class ToolsModal extends BaseComponent {

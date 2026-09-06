@@ -17,6 +17,7 @@ export function createSettingsApiHandlers({
   defaultWorkspace,
   environmentFileDetected = false,
   fileAccessDisabledByEnvironment = false,
+  onRigConfigurationsChanged = () => {},
 }) {
   async function handleHealthApi(req, res) {
     const envProvider = normalizeProvider(process.env.AI_PROVIDER);
@@ -157,6 +158,7 @@ export function createSettingsApiHandlers({
       try {
         const body = JSON.parse(await readRequestBody(req, 250_000) || "{}");
         const result = uiStateStore.setRigConfigurations(body.configurations, body.activeConfigurationId);
+        onRigConfigurationsChanged(result);
         json(res, 200, { ok: true, ...result });
       } catch (error) {
         json(res, 400, { ok: false, error: error.message });

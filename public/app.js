@@ -78,6 +78,7 @@ const presetsModal = appRoot.querySelector("presets-modal");
 const systemPromptsModal = appRoot.querySelector("system-prompts-modal");
 const skillsModal = appRoot.querySelector("skills-modal");
 const toolsModal = appRoot.querySelector("tools-modal");
+const subAgentsModal = appRoot.querySelector("sub-agents-modal");
 const mcpModal = appRoot.querySelector("mcp-modal");
 const workflowModal = appRoot.querySelector("workflow-modal");
 
@@ -153,6 +154,15 @@ const saveConfigButton = appRoot.querySelector("#saveConfigButton");
 const settingsStatus = appRoot.querySelector("#settingsStatus");
 const reloadConfigButton = appRoot.querySelector("#reloadConfigButton");
 const toolsDialog = appRoot.querySelector("#toolsDialog");
+const subAgentsDialog = appRoot.querySelector("#subAgentsDialog");
+const subAgentsDialogDescription = appRoot.querySelector("#subAgentsDialogDescription");
+const subAgentEditor = appRoot.querySelector("#subAgentEditor");
+const subAgentNameInput = appRoot.querySelector("#subAgentNameInput");
+const subAgentUrlInput = appRoot.querySelector("#subAgentUrlInput");
+const subAgentsList = appRoot.querySelector("#subAgentsList");
+const subAgentsStatus = appRoot.querySelector("#subAgentsStatus");
+const showAddSubAgentButton = appRoot.querySelector("#showAddSubAgentButton");
+const saveSubAgentsButton = appRoot.querySelector("#saveSubAgentsButton");
 const mcpDialog = appRoot.querySelector("#mcpDialog");
 const toolPermissionsStatus = appRoot.querySelector("#toolPermissionsStatus");
 const toolTypeSelect = appRoot.querySelector("#toolTypeSelect");
@@ -548,6 +558,7 @@ let editingPresetProviderSettings = null;
 let editingPresetSkillIds = new Set();
 let editingPresetMcpConfig = "";
 let presetMutationPending = false;
+let subAgentDrafts = [];
 let sidebarWidth = 344;
 let filesWidth = 300;
 let promptCommandRequestId = 0;
@@ -565,6 +576,7 @@ const PRESET_STATUS_TOOL_LABELS = {
   curl: "Curl",
   run_command: "Run commands",
   chrome_devtools: "Chrome DevTools",
+  delegate_to_sub_agent: "Sub-agent delegation",
 };
 
 const PRESET_STATUS_WORKFLOW_LABELS = {
@@ -607,6 +619,7 @@ function renderPresetStatusBar() {
     appendPresetStatusItem("Sys prompts", [], "0", openSystemPromptsModal);
     appendPresetStatusItem("Skills", [], "0", openSkillsModal);
     appendPresetStatusItem("Tools", [], "0", openToolsModal);
+    appendPresetStatusItem("Sub-agents", [], "0", openSubAgentsModal);
     appendPresetStatusItem("MCP", [], "None", openMcpModal);
     appendPresetStatusItem("Provider", [], "None", openProvidersModal);
     appendPresetStatusItem("Workflow", [], "0/4", openWorkflowSettings);
@@ -640,6 +653,7 @@ function renderPresetStatusBar() {
   appendPresetStatusItem("Sys prompts", configuredPrompts, String(configuredPrompts.length), openSystemPromptsModal);
   appendPresetStatusItem("Skills", skillStatus, String(selectedSkills.length || activeSkillIds.size), openSkillsModal);
   appendPresetStatusItem("Tools", selectedTools, String(selectedTools.length), openToolsModal);
+  appendPresetStatusItem("Sub-agents", (active.subAgents || []).map(({ name }) => name), String((active.subAgents || []).length), openSubAgentsModal);
   appendPresetStatusItem("MCP", selectedMcp, selectedMcp.length > 0 ? String(selectedMcp.length) : "None", openMcpModal);
   appendPresetStatusItem("Provider", providerName, null, openProvidersModal);
   appendPresetStatusItem("Workflow", selectedWorkflowItems, `${selectedWorkflowItems.length}/4`, openWorkflowSettings);
@@ -705,6 +719,7 @@ const PRESET_TOOL_INPUTS = {
   curl: "presetToolCurl",
   run_command: "presetToolRunCommand",
   chrome_devtools: "presetToolChromeDevTools",
+  delegate_to_sub_agent: "presetToolDelegateToSubAgent",
 };
 
 const PRESET_PROMPT_TITLES = {
@@ -3100,6 +3115,159 @@ function openToolsModal() {
   toolPermissionsStatus.dataset.state = "";
 }
 
+function normalizeSubAgentDrafts(value = []) {
+  const names = new Set();
+  return (Array.isArray(value) ? value : []).map((worker) => {
+    const name = String(worker?.name || "").trim();
+    if (!/^[A-Za-z0-9_-]{1,64}$/.test(name)) {
+      throw new Error("Worker names must use 1–64 letters, numbers, hyphens, or underscores.");
+    }
+    if (names.has(name)) throw new Error(`Worker name “${name}” is already configured.`);
+    names.add(name);
+    let url;
+    try {
+      url = new URL(String(worker?.url || "").trim());
+    } catch {
+      throw new Error(`Enter a valid URL for “${name}”.`);
+    }
+    if (!["http:", "https:"].includes(url.protocol) || url.username || url.password) {
+      throw new Error(`Worker “${name}” must use an HTTP(S) URL without embedded credentials.`);
+    }
+    if (url.hostname === "0.0.0.0") url.hostname = "127.0.0.1";
+    if (url.hostname === "[::]") url.hostname = "[::1]";
+    url.search = "";
+    url.hash = "";
+    return { name, url: url.href.replace(/\/$/, "") };
+  });
+}
+
+function setSubAgentsPending(pending) {
+  showAddSubAgentButton.disabled = pending;
+  saveSubAgentsButton.disabled = pending;
+  for (const control of subAgentsList.querySelectorAll("input, button")) control.disabled = pending;
+  for (const control of subAgentEditor.querySelectorAll("input, button")) control.disabled = pending;
+  saveSubAgentsButton.textContent = pending ? "Saving…" : "Save sub-agents";
+}
+
+function renderSubAgents() {
+  subAgentsList.replaceChildren();
+  if (subAgentDrafts.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "emptyTools";
+    empty.textContent = "No Agent Workers are configured for this preset.";
+    subAgentsList.append(empty);
+    return;
+  }
+  subAgentDrafts.forEach((worker, index) => {
+    const row = document.createElement("div");
+    row.className = "subAgentRow";
+
+    const name = document.createElement("input");
+    name.type = "text";
+    name.maxLength = 64;
+    name.value = worker.name;
+    name.setAttribute("aria-label", `Worker ${index + 1} name`);
+    name.addEventListener("input", () => { subAgentDrafts[index].name = name.value; });
+
+    const url = document.createElement("input");
+    url.type = "url";
+    url.value = worker.url;
+    url.setAttribute("aria-label", `Worker ${index + 1} URL`);
+    url.addEventListener("input", () => { subAgentDrafts[index].url = url.value; });
+
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "subAgentDeleteButton";
+    remove.textContent = "Remove";
+    remove.setAttribute("aria-label", `Remove ${worker.name || `worker ${index + 1}`}`);
+    remove.addEventListener("click", () => {
+      subAgentDrafts.splice(index, 1);
+      renderSubAgents();
+      subAgentsStatus.textContent = "Unsaved sub-agent changes.";
+      subAgentsStatus.dataset.state = "";
+    });
+    row.append(name, url, remove);
+    subAgentsList.append(row);
+  });
+}
+
+function closeSubAgentEditor() {
+  subAgentEditor.hidden = true;
+  subAgentNameInput.value = "";
+  subAgentUrlInput.value = "";
+}
+
+function openSubAgentEditor() {
+  subAgentEditor.hidden = false;
+  subAgentNameInput.focus();
+}
+
+function addSubAgentDraft() {
+  try {
+    subAgentDrafts = normalizeSubAgentDrafts([
+      ...subAgentDrafts,
+      { name: subAgentNameInput.value, url: subAgentUrlInput.value },
+    ]);
+    renderSubAgents();
+    closeSubAgentEditor();
+    subAgentsStatus.textContent = "Worker added. Save to update the active preset.";
+    subAgentsStatus.dataset.state = "success";
+  } catch (error) {
+    subAgentsStatus.textContent = error.message;
+    subAgentsStatus.dataset.state = "error";
+  }
+}
+
+function openSubAgentsModal() {
+  const active = presetConfigurations.find((configuration) => configuration.id === activePresetId);
+  if (!active) return;
+  closePresetDropdown();
+  closeSubAgentEditor();
+  subAgentDrafts = structuredClone(active.subAgents || []);
+  renderSubAgents();
+  subAgentsDialogDescription.textContent = `${active.name} · configure asynchronous Agent Workers`;
+  subAgentsStatus.textContent = runActive
+    ? "Stop the active run before changing sub-agents."
+    : "Workers are stored in the active preset.";
+  subAgentsStatus.dataset.state = runActive ? "error" : "";
+  setSubAgentsPending(runActive);
+  if (!subAgentsDialog.open) subAgentsDialog.showModal();
+}
+
+async function saveSubAgents() {
+  const index = presetConfigurations.findIndex((configuration) => configuration.id === activePresetId);
+  if (index < 0 || presetMutationPending || runActive) return;
+  let subAgents;
+  try {
+    subAgents = normalizeSubAgentDrafts(subAgentDrafts);
+  } catch (error) {
+    subAgentsStatus.textContent = error.message;
+    subAgentsStatus.dataset.state = "error";
+    return;
+  }
+  const active = presetConfigurations[index];
+  const configurations = presetConfigurations.map((configuration, configurationIndex) => (
+    configurationIndex === index
+      ? { ...configuration, subAgents, updatedAt: Date.now() }
+      : configuration
+  ));
+  setSubAgentsPending(true);
+  subAgentsStatus.textContent = "Saving sub-agents…";
+  subAgentsStatus.dataset.state = "";
+  const saved = await savePresetConfigurations(configurations, activePresetId, {
+    syncRuntime: true,
+    successMessage: "Sub-agents updated.",
+  });
+  setSubAgentsPending(false);
+  if (saved) {
+    addEvent("Sub-agents updated", `${active.name} · ${subAgents.length} configured`);
+    subAgentsDialog.close();
+  } else {
+    subAgentsStatus.textContent = presetsStatus.textContent || "Unable to save sub-agents.";
+    subAgentsStatus.dataset.state = "error";
+  }
+}
+
 async function openMcpModal() {
   if (!mcpDialog.open) mcpDialog.showModal();
   closeMcpEditor();
@@ -3203,6 +3371,10 @@ mcpModal.addEventListener("show-mcp-editor", () => openMcpEditor());
 mcpModal.addEventListener("cancel-mcp-editor", closeMcpEditor);
 providersModal.addEventListener("save-provider-settings", saveProviderSettings);
 toolsModal.addEventListener("save-tool-permissions", saveToolPermissions);
+subAgentsModal.addEventListener("show-sub-agent-editor", openSubAgentEditor);
+subAgentsModal.addEventListener("cancel-sub-agent-editor", closeSubAgentEditor);
+subAgentsModal.addEventListener("add-sub-agent", addSubAgentDraft);
+subAgentsModal.addEventListener("save-sub-agents", saveSubAgents);
 workflowModal.addEventListener("save-workflow", saveWorkflowSettings);
 workflowModal.addEventListener("workflow-draft-change", () => {
   workflowStatus.textContent = "Unsaved workflow changes.";

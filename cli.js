@@ -133,7 +133,7 @@ class HarnessCli {
     const disabled = new Set(disabledSteps);
     const permissions = normalizeStoredToolPermissions(preset.toolPermissions);
     const localTools = disabled.has("tools") ? [] : createTools({ root: this.workspace, approve: async () => true })
-      .filter((tool) => permissions[tool.name] === true);
+      .filter((tool) => permissions[tool.name] === true && tool.name !== "delegate_to_sub_agent");
     const mcpTools = disabled.has("mcp") ? [] : await loadMcpTools({
       root: this.workspace, configContent: preset.mcpConfig, approve: async () => true,
       autoApprove: true, onInfo: (message) => this.ui.info(message),

@@ -6,6 +6,7 @@ const DEFAULT_TOOL_PERMISSIONS = {
   curl: true,
   run_command: true,
   chrome_devtools: true,
+  delegate_to_sub_agent: true,
 };
 
 function defaultProviderSettings() {

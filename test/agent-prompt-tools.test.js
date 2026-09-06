@@ -39,6 +39,7 @@ test("agent prompt describes provider-managed remote MCP servers", async () => {
   await agent.run("What tools can you use?");
 
   assert.match(requests[0].instructions, /- read_file: Read a workspace file\./);
+  assert.match(requests[0].instructions, /Workspace root: \/workspace/);
   assert.match(
     requests[0].instructions,
     /- docs \(remote MCP server\): Available tools: search, fetch\./,
@@ -77,4 +78,66 @@ test("agent prompt identifies remote MCP servers with dynamically discovered too
     request.instructions,
     /- dynamic \(remote MCP server\): Tools are discovered from the server\./,
   );
+});
+
+test("composer and coding prompts explicitly identify configured sub-agents", async () => {
+  const requests = [];
+  const agent = new CodingAgent({
+    client: {
+      async createResponse(body) {
+        requests.push(body);
+        return requests.length === 1
+          ? { id: "composer-1", output_text: "Use a reviewer.", output: [] }
+          : { id: "response-1", output_text: "done", output: [] };
+      },
+    },
+    model: "test-model",
+    root: "/workspace",
+    tools: [{
+      name: "delegate_to_sub_agent",
+      description: "Delegate a task.",
+      subAgents: ["reviewer", "builder"],
+      parameters: { type: "object", properties: {} },
+      async execute() { return { ok: true }; },
+    }],
+  });
+
+  const refined = await agent.refinePrompt("Review this change.");
+  await agent.run(refined);
+
+  for (const request of requests) {
+    assert.match(request.instructions, /Configured sub-agents available for delegation:/);
+    assert.match(request.instructions, /- reviewer/);
+    assert.match(request.instructions, /- builder/);
+    assert.match(request.instructions, /delegate_to_sub_agent tool/);
+  }
+  assert.equal(Object.hasOwn(requests[1].tools[0], "subAgents"), false);
+});
+
+test("agent prompt omits workspace context when every file-access tool is unavailable", async () => {
+  let request;
+  const agent = new CodingAgent({
+    client: {
+      async createResponse(body) {
+        request = body;
+        return { id: "response-1", output_text: "done", output: [] };
+      },
+    },
+    model: "test-model",
+    root: "/sensitive/workspace",
+    tools: [{
+      name: "delegate_to_sub_agent",
+      description: "Delegate a task.",
+      subAgents: ["reviewer"],
+      parameters: { type: "object", properties: {} },
+      async execute() { return { ok: true }; },
+    }],
+  });
+
+  await agent.run("Review this change.");
+
+  assert.doesNotMatch(request.instructions, /Workspace root:/);
+  assert.doesNotMatch(request.instructions, /\/sensitive\/workspace/);
+  assert.doesNotMatch(request.instructions, /Platform:/);
+  assert.match(request.instructions, /Configured sub-agents available for delegation:/);
 });

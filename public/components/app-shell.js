@@ -7,6 +7,7 @@ import "./modals/presets-modal.js";
 import "./modals/system-prompts-modal.js";
 import "./modals/skills-modal.js";
 import "./modals/tools-modal.js";
+import "./modals/sub-agents-modal.js";
 import "./modals/mcp-modal.js";
 import "./modals/workflow-modal.js";
 
@@ -33,6 +34,7 @@ class AppShellContent extends BaseComponent {
       element("system-prompts-modal"),
       element("skills-modal"),
       element("tools-modal"),
+      element("sub-agents-modal"),
       element("mcp-modal"),
       element("workflow-modal"),
     ]);
