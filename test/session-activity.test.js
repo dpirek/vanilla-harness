@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  calculateTokenCost,
   formatStepDuration,
   formatTokenCount,
   normalizeTokenUsage,
@@ -53,6 +54,42 @@ test("model steps expose token usage and aggregate totals per prompt", () => {
   assert.deepEqual(activity.items[0].usage, { inputTokens: 100, outputTokens: 20, totalTokens: 120 });
   assert.deepEqual(activity.items[1].usage, { inputTokens: 250, outputTokens: 50, totalTokens: 300 });
   assert.deepEqual(activity.usage, { inputTokens: 350, outputTokens: 70, totalTokens: 420 });
+});
+
+test("token cost combines input and output usage at per-token prices", () => {
+  assert.equal(calculateTokenCost(
+    { input_tokens: 2_000, output_tokens: 500 },
+    { inputCost: 0.0000025, outputCost: 0.00001 },
+  ), 0.01);
+  assert.equal(calculateTokenCost(
+    { input_tokens: 2_000, output_tokens: 500 },
+    { inputCost: null, outputCost: 0.00001 },
+  ), null);
+});
+
+test("a run retains the provider and pricing snapshot from its prompt", () => {
+  const activity = sessionActivities([
+    {
+      title: "Prompt sent",
+      detail: {
+        prompt: "Inspect the workspace",
+        providerId: "provider-1",
+        provider: "openai",
+        model: "gpt-5",
+        inputCost: 0.000002,
+        outputCost: 0.000008,
+      },
+      timestamp: 1,
+    },
+  ]);
+  assert.deepEqual(activity.runContext, {
+    providerId: "provider-1",
+    provider: "openai",
+    model: "gpt-5",
+    inputCost: 0.000002,
+    outputCost: 0.000008,
+  });
+  assert.equal(activity.items[0].details[0].text, "Inspect the workspace");
 });
 
 test("model turns retain expandable input prompt and output text", () => {

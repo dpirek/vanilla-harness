@@ -29,7 +29,7 @@ import { randomUuid } from "./lib/ids.js";
 import { modelTestIcon } from "./lib/icons.js";
 import { normalizeSkillName, skillDraft, syncSkillContentName, validateSkillContent } from "./lib/skill-content.js";
 import { clearSessionHistory, createSession, promptHistoryFromSessions, titleFromPrompt } from "./lib/sessions.js";
-import { formatStepDuration, formatTokenCount, sessionActivityRuns } from "./lib/session-activity.js";
+import { calculateTokenCost, formatStepDuration, formatTokenCount, sessionActivityRuns } from "./lib/session-activity.js";
 import { formatContextPercentage } from "./lib/model-context.js";
 import {
   filterAndSortProviderModels,
@@ -2041,11 +2041,12 @@ function updateSessionActivityCard(card, activity, { active = false } = {}) {
   current.textContent = isRunning ? activity.current?.label || "Working…" : failed ? "Run completed with errors" : "Run completed";
   current.dataset.state = isRunning ? "running" : failed ? "failed" : "idle";
   const taskCount = `${activity.items.length} task${activity.items.length === 1 ? "" : "s"}`;
+  const runCost = calculateActivityRunCost(activity);
   count.textContent = activity.usage
-    ? `${taskCount} · ${formatTokenCount(activity.usage.totalTokens)} tokens`
+    ? `${taskCount} · ${formatTokenCount(activity.usage.totalTokens)} tokens${runCost === null ? "" : ` · ${formatRunCost(runCost)}`}`
     : taskCount;
   count.title = activity.usage
-    ? `${formatTokenCount(activity.usage.inputTokens)} input · ${formatTokenCount(activity.usage.outputTokens)} output · ${formatTokenCount(activity.usage.totalTokens)} total tokens`
+    ? `${formatTokenCount(activity.usage.inputTokens)} input · ${formatTokenCount(activity.usage.outputTokens)} output · ${formatTokenCount(activity.usage.totalTokens)} total tokens${runCost === null ? "" : ` · ${formatRunCost(runCost)} estimated cost`}`
     : "";
   const expandedTaskDetails = new Set(
     [...list.querySelectorAll(".sessionTask[data-details-open]")].map((item) => item.dataset.taskId),
@@ -2096,6 +2097,57 @@ function updateSessionActivityCard(card, activity, { active = false } = {}) {
   card.dataset.complete = String(activity.complete);
   if (isRunning) card.open = true;
   else if (activity.complete && !wasComplete) card.open = false;
+}
+
+function calculateActivityRunCost(activity) {
+  const usageItems = activity.items.filter((item) => item.usage);
+  if (usageItems.length === 0) return null;
+  let total = 0;
+  for (const item of usageItems) {
+    const modelName = item.model || activity.runContext?.model;
+    const pricing = providerModelPricing(activity.runContext, modelName);
+    const cost = calculateTokenCost(item.usage, pricing);
+    if (cost === null) return null;
+    total += cost;
+  }
+  return total;
+}
+
+function providerModelPricing(runContext, modelName) {
+  const contextProvider = runContext?.providerId
+    ? providers.find((provider) => String(provider.id) === runContext.providerId)
+    : null;
+  if (runContext?.providerId) {
+    const model = normalizeProviderModels([contextProvider?.model, ...(contextProvider?.models || [])])
+      .find((entry) => entry.id === modelName);
+    if (model?.inputCost !== null && model?.inputCost !== undefined
+      && model?.outputCost !== null && model?.outputCost !== undefined) return model;
+    return runContext?.model === modelName ? runContext : null;
+  }
+  const activeProviderId = matchingProviderId(providers, providerSettings);
+  const activeProvider = providers.find((provider) => String(provider.id) === activeProviderId);
+  const modelPricing = (provider) => normalizeProviderModels([provider?.model, ...(provider?.models || [])])
+    .find((entry) => entry.id === modelName
+      && entry.inputCost !== null && entry.outputCost !== null);
+  const activePricing = modelPricing(activeProvider);
+  if (activePricing) return activePricing;
+  const matches = providers.map(modelPricing).filter(Boolean);
+  const uniquePrices = new Set(matches.map((model) => `${model.inputCost}:${model.outputCost}`));
+  if (matches.length > 0 && uniquePrices.size === 1) {
+    return matches[0];
+  }
+  if (runContext?.model === modelName) return runContext;
+  return null;
+}
+
+function formatRunCost(value) {
+  if (value > 0 && value < 0.000001) return "<$0.000001";
+  return new Intl.NumberFormat(undefined, {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 6,
+  }).format(value);
 }
 
 function refreshRunningStepDurations() {
@@ -3350,7 +3402,18 @@ chatComponent.addEventListener("submit-prompt", () => {
     images,
   );
   renderMessages();
-  addEvent("Prompt sent", images.length > 0 ? `${displayPrompt} (${images.length} image)` : displayPrompt);
+  const matchedProviderId = matchingProviderId(providers, providerSettings);
+  const matchedProvider = providers.find((provider) => String(provider.id) === matchedProviderId);
+  const activeModel = normalizeProviderModels([matchedProvider?.model, ...(matchedProvider?.models || [])])
+    .find((model) => model.id === providerSettings.model);
+  addEvent("Prompt sent", {
+    prompt: images.length > 0 ? `${displayPrompt} (${images.length} image)` : displayPrompt,
+    providerId: matchedProviderId,
+    provider: providerSettings.provider,
+    model: providerSettings.model,
+    inputCost: activeModel?.inputCost ?? null,
+    outputCost: activeModel?.outputCost ?? null,
+  });
   promptInput.value = "";
   attachedImages = [];
   renderImagePreviews();

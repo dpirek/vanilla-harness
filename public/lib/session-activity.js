@@ -32,6 +32,17 @@ function formatTokenCount(value = 0) {
   return Math.max(0, Math.round(Number(value) || 0)).toLocaleString("en-US");
 }
 
+function calculateTokenCost(usage, pricing) {
+  const normalizedUsage = normalizeTokenUsage(usage);
+  if (pricing?.inputCost === null || pricing?.inputCost === undefined
+    || pricing?.outputCost === null || pricing?.outputCost === undefined) return null;
+  const inputCost = Number(pricing?.inputCost);
+  const outputCost = Number(pricing?.outputCost);
+  if (!normalizedUsage || !Number.isFinite(inputCost) || inputCost < 0
+    || !Number.isFinite(outputCost) || outputCost < 0) return null;
+  return (normalizedUsage.inputTokens * inputCost) + (normalizedUsage.outputTokens * outputCost);
+}
+
 function printableValue(value) {
   if (typeof value === "string") return value.trim();
   if (value === undefined || value === null) return "";
@@ -105,6 +116,7 @@ function sessionActivities(events = [], now = Date.now()) {
   const items = [];
   let sequence = 0;
   let complete = false;
+  let runContext = null;
   const timestampFor = (event) => {
     const timestamp = Number(event?.timestamp);
     return Number.isFinite(timestamp) ? timestamp : now;
@@ -165,8 +177,18 @@ function sessionActivities(events = [], now = Date.now()) {
     const type = detail.type;
 
     if (event.title === "Prompt sent") {
+      const promptDetail = event.detail && typeof event.detail === "object" ? event.detail : null;
+      if (promptDetail) {
+        runContext = {
+          providerId: String(promptDetail.providerId || ""),
+          provider: String(promptDetail.provider || ""),
+          model: String(promptDetail.model || ""),
+          inputCost: promptDetail.inputCost ?? null,
+          outputCost: promptDetail.outputCost ?? null,
+        };
+      }
       setDetails(add("Send prompt", "running", event, "prompt"), [
-        { title: "Prompt", text: event.detail },
+        { title: "Prompt", text: promptDetail?.prompt ?? event.detail },
       ]);
     } else if (type === "composer_start") {
       finish((item) => item.key === "prompt", event);
@@ -175,10 +197,12 @@ function sessionActivities(events = [], now = Date.now()) {
         { title: "Model", text: detail.model },
       ]);
     } else if (type === "composer_complete") {
-      setDetails(setUsage(
+      const item = setUsage(
         finish((item) => item.key === "composer", event, "completed", "Prompt refined"),
         detail.usage,
-      ), [
+      );
+      if (item) item.model = String(detail.model || "").trim();
+      setDetails(item, [
         { title: "Original prompt", text: detail.originalPrompt },
         { title: "Refined prompt", text: detail.refinedPrompt },
         { title: "Model", text: detail.model },
@@ -205,6 +229,7 @@ function sessionActivities(events = [], now = Date.now()) {
         detail.serverResponse?.usage || detail.usage,
       );
       if (item) {
+        item.model = model;
         item.contextUsage = contextUsageForTurn(detail, item.usage);
         item.modelTurn = {
           model,
@@ -315,6 +340,7 @@ function sessionActivities(events = [], now = Date.now()) {
     current: [...items].reverse().find((item) => item.status === "running") || null,
     complete,
     items,
+    runContext,
     usage,
   };
 }
@@ -334,6 +360,7 @@ function sessionActivityRuns(events = [], now = Date.now()) {
 }
 
 export {
+  calculateTokenCost,
   formatModelTurnInput,
   formatModelTurnOutput,
   formatStepDuration,
