@@ -721,7 +721,7 @@ dropdown-button { position: relative; display: block; flex: 0 0 auto; }
 
 .sessionActivity > summary {
   display: grid;
-  grid-template-columns: 88px auto minmax(0, 1fr) auto 12px;
+  grid-template-columns: 88px auto minmax(0, 1fr) auto auto 12px;
   align-items: center;
   gap: 10px;
   cursor: pointer;
@@ -815,7 +815,7 @@ dropdown-button { position: relative; display: block; flex: 0 0 auto; }
 }
 
 @media (max-width: 720px) {
-  .sessionActivity > summary { grid-template-columns: 72px minmax(0, 1fr) auto 12px; }
+  .sessionActivity > summary { grid-template-columns: 72px minmax(0, 1fr) auto auto 12px; }
   .stepVisualization { width: 72px; }
   .sessionActivityEyebrow { display: none; }
 }
@@ -826,6 +826,23 @@ dropdown-button { position: relative; display: block; flex: 0 0 auto; }
   font-size: .76rem;
   white-space: nowrap;
 }
+
+.sessionRating { display: inline-flex; align-items: center; gap: 1px; }
+.sessionRating[hidden] { display: none; }
+.sessionRating button {
+  width: 18px;
+  height: 22px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--faint);
+  font-size: .82rem;
+  line-height: 1;
+}
+.sessionRating button:hover,
+.sessionRating button:focus-visible,
+.sessionRating button.selected { color: #e9b949; }
+.sessionRating button:focus-visible { outline: 1px solid #e9b949; border-radius: 3px; }
 
 .sessionTaskList {
   display: grid;
@@ -1861,7 +1878,7 @@ textarea:disabled {
   outline: 0;
 }
 .providerModelsControls input:focus { border-color: var(--strong-line); }
-.providerModelsTable { min-width: 1220px; }
+.providerModelsTable { min-width: 1320px; }
 .providerModelsTable tbody tr { cursor: default; }
 .providerModelsTable th,
 .providerModelsTable td { white-space: nowrap; }

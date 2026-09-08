@@ -41,6 +41,44 @@ test("SQLite preserves discovered models for each provider", async () => {
   }
 });
 
+test("SQLite stores complete task rating snapshots and supports rating updates", async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "ai-harness-task-ratings-"));
+  const databasePath = path.join(directory, "ratings.sqlite");
+  let store;
+  try {
+    store = createUiStateStore(databasePath);
+    const record = {
+      runId: "run-1",
+      sessionId: "session-1",
+      providerId: "provider-1",
+      providerName: "OpenAI",
+      model: "gpt-5",
+      inputPrompt: "Build the feature",
+      presetSettings: { id: "preset-1", toolPermissions: { read_file: true } },
+      tools: { enabled: ["read_file"], mcpConfig: "[mcp_servers.example]" },
+      systemPrompts: { coding: "Write maintainable code." },
+      cost: 0.0125,
+      rating: 4,
+    };
+    store.setTaskRating(record);
+    store.setTaskRating({ ...record, rating: 5 });
+    store.close();
+    store = createUiStateStore(databasePath);
+
+    const [summary] = store.getTaskRatings();
+    assert.equal(summary.rating, 5);
+    assert.equal(summary.cost, 0.0125);
+    const [full] = store.getTaskRatings({ full: true });
+    assert.equal(full.inputPrompt, "Build the feature");
+    assert.deepEqual(full.presetSettings, record.presetSettings);
+    assert.deepEqual(full.tools, record.tools);
+    assert.deepEqual(full.systemPrompts, record.systemPrompts);
+  } finally {
+    store?.close();
+    await fs.rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("SQLite preserves conversation messages and step events across reopen", async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "ai-harness-history-"));
   const databasePath = path.join(directory, "history.sqlite");

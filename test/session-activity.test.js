@@ -83,11 +83,17 @@ test("a run retains the provider and pricing snapshot from its prompt", () => {
     },
   ]);
   assert.deepEqual(activity.runContext, {
+    runId: "",
     providerId: "provider-1",
+    providerName: "openai",
     provider: "openai",
     model: "gpt-5",
     inputCost: 0.000002,
     outputCost: 0.000008,
+    presetSettings: {},
+    tools: {},
+    systemPrompts: {},
+    inputPrompt: "Inspect the workspace",
   });
   assert.equal(activity.items[0].details[0].text, "Inspect the workspace");
 });

@@ -102,7 +102,7 @@ function formatProviderModelValues(details, key, formatter, unavailable = "—")
     || String(left.providerId || "").localeCompare(String(right.providerId || ""))
   ));
   return ordered.map((detail) => (
-    detail[key] === null ? unavailable : formatter(detail[key])
+    detail[key] === null || detail[key] === undefined ? unavailable : formatter(detail[key], detail)
   )).join(" / ");
 }
 

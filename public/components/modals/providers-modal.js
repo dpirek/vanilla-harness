@@ -22,6 +22,7 @@ class ProvidersModal extends BaseComponent {
       ["context", "Context"],
       ["inputCost", "Input / 1M"],
       ["outputCost", "Output / 1M"],
+      ["rating", "Rating"],
     ];
     const providersTable = element("table", { class: "providerTable", children: [
       element("thead", { children: [element("tr", { children: ["Use", "Name", "Type", "Model", "API key", ""].map((label) =>

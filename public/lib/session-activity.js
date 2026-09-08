@@ -180,11 +180,19 @@ function sessionActivities(events = [], now = Date.now()) {
       const promptDetail = event.detail && typeof event.detail === "object" ? event.detail : null;
       if (promptDetail) {
         runContext = {
+          runId: String(promptDetail.runId || ""),
           providerId: String(promptDetail.providerId || ""),
+          providerName: String(promptDetail.providerName || promptDetail.provider || ""),
           provider: String(promptDetail.provider || ""),
           model: String(promptDetail.model || ""),
           inputCost: promptDetail.inputCost ?? null,
           outputCost: promptDetail.outputCost ?? null,
+          presetSettings: promptDetail.presetSettings && typeof promptDetail.presetSettings === "object"
+            ? promptDetail.presetSettings : {},
+          tools: promptDetail.tools && typeof promptDetail.tools === "object" ? promptDetail.tools : {},
+          systemPrompts: promptDetail.systemPrompts && typeof promptDetail.systemPrompts === "object"
+            ? promptDetail.systemPrompts : {},
+          inputPrompt: String(promptDetail.prompt || ""),
         };
       }
       setDetails(add("Send prompt", "running", event, "prompt"), [
@@ -340,6 +348,7 @@ function sessionActivities(events = [], now = Date.now()) {
     current: [...items].reverse().find((item) => item.status === "running") || null,
     complete,
     items,
+    runId: runContext?.runId || String(items[0]?.startedAt || ""),
     runContext,
     usage,
   };

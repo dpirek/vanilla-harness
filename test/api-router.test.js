@@ -31,6 +31,7 @@ test("API router delegates every registered endpoint and falls through for unkno
     "/api/config",
     "/api/models",
     "/api/model-test",
+    "/api/task-ratings",
     "/api/ui-state",
     "/api/rig-configurations",
     "/api/system-prompts",

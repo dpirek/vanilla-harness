@@ -42,6 +42,20 @@ function testProviderModel(providerId, model) {
   );
 }
 
+async function loadTaskRatings() {
+  const payload = await requestJson("/api/task-ratings", {}, "Unable to load task ratings.");
+  return payload.ratings || [];
+}
+
+async function saveTaskRating(record) {
+  const payload = await requestJson(
+    "/api/task-ratings",
+    jsonOptions("PUT", record),
+    "Unable to save task rating.",
+  );
+  return payload.rating;
+}
+
 function loadConfig() {
   return requestJson("/api/config", {}, "Unable to load config.");
 }
@@ -74,10 +88,12 @@ export {
   loadRigConfigurations,
   loadSkills,
   loadSystemPrompts,
+  loadTaskRatings,
   saveConfig,
   saveRigConfigurations,
   saveSkill,
   saveSelectedSkills,
   saveSystemPrompt,
+  saveTaskRating,
   testProviderModel,
 };

@@ -293,6 +293,24 @@ export function createSettingsApiHandlers({
     methodNotAllowed(res, "GET, PUT");
   }
 
+  async function handleTaskRatingsApi(req, res) {
+    if (req.method === "GET") {
+      json(res, 200, { ok: true, ratings: uiStateStore.getTaskRatings() });
+      return;
+    }
+    if (req.method === "PUT") {
+      try {
+        const body = JSON.parse(await readRequestBody(req, 1_000_000) || "{}");
+        const rating = uiStateStore.setTaskRating(body);
+        json(res, 200, { ok: true, rating });
+      } catch (error) {
+        json(res, 400, { ok: false, error: error.message });
+      }
+      return;
+    }
+    methodNotAllowed(res, "GET, PUT");
+  }
+
   async function handleRigConfigurationsApi(req, res) {
     if (req.method === "GET") {
       json(res, 200, { ok: true, ...uiStateStore.getRigConfigurations() });
@@ -387,6 +405,7 @@ export function createSettingsApiHandlers({
     "/api/config": handleConfigApi,
     "/api/models": handleModelsApi,
     "/api/model-test": handleModelTestApi,
+    "/api/task-ratings": handleTaskRatingsApi,
     "/api/ui-state": handleUiStateApi,
     "/api/rig-configurations": handleRigConfigurationsApi,
     "/api/system-prompts": handleSystemPromptsApi,

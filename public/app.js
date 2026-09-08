@@ -67,11 +67,13 @@ import {
   loadRigConfigurations as fetchRigConfigurations,
   loadSkills as fetchSkills,
   loadSystemPrompts as fetchSystemPrompts,
+  loadTaskRatings as fetchTaskRatings,
   saveConfig as persistConfig,
   saveRigConfigurations as persistRigConfigurations,
   saveSelectedSkills as persistSelectedSkills,
   saveSkill as persistSkill,
   saveSystemPrompt as persistSystemPrompt,
+  saveTaskRating as persistTaskRating,
   testProviderModel as runProviderModelTest,
 } from "./services/settings-api.js";
 import SocketService from "./services/socket-service.js";
@@ -591,6 +593,7 @@ let allProviderModelsLoadId = 0;
 let providerModelsQuery = "";
 let providerModelsSort = { key: "model", direction: "asc" };
 const testingProviderModels = new Set();
+let taskRatings = [];
 let storedToolPermissions = normalizeToolPermissions();
 let presetConfigurations = [];
 let activePresetId = null;
@@ -1922,7 +1925,7 @@ function renderMessages() {
     if (isAgentMessage(message)) {
       if (agentIndex >= unmatchedAgentCount && activityIndex < activities.length) {
         const isLatest = activityIndex === activities.length - 1;
-        messages.append(createSessionActivityCard(activities[activityIndex], { active: isLatest && runActive }));
+        messages.append(createSessionActivityCard(activities[activityIndex], { active: isLatest && runActive, sessionId: session.id }));
         activityIndex += 1;
       }
       agentIndex += 1;
@@ -1931,14 +1934,15 @@ function renderMessages() {
   }
   while (activityIndex < activities.length) {
     const isLatest = activityIndex === activities.length - 1;
-    messages.append(createSessionActivityCard(activities[activityIndex], { active: isLatest && runActive }));
+    messages.append(createSessionActivityCard(activities[activityIndex], { active: isLatest && runActive, sessionId: session.id }));
     activityIndex += 1;
   }
 }
 
-function createSessionActivityCard(activity, { active = false } = {}) {
+function createSessionActivityCard(activity, { active = false, sessionId = activeSessionId } = {}) {
   const card = document.createElement("details");
   card.className = "sessionActivity";
+  card.dataset.sessionId = sessionId;
   card.setAttribute("aria-label", "Session step summary");
   card.setAttribute("aria-live", "polite");
   const summary = document.createElement("summary");
@@ -1949,11 +1953,28 @@ function createSessionActivityCard(activity, { active = false } = {}) {
   current.className = "currentSessionStep";
   const count = document.createElement("span");
   count.className = "sessionTaskCount";
+  const rating = document.createElement("span");
+  rating.className = "sessionRating";
+  rating.setAttribute("role", "group");
+  rating.setAttribute("aria-label", "Rate this completed task");
+  for (let value = 1; value <= 5; value += 1) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.rating = String(value);
+    button.textContent = "★";
+    button.setAttribute("aria-label", `Rate this task ${value} out of 5`);
+    button.addEventListener("click", async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      await rateSessionActivity(card, value);
+    });
+    rating.append(button);
+  }
   const chevron = document.createElement("span");
   chevron.className = "sessionActivityChevron";
   chevron.textContent = "›";
   chevron.setAttribute("aria-hidden", "true");
-  summary.append(visualization, eyebrow, current, count, chevron);
+  summary.append(visualization, eyebrow, current, count, rating, chevron);
   summary.addEventListener("click", (event) => {
     if (card.dataset.running === "true") event.preventDefault();
   });
@@ -2028,6 +2049,7 @@ function createStepDetailsButton(task, details, expanded = false) {
 }
 
 function updateSessionActivityCard(card, activity, { active = false } = {}) {
+  card.activity = activity;
   const wasComplete = card.dataset.complete === "true";
   const isRunning = active && !activity.complete;
   const failed = activity.items.some((item) => item.status === "failed");
@@ -2048,6 +2070,15 @@ function updateSessionActivityCard(card, activity, { active = false } = {}) {
   count.title = activity.usage
     ? `${formatTokenCount(activity.usage.inputTokens)} input · ${formatTokenCount(activity.usage.outputTokens)} output · ${formatTokenCount(activity.usage.totalTokens)} total tokens${runCost === null ? "" : ` · ${formatRunCost(runCost)} estimated cost`}`
     : "";
+  const ratingControl = card.querySelector(".sessionRating");
+  const storedRating = taskRatings.find((entry) => entry.runId === taskRatingRunId(activity, card.dataset.sessionId));
+  ratingControl.hidden = !activity.complete;
+  for (const button of ratingControl.querySelectorAll("button")) {
+    const selected = Number(button.dataset.rating) <= Number(storedRating?.rating || 0);
+    button.classList.toggle("selected", selected);
+    button.setAttribute("aria-pressed", String(Number(button.dataset.rating) === Number(storedRating?.rating || 0)));
+    button.disabled = ratingControl.dataset.pending === "true";
+  }
   const expandedTaskDetails = new Set(
     [...list.querySelectorAll(".sessionTask[data-details-open]")].map((item) => item.dataset.taskId),
   );
@@ -2099,6 +2130,56 @@ function updateSessionActivityCard(card, activity, { active = false } = {}) {
   else if (activity.complete && !wasComplete) card.open = false;
 }
 
+function taskRatingRunId(activity, sessionId) {
+  return activity.runContext?.runId || `${sessionId}:${activity.runId}`;
+}
+
+async function rateSessionActivity(card, rating) {
+  const activity = card.activity;
+  const sessionId = card.dataset.sessionId;
+  if (!activity?.complete || !sessionId) return;
+  const control = card.querySelector(".sessionRating");
+  control.dataset.pending = "true";
+  control.querySelectorAll("button").forEach((button) => { button.disabled = true; });
+  const context = activity.runContext || {};
+  const modelUsed = [...activity.items].reverse().find((item) => item.modelTurn?.model)?.modelTurn.model
+    || [...activity.items].reverse().find((item) => item.model)?.model
+    || context.model;
+  const provider = providers.find((entry) => String(entry.id) === String(context.providerId))
+    || (() => {
+      const matches = providers.filter((entry) => normalizeProviderModels([entry.model, ...(entry.models || [])])
+        .some((model) => model.id === modelUsed));
+      const typed = context.provider ? matches.filter((entry) => entry.type === context.provider) : matches;
+      return typed.length === 1 ? typed[0] : null;
+    })();
+  const record = {
+    runId: taskRatingRunId(activity, sessionId),
+    sessionId,
+    providerId: context.providerId || provider?.id || "",
+    providerName: context.providerName || provider?.name || titleCaseIdentifier(context.provider || "Unknown provider"),
+    model: modelUsed || "Unknown model",
+    inputPrompt: context.inputPrompt
+      || activity.items.find((item) => item.key === "prompt")?.details?.[0]?.text
+      || "",
+    presetSettings: context.presetSettings || {},
+    tools: context.tools || {},
+    systemPrompts: context.systemPrompts || {},
+    cost: calculateActivityRunCost(activity),
+    rating,
+  };
+  try {
+    const saved = await persistTaskRating(record);
+    taskRatings = [saved, ...taskRatings.filter((entry) => entry.runId !== saved.runId)];
+    control.dataset.pending = "false";
+    updateSessionActivityCard(card, activity, { active: false });
+    renderProviderModelsTable();
+  } catch (error) {
+    control.title = error.message;
+    control.dataset.pending = "false";
+    control.querySelectorAll("button").forEach((button) => { button.disabled = false; });
+  }
+}
+
 function calculateActivityRunCost(activity) {
   const usageItems = activity.items.filter((item) => item.usage);
   if (usageItems.length === 0) return null;
@@ -2114,6 +2195,9 @@ function calculateActivityRunCost(activity) {
 }
 
 function providerModelPricing(runContext, modelName) {
+  if (runContext?.model === modelName
+    && runContext.inputCost !== null && runContext.inputCost !== undefined
+    && runContext.outputCost !== null && runContext.outputCost !== undefined) return runContext;
   const contextProvider = runContext?.providerId
     ? providers.find((provider) => String(provider.id) === runContext.providerId)
     : null;
@@ -2124,13 +2208,9 @@ function providerModelPricing(runContext, modelName) {
       && model?.outputCost !== null && model?.outputCost !== undefined) return model;
     return runContext?.model === modelName ? runContext : null;
   }
-  const activeProviderId = matchingProviderId(providers, providerSettings);
-  const activeProvider = providers.find((provider) => String(provider.id) === activeProviderId);
   const modelPricing = (provider) => normalizeProviderModels([provider?.model, ...(provider?.models || [])])
     .find((entry) => entry.id === modelName
       && entry.inputCost !== null && entry.outputCost !== null);
-  const activePricing = modelPricing(activeProvider);
-  if (activePricing) return activePricing;
   const matches = providers.map(modelPricing).filter(Boolean);
   const uniquePrices = new Set(matches.map((model) => `${model.inputCost}:${model.outputCost}`));
   if (matches.length > 0 && uniquePrices.size === 1) {
@@ -2165,7 +2245,7 @@ function renderSessionActivity() {
   }
   let card = cards.at(-1);
   if (cards.length < activities.length) {
-    card = createSessionActivityCard(activities.at(-1), { active: runActive });
+    card = createSessionActivityCard(activities.at(-1), { active: runActive, sessionId: activeSessionId });
     const streamingMessage = messages.querySelector(".message-streaming");
     if (streamingMessage) messages.insertBefore(card, streamingMessage);
     else messages.append(card);
@@ -2742,7 +2822,13 @@ function renderProviderModelsTable() {
       selected ? (providerModelsSort.direction === "asc" ? "ascending" : "descending") : "none",
     );
   }
-  const allModels = groupedProviderModels(providers);
+  const allModels = groupedProviderModels(providers).map((item) => ({
+    ...item,
+    details: item.details.map((detail) => ({
+      ...detail,
+      ...providerModelRating(detail.providerId, item.model),
+    })),
+  }));
   const models = filterAndSortProviderModels(allModels, {
     query: providerModelsQuery,
     ...providerModelsSort,
@@ -2750,7 +2836,7 @@ function renderProviderModelsTable() {
   if (models.length === 0) {
     const row = document.createElement("tr");
     const cell = document.createElement("td");
-    cell.colSpan = 9;
+    cell.colSpan = 10;
     cell.textContent = providerModelsQuery
       ? `No models match “${providerModelsQuery}”.`
       : providers.length === 0
@@ -2788,6 +2874,7 @@ function renderProviderModelsTable() {
       formatGroupedModelValue(item.details, "context", formatContextSize),
       formatGroupedModelValue(item.details, "inputCost", formatTokenCost),
       formatGroupedModelValue(item.details, "outputCost", formatTokenCost),
+      formatGroupedModelValue(item.details, "rating", (value, detail) => `★ ${value.toFixed(1)} (${detail.ratingCount})`),
     ];
     const actionsCell = document.createElement("td");
     actionsCell.className = "providerModelActionsCell";
@@ -2911,6 +2998,17 @@ function sortProviderModels(key) {
 
 function formatGroupedModelValue(details, key, formatter) {
   return formatProviderModelValues(details, key, formatter);
+}
+
+function providerModelRating(providerId, model) {
+  const ratings = taskRatings.filter((entry) => (
+    String(entry.providerId) === String(providerId) && entry.model === model
+  ));
+  if (ratings.length === 0) return { rating: null, ratingCount: 0 };
+  return {
+    rating: ratings.reduce((sum, entry) => sum + entry.rating, 0) / ratings.length,
+    ratingCount: ratings.length,
+  };
 }
 
 function formatToolSupport(value) {
@@ -3406,13 +3504,33 @@ chatComponent.addEventListener("submit-prompt", () => {
   const matchedProvider = providers.find((provider) => String(provider.id) === matchedProviderId);
   const activeModel = normalizeProviderModels([matchedProvider?.model, ...(matchedProvider?.models || [])])
     .find((model) => model.id === providerSettings.model);
+  const activePreset = presetConfigurations.find((configuration) => configuration.id === activePresetId);
+  const effectiveSystemPrompts = activePreset?.systemPrompts
+    || Object.fromEntries(systemPrompts.map((entry) => [entry.key, entry.content]));
+  const effectiveToolPermissions = activePreset?.toolPermissions || storedToolPermissions;
+  const presetSnapshot = activePreset || {
+    name: "Current settings",
+    providerSettings,
+    toolPermissions: effectiveToolPermissions,
+    systemPrompts: effectiveSystemPrompts,
+    mcpConfig: toolsConfigContent,
+  };
   addEvent("Prompt sent", {
+    runId: randomUuid(),
     prompt: images.length > 0 ? `${displayPrompt} (${images.length} image)` : displayPrompt,
     providerId: matchedProviderId,
+    providerName: matchedProvider?.name || titleCaseIdentifier(providerSettings.provider),
     provider: providerSettings.provider,
     model: providerSettings.model,
     inputCost: activeModel?.inputCost ?? null,
     outputCost: activeModel?.outputCost ?? null,
+    presetSettings: JSON.parse(JSON.stringify(presetSnapshot)),
+    tools: {
+      permissions: { ...effectiveToolPermissions },
+      enabled: Object.entries(effectiveToolPermissions).filter(([, enabled]) => enabled).map(([name]) => name),
+      mcpConfig: activePreset?.mcpConfig || toolsConfigContent,
+    },
+    systemPrompts: { ...effectiveSystemPrompts },
   });
   promptInput.value = "";
   attachedImages = [];
@@ -3918,6 +4036,11 @@ async function initialize() {
     ? storedActiveSessionId
     : sessions[0].id;
   localStorage.setItem(ACTIVE_SESSION_STORAGE_KEY, activeSessionId);
+  try {
+    taskRatings = await fetchTaskRatings();
+  } catch {
+    taskRatings = [];
+  }
   renderProviderSettings();
   renderToolPermissions();
   renderRecents();
