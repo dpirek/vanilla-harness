@@ -34,6 +34,14 @@ function loadProviderModels({ provider, baseUrl, apiKey }) {
   );
 }
 
+function testProviderModel(providerId, model) {
+  return requestJson(
+    "/api/model-test",
+    jsonOptions("POST", { providerId, model }),
+    "Unable to test model performance.",
+  );
+}
+
 function loadConfig() {
   return requestJson("/api/config", {}, "Unable to load config.");
 }
@@ -71,4 +79,5 @@ export {
   saveSkill,
   saveSelectedSkills,
   saveSystemPrompt,
+  testProviderModel,
 };

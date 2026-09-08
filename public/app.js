@@ -26,10 +26,19 @@ import {
 import { describeAgentEvent } from "./lib/agent-events.js";
 import { readFileAsDataUrl, renderImagePreviews as renderImagePreviewList } from "./lib/image-attachments.js";
 import { randomUuid } from "./lib/ids.js";
+import { modelTestIcon } from "./lib/icons.js";
 import { normalizeSkillName, skillDraft, syncSkillContentName, validateSkillContent } from "./lib/skill-content.js";
 import { clearSessionHistory, createSession, promptHistoryFromSessions, titleFromPrompt } from "./lib/sessions.js";
 import { formatStepDuration, formatTokenCount, sessionActivityRuns } from "./lib/session-activity.js";
 import { formatContextPercentage } from "./lib/model-context.js";
+import {
+  filterAndSortProviderModels,
+  formatProviderModelValues,
+  groupedProviderModels,
+  mergeRefreshedProviderModels,
+  normalizeProviderModels,
+  providersNeedingInitialModelLoad,
+} from "./lib/provider-models.js";
 import { filterCommandOptions, parsePromptCommand } from "./lib/prompt-commands.js";
 import { createStateSaveQueue } from "./lib/state-save-queue.js";
 import { loadDefaultWorkspace, saveDefaultWorkspace } from "./lib/workspace-preferences.js";
@@ -63,6 +72,7 @@ import {
   saveSelectedSkills as persistSelectedSkills,
   saveSkill as persistSkill,
   saveSystemPrompt as persistSystemPrompt,
+  testProviderModel as runProviderModelTest,
 } from "./services/settings-api.js";
 import SocketService from "./services/socket-service.js";
 
@@ -83,6 +93,9 @@ const mcpModal = appRoot.querySelector("mcp-modal");
 const workflowModal = appRoot.querySelector("workflow-modal");
 
 const workspaceMeta = appRoot.querySelector("#workspaceMeta");
+const providerShortcutName = appRoot.querySelector("#providerShortcutName");
+const providerShortcutModel = appRoot.querySelector("#providerShortcutModel");
+const providerShortcutPrice = appRoot.querySelector("#providerShortcutPrice");
 const workspaceInput = appRoot.querySelector("#workspaceInput");
 const messages = appRoot.querySelector("#messages");
 const promptInput = appRoot.querySelector("#promptInput");
@@ -184,6 +197,14 @@ const providerSelect = appRoot.querySelector("#providerSelect");
 const providerSettingsSection = appRoot.querySelector("#providerSettings");
 const providerNameInput = appRoot.querySelector("#providerNameInput");
 const providersTableBody = appRoot.querySelector("#providersTableBody");
+const providerModelsTableBody = appRoot.querySelector("#providerModelsTableBody");
+const providerModelsSection = appRoot.querySelector("#providerModelsSection");
+const providersTab = appRoot.querySelector("#providersTab");
+const modelsTab = appRoot.querySelector("#modelsTab");
+const refreshAllProviderModelsButton = appRoot.querySelector("#refreshAllProviderModelsButton");
+const allProviderModelsStatus = appRoot.querySelector("#allProviderModelsStatus");
+const providerModelsSearch = appRoot.querySelector("#providerModelsSearch");
+const providerModelsSortButtons = [...appRoot.querySelectorAll("[data-provider-model-sort]")];
 const providerEditor = appRoot.querySelector("#providerEditor");
 const saveSettingsButton = appRoot.querySelector("#saveSettingsButton");
 const providerModelInput = appRoot.querySelector("#providerModelInput");
@@ -223,6 +244,7 @@ const fileEditorPath = appRoot.querySelector("#fileEditorPath");
 const fileEditorLanguage = appRoot.querySelector("#fileEditorLanguage");
 const copyFilePreviewButton = appRoot.querySelector("#copyFilePreviewButton");
 const fileEditorPreviewImage = appRoot.querySelector("#fileEditorPreviewImage");
+const fileEditorPreviewHtml = appRoot.querySelector("#fileEditorPreviewHtml");
 const fileEditorMarkdown = appRoot.querySelector("#fileEditorMarkdown");
 const fileEditorPreviewText = appRoot.querySelector("#fileEditorPreviewText");
 const fileEditorPreviewCode = appRoot.querySelector("#fileEditorPreviewCode");
@@ -269,7 +291,18 @@ function setFilePreviewClipboardValue(value, label = "source") {
 function updateFileEditorPreview(workspace, filePath, content, { copyable = true } = {}) {
   fileEditorPreviewImage.hidden = true;
   fileEditorPreviewImage.removeAttribute("src");
+  fileEditorPreviewHtml.hidden = true;
+  fileEditorPreviewHtml.removeAttribute("srcdoc");
   setFilePreviewClipboardValue(copyable ? content : null);
+  if (/\.html?$/i.test(filePath)) {
+    fileEditorPreviewText.hidden = true;
+    fileEditorMarkdown.hidden = true;
+    fileEditorMarkdown.replaceChildren();
+    fileEditorPreviewHtml.hidden = false;
+    fileEditorPreviewHtml.srcdoc = content;
+    fileEditorLanguage.textContent = "HTML";
+    return;
+  }
   if (/\.md$/i.test(filePath)) {
     fileEditorPreviewText.hidden = true;
     fileEditorMarkdown.hidden = false;
@@ -290,6 +323,8 @@ function updateFileEditorPreview(workspace, filePath, content, { copyable = true
 function updateImagePreview(workspace, node) {
   const assetUrl = workspaceFileAssetUrl(workspace, node.path);
   fileEditorPreviewCode.replaceChildren();
+  fileEditorPreviewHtml.hidden = true;
+  fileEditorPreviewHtml.removeAttribute("srcdoc");
   fileEditorMarkdown.replaceChildren();
   fileEditorMarkdown.hidden = true;
   fileEditorPreviewText.hidden = true;
@@ -550,6 +585,12 @@ let sessions = [];
 let providerSettings = defaultProviderSettings();
 let providers = [];
 let editingProviderId = null;
+let editingProviderModels = [];
+let editingProviderModelsLoadedAt = null;
+let allProviderModelsLoadId = 0;
+let providerModelsQuery = "";
+let providerModelsSort = { key: "model", direction: "asc" };
+const testingProviderModels = new Set();
 let storedToolPermissions = normalizeToolPermissions();
 let presetConfigurations = [];
 let activePresetId = null;
@@ -567,6 +608,14 @@ const persistUiState = createStateSaveQueue(
   saveUiState,
   (error) => addEvent("UI state save failed", error.message, { persist: false }),
 );
+
+function normalizeProviderRecords(value) {
+  return (Array.isArray(value) ? value : []).map((provider) => ({
+    ...provider,
+    models: normalizeProviderModels(provider.models),
+    modelsLoadedAt: Number(provider.modelsLoadedAt) || null,
+  }));
+}
 
 const PRESET_STATUS_TOOL_LABELS = {
   list_files: "List files",
@@ -1085,7 +1134,7 @@ async function loadPresetSummary() {
 async function syncPresetRuntimeState() {
   const [state, config, storedSkills] = await Promise.all([loadUiState(), fetchConfig(), fetchSkills()]);
   providerSettings = { ...defaultProviderSettings(), ...(state.providerSettings || {}) };
-  providers = Array.isArray(state.providers) ? state.providers : [];
+  providers = normalizeProviderRecords(state.providers);
   editingProviderId = providers.find((provider) => provider.selected)?.id || null;
   storedToolPermissions = normalizeToolPermissions(state.toolPermissions);
   toolsConfigContent = config.content || "";
@@ -2371,9 +2420,31 @@ function currentProviderSettings() {
 
 function applyActiveProviderSettings(settings) {
   providerSettings = { ...defaultProviderSettings(), ...(settings || {}) };
-  workspaceMeta.textContent = `${providerSettings.provider} · ${providerSettings.model || "default model"}`;
+  renderSidebarProviderSummary(providerSettings);
   updateActivePresetSnapshot({ providerSettings });
   send({ type: "provider_settings", ...providerSettings });
+}
+
+function renderSidebarProviderSummary(settings = providerSettings, fallback = {}) {
+  const matchedProviderId = matchingProviderId(providers, settings);
+  const matchedProvider = providers.find((provider) => String(provider.id) === matchedProviderId);
+  const providerName = matchedProvider?.name || titleCaseIdentifier(settings.provider || fallback.provider || "Provider");
+  const modelName = settings.model || fallback.model || "default model";
+  const model = normalizeProviderModels([matchedProvider?.model, ...(matchedProvider?.models || [])])
+    .find((item) => item.id === modelName);
+  const inputPrice = model?.inputCost === null || model?.inputCost === undefined
+    ? "—"
+    : formatTokenCost(model.inputCost);
+  const outputPrice = model?.outputCost === null || model?.outputCost === undefined
+    ? "—"
+    : formatTokenCost(model.outputCost);
+
+  providerShortcutName.textContent = providerName;
+  providerShortcutModel.textContent = modelName;
+  providerShortcutPrice.textContent = `Input ${inputPrice} / Output ${outputPrice} per 1M`;
+  const summary = `${providerName} · ${modelName} · Input ${inputPrice} / Output ${outputPrice} per 1M tokens`;
+  workspaceMeta.title = summary;
+  workspaceMeta.closest("button")?.setAttribute("aria-label", `Manage providers. ${summary}`);
 }
 
 function providerFormRecord(existing = {}) {
@@ -2382,6 +2453,8 @@ function providerFormRecord(existing = {}) {
     name: providerNameInput.value.trim() || `${providerSelect.value} provider`,
     type: providerSelect.value,
     model: providerModelInput.value.trim(),
+    models: normalizeProviderModels(editingProviderModels),
+    modelsLoadedAt: editingProviderModelsLoadedAt,
     baseUrl: providerBaseUrlInput.value.trim(),
     apiKey: providerApiKeyInput.value.trim(),
     selected: existing.selected === true,
@@ -2435,7 +2508,12 @@ function renderProvidersTable() {
     editButton.textContent = "Edit";
     editButton.addEventListener("click", async () => {
       editingProviderId = item.id;
-      renderProviderSettings({ provider: item.type, model: item.model, baseUrl: item.baseUrl, apiKey: item.apiKey }, item.name);
+      renderProviderSettings(
+        { provider: item.type, model: item.model, baseUrl: item.baseUrl, apiKey: item.apiKey },
+        item.name,
+        item.models,
+        item.modelsLoadedAt,
+      );
       providerSettingsSection.classList.add("editor-open");
       providerEditor.hidden = false;
       saveSettingsButton.hidden = false;
@@ -2461,6 +2539,7 @@ function renderProvidersTable() {
       if (editingProviderId === item.id) editingProviderId = null;
       persistUiState({ providers });
       renderProvidersTable();
+      renderProviderModelsTable();
       settingsStatus.textContent = `${item.name} deleted`;
       settingsStatus.dataset.state = "success";
     });
@@ -2472,7 +2551,7 @@ function renderProvidersTable() {
 
 function addProvider() {
   editingProviderId = null;
-  renderProviderSettings(defaultProviderSettings(), "");
+  renderProviderSettings(defaultProviderSettings(), "", [], null);
   providerSettingsSection.classList.add("editor-open");
   providerEditor.hidden = false;
   saveSettingsButton.hidden = false;
@@ -2493,6 +2572,7 @@ function saveProviderSettings() {
   }
   persistUiState(providers.length > 0 ? { providers } : { providerSettings: settings });
   renderProvidersTable();
+  renderProviderModelsTable();
   const updated = providers.find((item) => item.id === editingProviderId);
   if (!updated || updated.selected) {
     applyActiveProviderSettings(settings);
@@ -2542,7 +2622,7 @@ function setProviderModelsStatus(message, state = "") {
 function setModelOptions(models, selectedModel) {
   const selected = selectedModel || defaultModelForProvider(providerSelect.value);
   providerModelInput.replaceChildren();
-  const uniqueModels = [...new Set([selected, ...models].filter(Boolean))];
+  const uniqueModels = [...new Set([selected, ...normalizeProviderModels(models).map((model) => model.id)].filter(Boolean))];
   for (const model of uniqueModels) {
     const option = document.createElement("option");
     option.value = model;
@@ -2552,12 +2632,20 @@ function setModelOptions(models, selectedModel) {
   providerModelInput.value = selected;
 }
 
-function renderProviderSettings(settings = providerSettings, name = providers.find((item) => item.selected)?.name || "") {
+function renderProviderSettings(
+  settings = providerSettings,
+  name = providers.find((item) => item.selected)?.name || "",
+  models,
+  modelsLoadedAt,
+) {
+  const selectedProvider = providers.find((item) => item.selected);
+  editingProviderModels = normalizeProviderModels(models ?? selectedProvider?.models);
+  editingProviderModelsLoadedAt = Number(modelsLoadedAt ?? selectedProvider?.modelsLoadedAt) || null;
   providerNameInput.value = name;
   providerSelect.value = ["openai", "ollama", "custom"].includes(settings.provider)
     ? settings.provider
     : "openai";
-  setModelOptions([], settings.model || defaultModelForProvider(providerSelect.value));
+  setModelOptions(editingProviderModels, settings.model || defaultModelForProvider(providerSelect.value));
   providerBaseUrlInput.value = settings.baseUrl || "";
   providerApiKeyInput.value = settings.apiKey || "";
   providerBaseUrlInput.placeholder = providerSelect.value === "ollama"
@@ -2577,13 +2665,286 @@ async function loadProviderModels() {
   refreshModelsButton.disabled = true;
   try {
     const payload = await fetchProviderModels(current);
-    setModelOptions(payload.models || [], current.model);
-    setProviderModelsStatus(`${payload.models.length} model${payload.models.length === 1 ? "" : "s"} loaded`, "success");
+    editingProviderModels = mergeRefreshedProviderModels(
+      editingProviderModels,
+      payload.modelDetails || payload.models,
+    );
+    editingProviderModelsLoadedAt = Date.now();
+    setModelOptions(editingProviderModels, current.model);
+    setProviderModelsStatus(`${editingProviderModels.length} model${editingProviderModels.length === 1 ? "" : "s"} loaded`, "success");
   } catch (error) {
-    setModelOptions([], current.model || defaultModelForProvider(current.provider));
+    setModelOptions(editingProviderModels, current.model || defaultModelForProvider(current.provider));
     setProviderModelsStatus(error.message, "error");
   } finally {
     refreshModelsButton.disabled = false;
+  }
+}
+
+function renderProviderModelsTable() {
+  providerModelsTableBody.replaceChildren();
+  for (const button of providerModelsSortButtons) {
+    const selected = button.dataset.providerModelSort === providerModelsSort.key;
+    button.dataset.direction = selected ? providerModelsSort.direction : "";
+    button.closest("th").setAttribute(
+      "aria-sort",
+      selected ? (providerModelsSort.direction === "asc" ? "ascending" : "descending") : "none",
+    );
+  }
+  const allModels = groupedProviderModels(providers);
+  const models = filterAndSortProviderModels(allModels, {
+    query: providerModelsQuery,
+    ...providerModelsSort,
+  });
+  if (models.length === 0) {
+    const row = document.createElement("tr");
+    const cell = document.createElement("td");
+    cell.colSpan = 9;
+    cell.textContent = providerModelsQuery
+      ? `No models match “${providerModelsQuery}”.`
+      : providers.length === 0
+      ? "Add a provider to discover its models."
+      : "No models have been discovered yet.";
+    row.append(cell);
+    providerModelsTableBody.append(row);
+    return;
+  }
+  for (const item of models) {
+    const row = document.createElement("tr");
+    const modelCell = document.createElement("td");
+    modelCell.textContent = item.model;
+    modelCell.title = item.model;
+    const providersCell = document.createElement("td");
+    providersCell.className = "providerModelNames";
+    const providerBadges = document.createElement("div");
+    providerBadges.className = "providerModelBadges";
+    for (const [index, name] of item.providers.entries()) {
+      if (index > 0) {
+        const separator = document.createElement("span");
+        separator.className = "providerModelSeparator";
+        separator.textContent = "/";
+        providerBadges.append(separator);
+      }
+      const badge = document.createElement("span");
+      badge.textContent = name;
+      providerBadges.append(badge);
+    }
+    providersCell.append(providerBadges);
+    const metadata = [
+      formatGroupedModelValue(item.details, "tools", formatToolSupport),
+      formatGroupedModelValue(item.details, "throughput", (value) => `${formatMetric(value)} t/s`),
+      formatGroupedModelValue(item.details, "latency", (value) => `${formatMetric(value)} ms`),
+      formatGroupedModelValue(item.details, "context", formatContextSize),
+      formatGroupedModelValue(item.details, "inputCost", formatTokenCost),
+      formatGroupedModelValue(item.details, "outputCost", formatTokenCost),
+    ];
+    const actionsCell = document.createElement("td");
+    actionsCell.className = "providerModelActionsCell";
+    const useActions = document.createElement("div");
+    useActions.className = "providerModelUseActions";
+    const orderedDetails = [...item.details].sort((left, right) => (
+      left.provider.localeCompare(right.provider)
+      || String(left.providerId || "").localeCompare(String(right.providerId || ""))
+    ));
+    for (const [index, detail] of orderedDetails.entries()) {
+      if (index > 0) {
+        const separator = document.createElement("span");
+        separator.textContent = "/";
+        separator.setAttribute("aria-hidden", "true");
+        useActions.append(separator);
+      }
+      const useButton = document.createElement("button");
+      useButton.type = "button";
+      useButton.className = "providerModelUseButton";
+      useButton.textContent = "Use";
+      const isActive = providers.some((provider) => (
+        String(provider.id) === String(detail.providerId)
+        && provider.selected === true
+        && provider.model === item.model
+      ));
+      useButton.disabled = !detail.providerId || isActive;
+      useButton.setAttribute("aria-pressed", String(isActive));
+      useButton.title = isActive
+        ? `Currently using ${item.model} with ${detail.provider}`
+        : `Use ${item.model} with ${detail.provider}`;
+      useButton.setAttribute("aria-label", useButton.title);
+      useButton.addEventListener("click", () => useProviderModel(detail.providerId, item.model));
+      useActions.append(useButton);
+    }
+    const testButton = document.createElement("button");
+    testButton.type = "button";
+    testButton.className = "providerModelTestButton";
+    testButton.title = `Test latency and throughput for ${item.model}`;
+    testButton.setAttribute("aria-label", testButton.title);
+    const isTesting = testingProviderModels.has(item.model);
+    testButton.disabled = isTesting;
+    testButton.classList.toggle("is-testing", isTesting);
+    testButton.setAttribute("aria-busy", String(isTesting));
+    testButton.append(modelTestIcon());
+    testButton.addEventListener("click", () => testModelPerformance(item));
+    useActions.prepend(testButton);
+    actionsCell.append(useActions);
+    row.append(modelCell, providersCell, ...metadata.map((value) => {
+      const cell = document.createElement("td");
+      cell.textContent = value;
+      return cell;
+    }), actionsCell);
+    providerModelsTableBody.append(row);
+  }
+}
+
+function useProviderModel(providerId, model) {
+  const selected = providers.find((provider) => String(provider.id) === String(providerId));
+  if (!selected) return;
+  providers = providers.map((provider) => ({
+    ...provider,
+    selected: String(provider.id) === String(providerId),
+    ...(String(provider.id) === String(providerId) ? { model } : {}),
+  }));
+  editingProviderId = selected.id;
+  const settings = {
+    provider: selected.type,
+    model,
+    baseUrl: selected.baseUrl,
+    apiKey: selected.apiKey,
+  };
+  applyActiveProviderSettings(settings);
+  persistUiState({ providers });
+  renderProvidersTable();
+  renderProviderModelsTable();
+  renderProviderSettings(settings, selected.name, selected.models, selected.modelsLoadedAt);
+  allProviderModelsStatus.textContent = `Using ${model} with ${selected.name}.`;
+  allProviderModelsStatus.dataset.state = "success";
+}
+
+async function testModelPerformance(item) {
+  if (testingProviderModels.has(item.model)) return;
+  const providerIds = [...new Set(item.details.map((detail) => detail.providerId).filter(Boolean))];
+  testingProviderModels.add(item.model);
+  renderProviderModelsTable();
+  allProviderModelsStatus.textContent = `Testing ${item.model} on ${providerIds.length} provider${providerIds.length === 1 ? "" : "s"}…`;
+  allProviderModelsStatus.dataset.state = "";
+  let completed = 0;
+  const errors = [];
+  try {
+    for (const providerId of providerIds) {
+      try {
+        const result = await runProviderModelTest(providerId, item.model);
+        providers = providers.map((provider) => {
+          if (provider.id !== providerId) return provider;
+          const models = normalizeProviderModels(provider.models).map((model) =>
+            model.id === item.model ? { ...model, ...result.benchmark } : model);
+          return { ...provider, models: normalizeProviderModels(models) };
+        });
+        completed += 1;
+      } catch (error) {
+        errors.push(error.message);
+      }
+    }
+    allProviderModelsStatus.textContent = errors.length
+      ? `${completed} provider test${completed === 1 ? "" : "s"} completed · ${errors.length} failed: ${errors[0]}`
+      : `Performance test saved for ${item.model}.`;
+    allProviderModelsStatus.dataset.state = errors.length ? "error" : "success";
+  } finally {
+    testingProviderModels.delete(item.model);
+    renderProviderModelsTable();
+  }
+}
+
+function sortProviderModels(key) {
+  providerModelsSort = providerModelsSort.key === key
+    ? { key, direction: providerModelsSort.direction === "asc" ? "desc" : "asc" }
+    : { key, direction: "asc" };
+  renderProviderModelsTable();
+}
+
+function formatGroupedModelValue(details, key, formatter) {
+  return formatProviderModelValues(details, key, formatter);
+}
+
+function formatToolSupport(value) {
+  return value ? "Yes" : "No";
+}
+
+function formatMetric(value) {
+  return new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(value);
+}
+
+function formatContextSize(value) {
+  return new Intl.NumberFormat(undefined, { notation: "compact", maximumFractionDigits: 1 }).format(value);
+}
+
+function formatTokenCost(value) {
+  return new Intl.NumberFormat(undefined, {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 4,
+  }).format(value * 1_000_000);
+}
+
+function selectProviderTab(tab) {
+  const showModels = tab === "models";
+  providersTab.setAttribute("aria-selected", String(!showModels));
+  modelsTab.setAttribute("aria-selected", String(showModels));
+  providerSettingsSection.hidden = showModels;
+  providerModelsSection.hidden = !showModels;
+  saveSettingsButton.hidden = showModels || providerEditor.hidden;
+  if (showModels) renderProviderModelsTable();
+}
+
+async function loadAllProviderModels({ missingOnly = false } = {}) {
+  const loadId = ++allProviderModelsLoadId;
+  renderProviderModelsTable();
+  if (providers.length === 0) {
+    allProviderModelsStatus.textContent = "No providers configured.";
+    return;
+  }
+  const targets = missingOnly
+    ? providersNeedingInitialModelLoad(providers)
+    : providers;
+  if (targets.length === 0) {
+    allProviderModelsStatus.textContent = `${groupedProviderModels(providers).length} cached models.`;
+    return;
+  }
+  refreshAllProviderModelsButton.disabled = true;
+  allProviderModelsStatus.textContent = `Loading models from ${targets.length} provider${targets.length === 1 ? "" : "s"}…`;
+  allProviderModelsStatus.dataset.state = "";
+  const results = await Promise.all(targets.map(async (provider) => {
+    try {
+      const payload = await fetchProviderModels({
+        provider: provider.type,
+        baseUrl: provider.baseUrl,
+        apiKey: provider.apiKey,
+      });
+      return { id: provider.id, models: normalizeProviderModels(payload.modelDetails || payload.models) };
+    } catch (error) {
+      return { id: provider.id, error };
+    }
+  }));
+  if (loadId !== allProviderModelsLoadId) return;
+  const resultsById = new Map(results.map((result) => [result.id, result]));
+  providers = providers.map((provider) => {
+    const result = resultsById.get(provider.id);
+    if (!result) return provider;
+    return {
+      ...provider,
+      ...(result.models ? { models: mergeRefreshedProviderModels(provider.models, result.models) } : {}),
+      modelsLoadedAt: Date.now(),
+    };
+  });
+  try {
+    await persistUiState({ providers });
+    renderProviderModelsTable();
+    renderSidebarProviderSummary();
+    const failed = results.filter((result) => result.error).length;
+    const count = groupedProviderModels(providers).length;
+    allProviderModelsStatus.textContent = `${count} unique model${count === 1 ? "" : "s"} saved to SQLite${failed ? ` · ${failed} provider${failed === 1 ? "" : "s"} failed` : ""}.`;
+    allProviderModelsStatus.dataset.state = failed ? "error" : "success";
+  } catch (error) {
+    allProviderModelsStatus.textContent = error.message;
+    allProviderModelsStatus.dataset.state = "error";
+  } finally {
+    refreshAllProviderModelsButton.disabled = false;
   }
 }
 
@@ -2864,9 +3225,13 @@ async function loadHealth(initialHealth = null) {
     if (changed) saveSessions();
     renderWorkspace();
     const settings = providerSettings;
-    workspaceMeta.textContent = `${settings.provider || health.provider} · ${settings.model || health.model}`;
+    renderSidebarProviderSummary(settings, health);
   } catch {
-    workspaceMeta.textContent = "Server health unavailable";
+    providerShortcutName.textContent = "Server health unavailable";
+    providerShortcutModel.textContent = "";
+    providerShortcutPrice.textContent = "";
+    workspaceMeta.title = "Server health unavailable";
+    workspaceMeta.closest("button")?.setAttribute("aria-label", "Manage providers. Server health unavailable");
   }
 }
 
@@ -3011,6 +3376,7 @@ fileEditorDialog.addEventListener("close", () => {
   window.clearTimeout(filePreviewStatusTimer);
   setFilePreviewClipboardValue(null);
   fileEditorPreviewImage.removeAttribute("src");
+  fileEditorPreviewHtml.removeAttribute("srcdoc");
 });
 workspaceComponent.addEventListener("focus-prompt", () => promptInput.focus());
 workspaceComponent.addEventListener("refresh-workspace", loadWorkspaceTree);
@@ -3070,10 +3436,15 @@ window.addEventListener("resize", () => {
 });
 
 function openProvidersModal() {
+  providerModelsQuery = "";
+  providerModelsSort = { key: "model", direction: "asc" };
+  providerModelsSearch.value = "";
   renderProvidersTable();
+  renderProviderModelsTable();
   providerSettingsSection.classList.remove("editor-open");
   providerEditor.hidden = true;
   saveSettingsButton.hidden = true;
+  selectProviderTab("providers");
   settingsStatus.textContent = "Provider settings are stored in SQLite.";
   settingsStatus.dataset.state = "";
   if (!settingsDialog.open) settingsDialog.showModal();
@@ -3363,6 +3734,16 @@ skillsModal.addEventListener("create-skill", () => openSkillEditor());
 skillsModal.addEventListener("cancel-skill-edit", closeSkillEditor);
 skillsModal.addEventListener("save-skill-edit", saveSkillEdit);
 providersModal.addEventListener("refresh-provider-models", loadProviderModels);
+providersModal.addEventListener("refresh-all-provider-models", () => loadAllProviderModels());
+providersModal.addEventListener("provider-model-search", (event) => {
+  providerModelsQuery = event.detail.query;
+  renderProviderModelsTable();
+});
+providersModal.addEventListener("provider-model-sort", (event) => sortProviderModels(event.detail.key));
+providersModal.addEventListener("provider-tab-change", async (event) => {
+  selectProviderTab(event.detail.tab);
+  if (event.detail.tab === "models") await loadAllProviderModels({ missingOnly: true });
+});
 providersModal.addEventListener("add-provider", addProvider);
 mcpModal.addEventListener("reload-mcp-config", loadConfig);
 mcpModal.addEventListener("save-mcp-config", saveConfig);
@@ -3399,8 +3780,10 @@ providersModal.addEventListener("provider-type-change", async () => {
         ? "http://localhost:8000/v1"
         : "";
   }
+  editingProviderModels = [];
+  editingProviderModelsLoadedAt = null;
   setModelOptions([], defaultModelForProvider(nextProvider));
-  renderProviderSettings(currentProviderSettings(), providerName);
+  renderProviderSettings(currentProviderSettings(), providerName, [], null);
   await loadProviderModels();
 });
 
@@ -3459,7 +3842,7 @@ async function initialize() {
       }))
       : [createSession("AI Harness Session", defaultWorkspace)];
     providerSettings = { ...defaultProviderSettings(), ...(state.providerSettings || {}) };
-    providers = Array.isArray(state.providers) ? state.providers : [];
+    providers = normalizeProviderRecords(state.providers);
     shouldOpenProvidersModal = providers.length === 0;
     editingProviderId = providers.find((item) => item.selected)?.id || null;
     storedToolPermissions = normalizeToolPermissions(state.toolPermissions);

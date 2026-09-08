@@ -41,7 +41,17 @@ class HarnessSidebar extends BaseComponent {
       type: "button",
       title: "Manage providers",
       "aria-label": "Manage providers",
-      children: [this.createElement("span", { id: "workspaceMeta", textContent: "Connecting..." })],
+      children: [
+        this.createElement("span", {
+          id: "workspaceMeta",
+          class: "providerShortcutSummary",
+          children: [
+            this.createElement("span", { id: "providerShortcutName", class: "providerShortcutName", textContent: "Connecting..." }),
+            this.createElement("span", { id: "providerShortcutModel", class: "providerShortcutModel" }),
+            this.createElement("span", { id: "providerShortcutPrice", class: "providerShortcutPrice" }),
+          ],
+        }),
+      ],
     });
 
     this.appendChildren(this, [

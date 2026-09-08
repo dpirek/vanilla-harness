@@ -4,6 +4,8 @@ import {
   normalizeProvider,
   resolveProviderApiKey,
 } from "../lib/provider-config.js";
+import { benchmarkModel } from "../lib/model-benchmark.js";
+import { createModelClient } from "../lib/openai.js";
 import {
   normalizeSkillName,
   skillDraft,
@@ -11,6 +13,79 @@ import {
   validateSkillContent,
 } from "../public/lib/skill-content.js";
 import { json, methodNotAllowed, readRequestBody } from "./http.js";
+
+export function catalogModel(model) {
+  const id = String(model?.id || model?.model || model?.name || "").trim();
+  if (!id) return null;
+  const supported = Array.isArray(model.supported_parameters)
+    ? model.supported_parameters
+    : Array.isArray(model.capabilities)
+      ? model.capabilities
+      : null;
+  const pricing = model.pricing && typeof model.pricing === "object" ? model.pricing : {};
+  return {
+    id,
+    tools: supported ? supported.some((value) => ["tools", "tool_choice", "tool_use"].includes(String(value))) : null,
+    throughput: firstFinite(model.throughput, model.performance?.throughput, model.tokens_per_second),
+    latency: firstFinite(model.latency, model.performance?.latency, model.latency_ms),
+    context: firstFinite(model.context_length, model.context_window, model.top_provider?.context_length, model.details?.context_length),
+    inputCost: firstNonNegative(pricing.prompt, pricing.input, model.input_cost_per_token),
+    outputCost: firstNonNegative(pricing.completion, pricing.output, model.output_cost_per_token),
+  };
+}
+
+export function openAiPricingCatalog(payload) {
+  const source = Array.isArray(payload?.data)
+    ? payload.data
+    : Array.isArray(payload?.prices)
+      ? payload.prices
+      : Array.isArray(payload?.models)
+        ? payload.models
+        : payload?.data && typeof payload.data === "object"
+          ? Object.entries(payload.data).map(([id, value]) => ({ id, ...value }))
+          : [];
+  return source.flatMap((entry) => {
+    const ids = Array.isArray(entry?.model_ids)
+      ? entry.model_ids
+      : [entry?.model || entry?.model_id || entry?.id || entry?.name];
+    const inputCost = pricingCostPerToken(entry, "input");
+    const outputCost = pricingCostPerToken(entry, "output");
+    return ids.filter(Boolean).map((id) => ({ id: String(id), inputCost, outputCost }));
+  });
+}
+
+function pricingCostPerToken(entry, kind) {
+  const pricing = entry?.pricing && typeof entry.pricing === "object" ? entry.pricing : {};
+  const perToken = firstNonNegative(
+    entry?.[`${kind}_cost_per_token`],
+    entry?.[`${kind}_price_per_token`],
+    kind === "input" ? pricing.prompt : pricing.completion,
+  );
+  if (perToken !== null) return perToken;
+  const perMillion = firstNonNegative(
+    entry?.[kind],
+    entry?.[`${kind}_price`],
+    entry?.[`${kind}_cost_per_million_tokens`],
+    entry?.[`${kind}_price_per_million_tokens`],
+    entry?.[`${kind}_price_per_1m_tokens`],
+    pricing[kind],
+  );
+  return perMillion === null ? null : perMillion / 1_000_000;
+}
+
+function firstFinite(...values) {
+  for (const value of values) {
+    if (value === null || value === undefined || value === "") continue;
+    const number = Number(value);
+    if (Number.isFinite(number)) return number;
+  }
+  return null;
+}
+
+function firstNonNegative(...values) {
+  const number = firstFinite(...values);
+  return number !== null && number >= 0 ? number : null;
+}
 
 export function createSettingsApiHandlers({
   uiStateStore,
@@ -93,11 +168,11 @@ export function createSettingsApiHandlers({
           throw new Error(`Ollama returned invalid JSON (HTTP ${response.status}): ${text}`);
         }
         if (!response.ok) throw new Error(`Ollama API error (HTTP ${response.status}): ${data.error || text}`);
-        const models = (data.models || [])
-          .map((model) => model.model || model.name)
+        const modelDetails = (data.models || [])
+          .map(catalogModel)
           .filter(Boolean)
-          .sort((a, b) => a.localeCompare(b));
-        json(res, 200, { ok: true, provider, models });
+          .sort((a, b) => a.id.localeCompare(b.id));
+        json(res, 200, { ok: true, provider, models: modelDetails.map((model) => model.id), modelDetails });
         return;
       }
 
@@ -121,13 +196,82 @@ export function createSettingsApiHandlers({
         const message = data.error?.message || JSON.stringify(data);
         throw new Error(`${provider === "custom" ? "Custom provider" : "OpenAI"} API error (HTTP ${response.status}): ${message}`);
       }
-      const models = (data.data || [])
-        .map((model) => model.id)
+      let modelDetails = (data.data || [])
+        .map(catalogModel)
         .filter(Boolean)
-        .sort((a, b) => a.localeCompare(b));
-      json(res, 200, { ok: true, provider, models });
+        .sort((a, b) => a.id.localeCompare(b.id));
+      if (provider === "openai") {
+        const pricingResponse = await fetch("https://api.openai.com/v1/pricing", { headers });
+        const pricingText = await pricingResponse.text();
+        let pricingData;
+        try {
+          pricingData = JSON.parse(pricingText);
+        } catch {
+          throw new Error(`OpenAI pricing returned invalid JSON (HTTP ${pricingResponse.status}): ${pricingText}`);
+        }
+        if (!pricingResponse.ok) {
+          const message = pricingData.error?.message || JSON.stringify(pricingData);
+          throw new Error(`OpenAI pricing API error (HTTP ${pricingResponse.status}): ${message}`);
+        }
+        const prices = new Map(openAiPricingCatalog(pricingData).map((price) => [price.id, price]));
+        modelDetails = modelDetails.map((model) => {
+          const price = prices.get(model.id);
+          return price ? { ...model, inputCost: price.inputCost, outputCost: price.outputCost } : model;
+        });
+      }
+      json(res, 200, { ok: true, provider, models: modelDetails.map((model) => model.id), modelDetails });
     } catch (error) {
       json(res, 400, { ok: false, error: error.message });
+    }
+  }
+
+  async function handleModelTestApi(req, res) {
+    if (req.method !== "POST") {
+      methodNotAllowed(res, "POST");
+      return;
+    }
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 60_000);
+    try {
+      const body = JSON.parse(await readRequestBody(req, 20_000) || "{}");
+      const providerId = String(body.providerId || "");
+      const model = String(body.model || "").trim();
+      const providers = uiStateStore.getProviders();
+      const provider = providers.find((item) => item.id === providerId);
+      if (!provider) throw new Error("The selected provider no longer exists.");
+      const modelIds = new Set([
+        provider.model,
+        ...(Array.isArray(provider.models) ? provider.models : []).map((item) =>
+          typeof item === "string" ? item : item?.id),
+      ].filter(Boolean));
+      if (!model || !modelIds.has(model)) throw new Error("The selected model is not available from this provider.");
+      const client = createModelClient({
+        provider: provider.type,
+        baseUrl: provider.baseUrl,
+        apiKey: provider.apiKey,
+        fetchImpl: (url, options = {}) => fetch(url, { ...options, signal: controller.signal }),
+      });
+      const benchmark = await benchmarkModel(client, model);
+      const nextProviders = providers.map((item) => {
+        if (item.id !== providerId) return item;
+        const existingModels = Array.isArray(item.models) ? item.models : [];
+        let matched = false;
+        const models = existingModels.map((entry) => {
+          const id = typeof entry === "string" ? entry : entry?.id;
+          if (id !== model) return entry;
+          matched = true;
+          return { ...(typeof entry === "object" ? entry : { id }), ...benchmark };
+        });
+        if (!matched) models.push({ id: model, ...benchmark });
+        return { ...item, models };
+      });
+      uiStateStore.set({ providers: nextProviders });
+      json(res, 200, { ok: true, providerId, model, benchmark });
+    } catch (error) {
+      const message = error.name === "AbortError" ? "Model test timed out after 60 seconds." : error.message;
+      json(res, 400, { ok: false, error: message });
+    } finally {
+      clearTimeout(timeout);
     }
   }
 
@@ -242,6 +386,7 @@ export function createSettingsApiHandlers({
     "/api/health": handleHealthApi,
     "/api/config": handleConfigApi,
     "/api/models": handleModelsApi,
+    "/api/model-test": handleModelTestApi,
     "/api/ui-state": handleUiStateApi,
     "/api/rig-configurations": handleRigConfigurationsApi,
     "/api/system-prompts": handleSystemPromptsApi,

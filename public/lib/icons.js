@@ -34,6 +34,31 @@ export function copyIcon(className = "copyIcon") {
   return svg;
 }
 
+export function modelTestIcon(className = "modelTestIcon") {
+  const svg = createSvgNode("svg", {
+    class: className,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    "aria-hidden": "true",
+    focusable: "false",
+  });
+  svg.append(
+    createSvgNode("path", {
+      d: "M5 16a8 8 0 1 1 14 0",
+      stroke: "currentColor",
+      "stroke-width": "1.8",
+      "stroke-linecap": "round",
+    }),
+    createSvgNode("path", {
+      d: "m12 12 4-3M4 18h16",
+      stroke: "currentColor",
+      "stroke-width": "1.8",
+      "stroke-linecap": "round",
+    }),
+  );
+  return svg;
+}
+
 export function workspaceExplorerIcon(className = "workspaceExplorerIcon") {
   const svg = createSvgNode("svg", {
     class: className,

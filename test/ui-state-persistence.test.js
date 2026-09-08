@@ -7,6 +7,40 @@ import test from "node:test";
 
 import { createUiStateStore } from "../lib/ui-state.js";
 
+test("SQLite preserves discovered models for each provider", async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "ai-harness-provider-models-"));
+  const databasePath = path.join(directory, "providers.sqlite");
+  let store;
+  try {
+    store = createUiStateStore(databasePath);
+    store.set({ providers: [{
+      id: "openai-primary",
+      name: "OpenAI",
+      type: "openai",
+      model: "gpt-5",
+      models: [
+        "gpt-5",
+        "gpt-4.1",
+        { id: "gpt-5", throughput: 42.5, latency: 310, testedAt: 67890 },
+      ],
+      modelsLoadedAt: 12345,
+      baseUrl: "",
+      apiKey: "secret",
+      selected: true,
+    }] });
+    store.close();
+    store = createUiStateStore(databasePath);
+    assert.deepEqual(store.getProviders()[0].models, [
+      { id: "gpt-5", throughput: 42.5, latency: 310, testedAt: 67890 },
+      "gpt-4.1",
+    ]);
+    assert.equal(store.getProviders()[0].modelsLoadedAt, 12345);
+  } finally {
+    store?.close();
+    await fs.rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("SQLite preserves conversation messages and step events across reopen", async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "ai-harness-history-"));
   const databasePath = path.join(directory, "history.sqlite");
