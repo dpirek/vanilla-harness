@@ -33,6 +33,8 @@ import { calculateTokenCost, formatStepDuration, formatTokenCount, sessionActivi
 import { formatContextPercentage } from "./lib/model-context.js";
 import {
   filterAndSortProviderModels,
+  modelsRouteProviderId,
+  modelsRoutePath,
   formatProviderModelValues,
   groupedProviderModels,
   mergeRefreshedProviderModels,
@@ -200,12 +202,11 @@ const providerSettingsSection = appRoot.querySelector("#providerSettings");
 const providerNameInput = appRoot.querySelector("#providerNameInput");
 const providersTableBody = appRoot.querySelector("#providersTableBody");
 const providerModelsTableBody = appRoot.querySelector("#providerModelsTableBody");
-const providerModelsSection = appRoot.querySelector("#providerModelsSection");
-const providersTab = appRoot.querySelector("#providersTab");
-const modelsTab = appRoot.querySelector("#modelsTab");
+const modelsPage = appRoot.querySelector("models-page");
+const providerModelsFilter = appRoot.querySelector("#providerModelsFilter");
+let routeReady = false;
 const refreshAllProviderModelsButton = appRoot.querySelector("#refreshAllProviderModelsButton");
 const allProviderModelsStatus = appRoot.querySelector("#allProviderModelsStatus");
-const providerModelsSearch = appRoot.querySelector("#providerModelsSearch");
 const providerModelsSortButtons = [...appRoot.querySelectorAll("[data-provider-model-sort]")];
 const providerEditor = appRoot.querySelector("#providerEditor");
 const saveSettingsButton = appRoot.querySelector("#saveSettingsButton");
@@ -591,6 +592,7 @@ let editingProviderModels = [];
 let editingProviderModelsLoadedAt = null;
 let allProviderModelsLoadId = 0;
 let providerModelsQuery = "";
+let providerModelsProviderId = "";
 let providerModelsSort = { key: "model", direction: "asc" };
 const testingProviderModels = new Set();
 let taskRatings = [];
@@ -2291,6 +2293,7 @@ function renderRecents() {
     label.textContent = title;
     button.append(icon, label);
     button.addEventListener("click", () => {
+      navigateRoute("/");
       if (runActive || microphoneState !== "idle" || session.id === activeSessionId) return;
       activeSessionId = session.id;
       localStorage.setItem(ACTIVE_SESSION_STORAGE_KEY, activeSessionId);
@@ -2344,6 +2347,7 @@ function renderRecents() {
 }
 
 async function startNewChat() {
+  navigateRoute("/");
   if (runActive || microphoneState !== "idle" || creatingConversation) return;
   creatingConversation = true;
   try {
@@ -2813,6 +2817,28 @@ async function loadProviderModels() {
 }
 
 function renderProviderModelsTable() {
+  if (routeReady && providerModelsProviderId && !providers.some((provider) => String(provider.id) === providerModelsProviderId)) {
+    providerModelsProviderId = "";
+    if (modelsRouteProviderId(window.location.pathname) !== null) {
+      window.history.replaceState({}, "", modelsRoutePath());
+    }
+  }
+  const filterOptions = [
+    { value: "", label: "All providers" },
+    ...providers.map((provider) => ({ value: String(provider.id), label: provider.name || provider.type || "Provider" }))
+      .sort((a, b) => a.label.localeCompare(b.label)),
+  ];
+  const signature = JSON.stringify(filterOptions);
+  if (providerModelsFilter.dataset.options !== signature) {
+    providerModelsFilter.replaceChildren(...filterOptions.map(({ value, label }) => {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = label;
+      return option;
+    }));
+    providerModelsFilter.dataset.options = signature;
+  }
+  providerModelsFilter.value = providerModelsProviderId;
   providerModelsTableBody.replaceChildren();
   for (const button of providerModelsSortButtons) {
     const selected = button.dataset.providerModelSort === providerModelsSort.key;
@@ -2831,6 +2857,7 @@ function renderProviderModelsTable() {
   }));
   const models = filterAndSortProviderModels(allModels, {
     query: providerModelsQuery,
+    providerId: providerModelsProviderId,
     ...providerModelsSort,
   });
   if (models.length === 0) {
@@ -2841,6 +2868,8 @@ function renderProviderModelsTable() {
       ? `No models match “${providerModelsQuery}”.`
       : providers.length === 0
       ? "Add a provider to discover its models."
+      : providerModelsProviderId
+      ? "No models have been discovered for this provider yet."
       : "No models have been discovered yet.";
     row.append(cell);
     providerModelsTableBody.append(row);
@@ -3032,15 +3061,31 @@ function formatTokenCost(value) {
   }).format(value * 1_000_000);
 }
 
-function selectProviderTab(tab) {
-  const showModels = tab === "models";
-  providersTab.setAttribute("aria-selected", String(!showModels));
-  modelsTab.setAttribute("aria-selected", String(showModels));
-  providerSettingsSection.hidden = showModels;
-  providerModelsSection.hidden = !showModels;
-  saveSettingsButton.hidden = showModels || providerEditor.hidden;
-  if (showModels) renderProviderModelsTable();
+function renderRoute() {
+  const routeProviderId = modelsRouteProviderId(window.location.pathname);
+  const showModels = routeProviderId !== null;
+  if (showModels) providerModelsProviderId = routeProviderId;
+  appShell.classList.toggle("models-route", showModels);
+  modelsPage.hidden = !showModels;
+  providerShortcutModel.setAttribute("aria-current", showModels ? "page" : "false");
+  document.title = showModels ? "Models · AI Harness" : "AI Harness";
+  if (showModels && routeReady) loadAllProviderModels({ missingOnly: true });
 }
+
+function navigateRoute(path) {
+  if (window.location.pathname !== path) window.history.pushState({}, "", path);
+  renderRoute();
+}
+
+appRoot.addEventListener("click", (event) => {
+  const link = event.target.closest("a[data-app-route]");
+  if (!link || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+  event.preventDefault();
+  navigateRoute(link.getAttribute("href"));
+});
+window.addEventListener("popstate", renderRoute);
+modelsPage.addEventListener("open-providers", openProvidersModal);
+renderRoute();
 
 async function loadAllProviderModels({ missingOnly = false } = {}) {
   const loadId = ++allProviderModelsLoadId;
@@ -3378,7 +3423,7 @@ async function loadHealth(initialHealth = null) {
     renderSidebarProviderSummary(settings, health);
   } catch {
     providerShortcutName.textContent = "Server health unavailable";
-    providerShortcutModel.textContent = "";
+    providerShortcutModel.textContent = "Models";
     providerShortcutPrice.textContent = "";
     workspaceMeta.title = "Server health unavailable";
     workspaceMeta.closest("button")?.setAttribute("aria-label", "Manage providers. Server health unavailable");
@@ -3617,15 +3662,11 @@ window.addEventListener("resize", () => {
 });
 
 function openProvidersModal() {
-  providerModelsQuery = "";
-  providerModelsSort = { key: "model", direction: "asc" };
-  providerModelsSearch.value = "";
   renderProvidersTable();
   renderProviderModelsTable();
   providerSettingsSection.classList.remove("editor-open");
   providerEditor.hidden = true;
   saveSettingsButton.hidden = true;
-  selectProviderTab("providers");
   settingsStatus.textContent = "Provider settings are stored in SQLite.";
   settingsStatus.dataset.state = "";
   if (!settingsDialog.open) settingsDialog.showModal();
@@ -3915,16 +3956,15 @@ skillsModal.addEventListener("create-skill", () => openSkillEditor());
 skillsModal.addEventListener("cancel-skill-edit", closeSkillEditor);
 skillsModal.addEventListener("save-skill-edit", saveSkillEdit);
 providersModal.addEventListener("refresh-provider-models", loadProviderModels);
-providersModal.addEventListener("refresh-all-provider-models", () => loadAllProviderModels());
-providersModal.addEventListener("provider-model-search", (event) => {
+modelsPage.addEventListener("refresh-all-provider-models", () => loadAllProviderModels());
+modelsPage.addEventListener("provider-model-search", (event) => {
   providerModelsQuery = event.detail.query;
   renderProviderModelsTable();
 });
-providersModal.addEventListener("provider-model-sort", (event) => sortProviderModels(event.detail.key));
-providersModal.addEventListener("provider-tab-change", async (event) => {
-  selectProviderTab(event.detail.tab);
-  if (event.detail.tab === "models") await loadAllProviderModels({ missingOnly: true });
+modelsPage.addEventListener("provider-model-filter", (event) => {
+  navigateRoute(modelsRoutePath(event.detail.providerId));
 });
+modelsPage.addEventListener("provider-model-sort", (event) => sortProviderModels(event.detail.key));
 providersModal.addEventListener("add-provider", addProvider);
 mcpModal.addEventListener("reload-mcp-config", loadConfig);
 mcpModal.addEventListener("save-mcp-config", saveConfig);
@@ -4051,10 +4091,13 @@ async function initialize() {
   await loadPresetSummary();
   await loadHealth(initialHealth);
   await loadWorkspaceTree();
-  if (needsDefaultWorkspace) {
+  routeReady = true;
+  renderRoute();
+  const viewingModels = appShell.classList.contains("models-route");
+  if (!viewingModels && needsDefaultWorkspace) {
     openProvidersAfterWorkspaceSelection = shouldOpenProvidersModal;
     await openDefaultWorkspacePicker();
-  } else if (shouldOpenProvidersModal) {
+  } else if (!viewingModels && shouldOpenProvidersModal) {
     openProvidersModal();
   }
   connect();

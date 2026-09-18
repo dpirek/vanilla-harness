@@ -3,6 +3,8 @@ import test from "node:test";
 
 import {
   filterAndSortProviderModels,
+  modelsRouteProviderId,
+  modelsRoutePath,
   formatProviderModelValues,
   groupedProviderModels,
   mergeRefreshedProviderModels,
@@ -108,4 +110,32 @@ test("grouped models filter by model or provider and sort metadata with missing 
     filterAndSortProviderModels(grouped, { key: "context", direction: "asc" }).map(({ model }) => model),
     ["model-b", "model-a", "model-c"],
   );
+});
+
+test("provider filter scopes shared models and metadata by ID and combines with search and sorting", () => {
+  const grouped = groupedProviderModels([
+    { id: "a", name: "Gateway", models: [{ id: "shared", context: 100 }, { id: "only-a" }] },
+    { id: "b", name: "Gateway", models: [{ id: "shared", context: 200 }, { id: "only-b", context: 300 }] },
+  ]);
+  const filtered = filterAndSortProviderModels(grouped, { providerId: "b", key: "context", direction: "desc" });
+  assert.deepEqual(filtered.map(({ model }) => model), ["only-b", "shared"]);
+  assert.deepEqual(filtered[1].details.map(({ providerId, context }) => ({ providerId, context })), [
+    { providerId: "b", context: 200 },
+  ]);
+  assert.deepEqual(filterAndSortProviderModels(grouped, { providerId: "b", query: "only-a" }), []);
+  assert.equal(filterAndSortProviderModels(grouped, { providerId: "b", query: "shared" }).length, 1);
+  assert.deepEqual(filterAndSortProviderModels(grouped, { providerId: "missing" }), []);
+  assert.equal(filterAndSortProviderModels(grouped, { providerId: "" }).length, 3);
+  assert.equal(grouped.find(({ model }) => model === "shared").details.length, 2);
+});
+
+test("models routes round-trip provider IDs and distinguish non-model paths", () => {
+  for (const providerId of ["", "provider-123", "My provider", "gateway/custom", "a%?#"]) {
+    assert.equal(modelsRouteProviderId(modelsRoutePath(providerId)), providerId);
+  }
+  assert.equal(modelsRouteProviderId("/models/provider-123/"), "provider-123");
+  assert.equal(modelsRouteProviderId("/models/"), "");
+  assert.equal(modelsRouteProviderId("/models/%broken"), "");
+  assert.equal(modelsRouteProviderId("/"), null);
+  assert.equal(modelsRouteProviderId("/models/provider/extra"), null);
 });

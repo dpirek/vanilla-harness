@@ -1,3 +1,17 @@
+function modelsRouteProviderId(pathname) {
+  const match = /^\/models(?:\/([^/]+))?\/?$/.exec(pathname);
+  if (!match) return null;
+  try {
+    return decodeURIComponent(match[1] || "");
+  } catch {
+    return "";
+  }
+}
+
+function modelsRoutePath(providerId = "") {
+  return providerId ? `/models/${encodeURIComponent(providerId)}` : "/models";
+}
+
 function normalizeProviderModels(models) {
   const normalized = new Map();
   for (const value of Array.isArray(models) ? models : []) {
@@ -68,9 +82,18 @@ function mergeRefreshedProviderModels(existingModels, refreshedModels) {
   });
 }
 
-function filterAndSortProviderModels(models, { query = "", key = "model", direction = "asc" } = {}) {
+function filterAndSortProviderModels(models, { query = "", providerId = "", key = "model", direction = "asc" } = {}) {
   const normalizedQuery = String(query).trim().toLocaleLowerCase();
-  const filtered = (Array.isArray(models) ? models : []).filter((item) => (
+  const scoped = (Array.isArray(models) ? models : []).flatMap((item) => {
+    if (!providerId) return [item];
+    const details = item.details.filter((detail) => String(detail.providerId) === String(providerId));
+    return details.length ? [{
+      ...item,
+      details,
+      providers: [...new Set(details.map((detail) => detail.provider))],
+    }] : [];
+  });
+  const filtered = scoped.filter((item) => (
     !normalizedQuery || `${item.model} ${item.providers.join(" ")}`.toLocaleLowerCase().includes(normalizedQuery)
   ));
   const multiplier = direction === "desc" ? -1 : 1;
@@ -118,6 +141,8 @@ function nonNegativeNumber(value) {
 }
 
 export {
+  modelsRouteProviderId,
+  modelsRoutePath,
   filterAndSortProviderModels,
   formatProviderModelValues,
   groupedProviderModels,

@@ -42,15 +42,19 @@ class HarnessSidebar extends BaseComponent {
       title: "Manage providers",
       "aria-label": "Manage providers",
       children: [
-        this.createElement("span", {
-          id: "workspaceMeta",
-          class: "providerShortcutSummary",
-          children: [
-            this.createElement("span", { id: "providerShortcutName", class: "providerShortcutName", textContent: "Connecting..." }),
-            this.createElement("span", { id: "providerShortcutModel", class: "providerShortcutModel" }),
-            this.createElement("span", { id: "providerShortcutPrice", class: "providerShortcutPrice" }),
-          ],
+        this.createElement("span", { id: "providerShortcutName", class: "providerShortcutName", textContent: "Connecting..." }),
+      ],
+    });
+    const providerSummary = this.createElement("div", {
+      id: "workspaceMeta",
+      class: "providerShortcutSummary",
+      children: [
+        providerShortcut,
+        this.createElement("a", {
+          id: "providerShortcutModel", class: "providerShortcutModel",
+          href: "/models", "data-app-route": "", title: "Browse models", textContent: "Models",
         }),
+        this.createElement("span", { id: "providerShortcutPrice", class: "providerShortcutPrice" }),
       ],
     });
 
@@ -76,7 +80,7 @@ class HarnessSidebar extends BaseComponent {
           this.createElement("div", { id: "recentsList", class: "recentsList" }),
         ],
       }),
-      this.createElement("footer", { class: "account", children: [providerShortcut] }),
+      this.createElement("footer", { class: "account", children: [providerSummary] }),
     ]);
 
     this.querySelector("#newChatButton").addEventListener("click", () => this.emit("new-chat"));

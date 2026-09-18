@@ -400,18 +400,20 @@ code {
   width: 100%;
   min-width: 0;
   border-radius: 8px;
-  padding: 8px 12px;
+  padding: 0;
   text-align: left;
 }
 
-.account .providerShortcutSummary { display: grid; margin: 0; gap: 3px; }
+.account .providerShortcutSummary { display: grid; min-width: 0; margin: 0; padding: 8px 12px; gap: 3px; }
 .account .providerShortcutName {
   margin-top: 0;
   color: var(--text);
   font-size: .82rem;
   font-weight: 700;
 }
-.account .providerShortcutModel { margin-top: 0; color: var(--muted); font-size: .76rem; }
+.account .providerShortcutModel { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 0; color: var(--muted); font-size: .76rem; text-decoration: none; }
+.account .providerShortcutModel:hover,
+.account .providerShortcutModel[aria-current="page"] { color: var(--text); text-decoration: underline; }
 .account .providerShortcutPrice { margin-top: 0; color: var(--faint); font-size: .68rem; }
 
 .providerShortcutButton:hover,
@@ -1646,7 +1648,7 @@ textarea:disabled {
 
 #settingsDialog .settingsPanel {
   height: 100%;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 0;
   overflow: hidden;
   padding: 0;
@@ -1839,35 +1841,15 @@ textarea:disabled {
   gap: 14px 12px;
 }
 
-.providerTabs {
-  display: flex;
-  gap: 4px;
-  border-bottom: 1px solid var(--line);
-  padding: 0 18px;
-}
-
-.providerTabs button {
-  min-height: 40px;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  background: transparent;
-  color: var(--muted);
-  padding: 0 14px;
-}
-
-.providerTabs button[aria-selected="true"] {
-  border-bottom-color: var(--text);
-  color: var(--text);
-}
-
 .providerTabContent { min-height: 0; }
 .providerTabPanel { padding: 18px; }
 .providerTabPanel[hidden] { display: none; }
 .providerModelsSection { display: grid; gap: 14px; }
 .providerModelsHeading { display: grid !important; gap: 3px !important; }
 .providerModelsSection .providerTableToolbar span { color: var(--muted); font-size: .78rem; }
-.providerModelsControls { display: flex !important; align-items: center; gap: 8px !important; }
-.providerModelsControls input {
+.providerModelsControls { display: flex !important; flex-wrap: wrap; align-items: center; gap: 8px !important; }
+.providerModelsControls input,
+.providerModelsControls select {
   width: min(360px, 32vw);
   min-height: 34px;
   border: 1px solid var(--line);
@@ -1877,7 +1859,9 @@ textarea:disabled {
   padding: 0 13px;
   outline: 0;
 }
-.providerModelsControls input:focus { border-color: var(--strong-line); }
+.providerModelsControls select { max-width: 220px; }
+.providerModelsControls input:focus,
+.providerModelsControls select:focus { border-color: var(--strong-line); }
 .providerModelsTable { min-width: 1320px; }
 .providerModelsTable tbody tr { cursor: default; }
 .providerModelsTable th,
@@ -3083,4 +3067,30 @@ textarea,
   .resetFab {
     right: 14px;
   }
+}
+
+
+/* The models catalog occupies the main area while preserving navigation. */
+.app.models-route { grid-template-columns: var(--sidebar-width) 8px minmax(0, 1fr); }
+.app.models-route.sidebar-collapsed { grid-template-columns: var(--sidebar-collapsed-width) 8px minmax(0, 1fr); }
+.app.models-route .chat,
+.app.models-route .filesColumn,
+.app.models-route .filesResizeHandle { display: none; }
+models-page { display: flex; flex-direction: column; min-width: 0; min-height: 0; padding: 24px; gap: 20px; overflow: auto; }
+models-page[hidden] { display: none; }
+.modelsPageHeader { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.modelsPageHeader h1 { margin: 0; margin-right: auto; font-size: 1.4rem; }
+.modelsPageHeader a { color: var(--muted); }
+.modelsPageHeader button { padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--text); cursor: pointer; }
+models-page .providerModelsSection { min-height: 0; }
+models-page .providerTableWrap { max-height: none; }
+@media (max-width: 900px) {
+  .app.models-route, .app.models-route.sidebar-collapsed { grid-template-columns: minmax(0, 1fr); }
+  .app.models-route .sidebarResizeHandle { display: none; }
+}
+@media (max-width: 700px) {
+  models-page { padding: 12px; }
+  models-page .providerTableToolbar { align-items: stretch; flex-direction: column; }
+  models-page .providerModelsControls { flex-wrap: wrap; }
+  models-page .providerModelsControls input { width: 100%; min-width: 0; }
 }

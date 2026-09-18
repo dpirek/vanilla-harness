@@ -1,3 +1,4 @@
+import "./models-page.js";
 import BaseComponent from "./base-component.js";
 import "./modals/workspace-picker-modal.js";
 import "./modals/create-workspace-modal.js";
@@ -26,6 +27,7 @@ class AppShellContent extends BaseComponent {
       element("harness-chat", { class: "chat" }),
       element("column-resize-handle", { id: "filesResizeHandle", class: "columnResizeHandle filesResizeHandle", label: "Resize workspace files column" }),
       element("workspace-panel", { class: "filesColumn" }),
+      element("models-page", { hidden: "", role: "main" }),
       element("workspace-picker-modal"),
       element("create-workspace-modal"),
       element("file-editor-modal"),
