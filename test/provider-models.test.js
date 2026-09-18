@@ -149,3 +149,16 @@ test("cached OpenAI catalogs without prices refresh even when configured as cust
   ];
   assert.deepEqual(providersNeedingInitialModelLoad(providers).map(({ id }) => id), ["openai-custom"]);
 });
+
+test("cached DeepSeek catalogs without prices refresh by endpoint", () => {
+  const providers = [
+    { id: "deepseek", type: "custom", baseUrl: "https://api.deepseek.com/v1", models: ["deepseek-flash"], modelsLoadedAt: 1 },
+    { id: "other", type: "custom", baseUrl: "https://gateway.example", models: ["deepseek-flash"], modelsLoadedAt: 1 },
+  ];
+  assert.deepEqual(providersNeedingInitialModelLoad(providers).map(({ id }) => id), ["deepseek"]);
+});
+
+test("cached Hugging Face models without prices refresh", () => {
+  const provider = { id: "hf", type: "openai", baseUrl: "https://router.huggingface.co/v1", models: ["org/model"], modelsLoadedAt: 1 };
+  assert.deepEqual(providersNeedingInitialModelLoad([provider]).map(({ id }) => id), ["hf"]);
+});

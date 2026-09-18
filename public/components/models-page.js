@@ -17,7 +17,6 @@ class ModelsPage extends BaseComponent {
       ["context", "Context"],
       ["inputCost", "Input / 1M"],
       ["outputCost", "Output / 1M"],
-      ["rating", "Rating"],
     ];
     const modelsTable = element("table", { class: "providerTable providerModelsTable", children: [
       element("thead", { children: [element("tr", { children: [...modelColumns.map(([key, label]) =>

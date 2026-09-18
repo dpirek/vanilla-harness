@@ -2636,7 +2636,7 @@ function renderProvidersTable() {
     }
     const apiKeyCell = document.createElement("td");
     apiKeyCell.className = "providerKeyStatus";
-    apiKeyCell.textContent = item.type === "ollama" ? "Not required" : item.apiKey ? "••••••••" : "Not set";
+    apiKeyCell.textContent = item.apiKey ? "••••••••" : item.type === "ollama" ? "Optional (local)" : "Not set";
     row.append(apiKeyCell);
     const actionCell = document.createElement("td");
     const editButton = document.createElement("button");
@@ -2789,10 +2789,12 @@ function renderProviderSettings(
     : providerSelect.value === "custom"
       ? "http://localhost:8000/v1"
       : "https://api.openai.com/v1";
-  providerApiKeyField.hidden = providerSelect.value === "ollama";
+  providerApiKeyField.hidden = false;
   providerApiKeyInput.placeholder = providerSelect.value === "openai"
     ? "Required OpenAI API key"
-    : "Optional bearer token";
+    : providerSelect.value === "ollama"
+      ? "Ollama Cloud API key (optional locally)"
+      : "Optional bearer token";
 }
 
 async function loadProviderModels() {
@@ -2863,7 +2865,7 @@ function renderProviderModelsTable() {
   if (models.length === 0) {
     const row = document.createElement("tr");
     const cell = document.createElement("td");
-    cell.colSpan = 10;
+    cell.colSpan = 9;
     cell.textContent = providerModelsQuery
       ? `No models match “${providerModelsQuery}”.`
       : providers.length === 0
@@ -2903,7 +2905,6 @@ function renderProviderModelsTable() {
       formatGroupedModelValue(item.details, "context", formatContextSize),
       formatGroupedModelValue(item.details, "inputCost", formatTokenCost),
       formatGroupedModelValue(item.details, "outputCost", formatTokenCost),
-      formatGroupedModelValue(item.details, "rating", (value, detail) => `★ ${value.toFixed(1)} (${detail.ratingCount})`),
     ];
     const actionsCell = document.createElement("td");
     actionsCell.className = "providerModelActionsCell";
@@ -2951,9 +2952,27 @@ function renderProviderModelsTable() {
     testButton.addEventListener("click", () => testModelPerformance(item));
     useActions.prepend(testButton);
     actionsCell.append(useActions);
-    row.append(modelCell, providersCell, ...metadata.map((value) => {
+    row.append(modelCell, providersCell, ...metadata.map((value, index) => {
       const cell = document.createElement("td");
       cell.textContent = value;
+      if ((index === 4 || index === 5) && item.details.some((detail) => {
+        const provider = providers.find((entry) => String(entry.id) === String(detail.providerId));
+        try { return new URL(provider?.baseUrl).hostname === "api.deepseek.com"; } catch { return false; }
+      })) {
+        cell.title = "DeepSeek: peak rates per 1M tokens; input is uncached. Off-peak and cache-hit rates are lower.";
+      }
+      if ((index === 4 || index === 5) && item.details.some((detail) => {
+        const provider = providers.find((entry) => String(entry.id) === String(detail.providerId));
+        try { return new URL(provider?.baseUrl).hostname === "router.huggingface.co"; } catch { return false; }
+      })) {
+        cell.title = "Hugging Face: published rate for the fastest live upstream provider. Actual rates can change with routing.";
+      }
+      if ((index === 4 || index === 5) && item.details.some((detail) => {
+        const provider = providers.find((entry) => String(entry.id) === String(detail.providerId));
+        try { return new URL(provider?.baseUrl).hostname === "ollama.com"; } catch { return false; }
+      })) {
+        cell.title = "Ollama Cloud: uncached input and output rates per 1M tokens; peak rates shown where applicable.";
+      }
       return cell;
     }), actionsCell);
     providerModelsTableBody.append(row);
@@ -3068,6 +3087,7 @@ function renderRoute() {
   appShell.classList.toggle("models-route", showModels);
   modelsPage.hidden = !showModels;
   providerShortcutModel.setAttribute("aria-current", showModels ? "page" : "false");
+  appRoot.querySelector("#collapsedModelsLink").setAttribute("aria-current", showModels ? "page" : "false");
   document.title = showModels ? "Models · AI Harness" : "AI Harness";
   if (showModels && routeReady) loadAllProviderModels({ missingOnly: true });
 }

@@ -80,7 +80,23 @@ class HarnessSidebar extends BaseComponent {
           this.createElement("div", { id: "recentsList", class: "recentsList" }),
         ],
       }),
-      this.createElement("footer", { class: "account", children: [providerSummary] }),
+      this.createElement("footer", { class: "account", children: [
+        providerSummary,
+        this.createElement("a", {
+          id: "collapsedModelsLink", class: "collapsedModelsLink",
+          href: "/models", "data-app-route": "", title: "Models", "aria-label": "Models",
+          children: [this.createElement("svg", {
+            viewBox: "0 0 24 24", width: "20", height: "20", fill: "none",
+            stroke: "currentColor", "stroke-width": "1.5", "aria-hidden": "true",
+            children: [
+              this.createElement("rect", { x: "3", y: "3", width: "7", height: "7", rx: "1.5" }),
+              this.createElement("rect", { x: "14", y: "3", width: "7", height: "7", rx: "1.5" }),
+              this.createElement("rect", { x: "3", y: "14", width: "7", height: "7", rx: "1.5" }),
+              this.createElement("rect", { x: "14", y: "14", width: "7", height: "7", rx: "1.5" }),
+            ],
+          })],
+        }),
+      ] }),
     ]);
 
     this.querySelector("#newChatButton").addEventListener("click", () => this.emit("new-chat"));

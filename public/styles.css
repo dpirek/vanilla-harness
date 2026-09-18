@@ -513,7 +513,7 @@ code {
 }
 
 .app.sidebar-collapsed .recentsList {
-  gap: 9px;
+  display: none;
 }
 
 .app.sidebar-collapsed .recentsList .navLabel {
@@ -532,9 +532,21 @@ code {
   padding-bottom: 12px;
 }
 
-.app.sidebar-collapsed .account {
-  display: none;
+.app.sidebar-collapsed .account { display: flex; justify-content: center; }
+.app.sidebar-collapsed .providerShortcutSummary { display: none; }
+.collapsedModelsLink { display: none; }
+.app.sidebar-collapsed .collapsedModelsLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  color: var(--muted);
 }
+.collapsedModelsLink:hover,
+.collapsedModelsLink[aria-current="page"] { background: var(--surface-hover); color: var(--text); }
+.collapsedModelsLink:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .chat {
   position: relative;

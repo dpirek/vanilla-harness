@@ -1,8 +1,12 @@
+import { enrichOllamaPrices } from "../lib/ollama-pricing.js";
+import { huggingFaceModelPricing } from "../lib/huggingface-pricing.js";
+import { enrichDeepSeekPrices } from "../lib/deepseek-pricing.js";
 import { enrichOpenAiPrices } from "../lib/openai-pricing.js";
 import {
   defaultBaseUrlForProvider,
   defaultModelForProvider,
   normalizeProvider,
+  normalizeOllamaBaseUrl,
   resolveProviderApiKey,
 } from "../lib/provider-config.js";
 import { benchmarkModel } from "../lib/model-benchmark.js";
@@ -120,8 +124,11 @@ export function createSettingsApiHandlers({
       const apiKey = String(body.apiKey || storedApiKey || "").trim();
 
       if (provider === "ollama") {
-        const origin = (baseUrl || process.env.OLLAMA_BASE_URL || "http://localhost:11434").replace(/\/$/, "");
-        const response = await fetch(`${origin}/api/tags`);
+        const origin = normalizeOllamaBaseUrl(baseUrl || process.env.OLLAMA_BASE_URL || "http://localhost:11434");
+        const bearer = resolveProviderApiKey("ollama", apiKey);
+        const response = await fetch(`${origin}/api/tags`, {
+          headers: bearer ? { authorization: `Bearer ${bearer}` } : {},
+        });
         const text = await response.text();
         let data;
         try {
@@ -130,10 +137,13 @@ export function createSettingsApiHandlers({
           throw new Error(`Ollama returned invalid JSON (HTTP ${response.status}): ${text}`);
         }
         if (!response.ok) throw new Error(`Ollama API error (HTTP ${response.status}): ${data.error || text}`);
-        const modelDetails = (data.models || [])
+        let modelDetails = (data.models || [])
           .map(catalogModel)
           .filter(Boolean)
           .sort((a, b) => a.id.localeCompare(b.id));
+        if (new URL(origin).hostname === "ollama.com") {
+          modelDetails = await enrichOllamaPrices(modelDetails);
+        }
         json(res, 200, { ok: true, provider, models: modelDetails.map((model) => model.id), modelDetails });
         return;
       }
@@ -159,11 +169,18 @@ export function createSettingsApiHandlers({
         throw new Error(`${provider === "custom" ? "Custom provider" : "OpenAI"} API error (HTTP ${response.status}): ${message}`);
       }
       let modelDetails = (data.data || [])
-        .map(catalogModel)
+        .map((model) => {
+          const entry = catalogModel(model);
+          return entry && new URL(origin).hostname === "router.huggingface.co"
+            ? { ...entry, ...huggingFaceModelPricing(model) }
+            : entry;
+        })
         .filter(Boolean)
         .sort((a, b) => a.id.localeCompare(b.id));
       if (new URL(origin).hostname === "api.openai.com") {
         modelDetails = await enrichOpenAiPrices(modelDetails);
+      } else if (new URL(origin).hostname === "api.deepseek.com") {
+        modelDetails = await enrichDeepSeekPrices(modelDetails);
       }
       json(res, 200, { ok: true, provider, models: modelDetails.map((model) => model.id), modelDetails });
     } catch (error) {

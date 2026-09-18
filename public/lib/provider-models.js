@@ -63,11 +63,11 @@ function providersNeedingInitialModelLoad(providers) {
     const models = normalizeProviderModels(provider?.models);
     const loadedAt = Number(provider?.modelsLoadedAt);
     if (!loadedAt && models.length === 0) return true;
-    let isOpenAi = false;
+    let hasPublishedPricing = false;
     try {
-      isOpenAi = new URL(provider.baseUrl || (provider.type === "openai" ? "https://api.openai.com/v1" : "")).hostname === "api.openai.com";
+      hasPublishedPricing = ["api.openai.com", "api.deepseek.com", "router.huggingface.co", "ollama.com"].includes(new URL(provider.baseUrl || (provider.type === "openai" ? "https://api.openai.com/v1" : "")).hostname);
     } catch {}
-    return isOpenAi
+    return hasPublishedPricing
       && !models.some((model) => model.inputCost !== null || model.outputCost !== null)
       && (!loadedAt || Date.now() - loadedAt > 60 * 60 * 1000);
   });
