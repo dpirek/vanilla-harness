@@ -1,3 +1,4 @@
+import { bootstrapIcon } from "../lib/icons.js";
 import BaseComponent from "./base-component.js";
 
 class DropdownButton extends BaseComponent {
@@ -23,20 +24,7 @@ class DropdownButton extends BaseComponent {
       class: "dropdownButtonLabel",
       textContent: this.getAttribute("placeholder") || "Select",
     });
-    const caret = this.createElement("svg", {
-      class: "dropdownButtonCaret",
-      viewBox: "0 0 12 12",
-      fill: "none",
-      "aria-hidden": "true",
-      focusable: "false",
-      children: [this.createElement("path", {
-        d: "M2.5 4.25 6 7.75l3.5-3.5",
-        stroke: "currentColor",
-        "stroke-width": "1.5",
-        "stroke-linecap": "round",
-        "stroke-linejoin": "round",
-      })],
-    });
+    const caret = bootstrapIcon("chevron-down", "dropdownButtonCaret");
     const trigger = this.createElement("button", {
       class: "dropdownButtonTrigger",
       type: "button",
@@ -93,7 +81,7 @@ class DropdownButton extends BaseComponent {
           this.createElement("span", {
             class: "dropdownButtonCheck",
             "aria-hidden": "true",
-            textContent: item.selected ? "✓" : "",
+            children: item.selected ? [bootstrapIcon("check-lg")] : [],
           }),
         ],
       });

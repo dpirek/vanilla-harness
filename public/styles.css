@@ -1,3 +1,4 @@
+.bsIcon { display: inline-block; flex-shrink: 0; vertical-align: -.125em; pointer-events: none; }
 :root,
 :host {
   color-scheme: dark;
@@ -1875,7 +1876,7 @@ textarea:disabled {
   max-width: 220px;
   appearance: none;
   padding-right: 36px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='m3 4.5 3 3 3-3' fill='none' stroke='%239b9b9b' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-image: url("/vendor/bootstrap-icons/chevron-down-muted.svg");
   background-repeat: no-repeat;
   background-position: right 13px center;
 }
@@ -1899,9 +1900,9 @@ textarea:disabled {
   padding: 0;
   text-align: left;
 }
-.providerModelsSortButton::after { content: "↕"; opacity: .38; }
-.providerModelsSortButton[data-direction="asc"]::after { content: "↑"; opacity: 1; }
-.providerModelsSortButton[data-direction="desc"]::after { content: "↓"; opacity: 1; }
+.providerModelsSortButton::after { content: ""; width: 12px; height: 12px; background: currentColor; mask: url("/vendor/bootstrap-icons/arrow-down-up.svg") center / contain no-repeat; opacity: .38; }
+.providerModelsSortButton[data-direction="asc"]::after { mask-image: url("/vendor/bootstrap-icons/arrow-up.svg"); opacity: 1; }
+.providerModelsSortButton[data-direction="desc"]::after { mask-image: url("/vendor/bootstrap-icons/arrow-down.svg"); opacity: 1; }
 .providerModelsSortButton:hover { color: var(--text); }
 .providerModelsTable th:first-child,
 .providerModelsTable td:first-child { width: 260px; max-width: 260px; }
@@ -2080,7 +2081,7 @@ textarea:disabled {
 .toolsAddPanel select {
   appearance: none;
   padding-right: 44px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.25 6 6.25l5-5' fill='none' stroke='%23d7d7d7' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-image: url("/vendor/bootstrap-icons/chevron-down-muted.svg");
   background-repeat: no-repeat;
   background-position: right 16px center;
 }
@@ -3109,3 +3110,12 @@ models-page .providerTableWrap { max-height: none; }
   models-page .providerModelsControls { flex-wrap: wrap; }
   models-page .providerModelsControls input { width: 100%; min-width: 0; }
 }
+
+.iconButton .bsIcon, .sendButton .bsIcon, .composerIcon .bsIcon { width: 18px; height: 18px; }
+.treeChevron .bsIcon, .workspacePickerChevron .bsIcon, .sessionActivityChevron .bsIcon { width: 12px; height: 12px; }
+.sessionTaskMarker .bsIcon { width: 12px; height: 12px; }
+.sessionTaskExpand .bsIcon, .deleteConversationButton .bsIcon { width: 12px; height: 12px; }
+.navIcon .bsIcon { width: 18px; height: 18px; }
+.collapsedModelsLink .bsIcon { width: 20px; height: 20px; }
+
+.modelRatingIcon { width: 12px; height: 12px; }

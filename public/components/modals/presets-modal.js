@@ -1,3 +1,4 @@
+import { bootstrapIcon } from "../../lib/icons.js";
 import BaseComponent from "../base-component.js";
 
 class PresetsModal extends BaseComponent {
@@ -13,13 +14,13 @@ class PresetsModal extends BaseComponent {
         this.createElement("section", { class: "settingsPanel", children: [
           this.createElement("header", { class: "settingsHeader", children: [
             this.createElement("div", { class: "presetHeaderIdentity", children: [
-              this.createElement("button", { id: "backToPresetsButton", class: "iconButton", type: "button", hidden: "", "aria-label": "Back to presets", children: [document.createTextNode("←")] }),
+              this.createElement("button", { id: "backToPresetsButton", class: "iconButton", type: "button", hidden: "", "aria-label": "Back to presets", children: [bootstrapIcon("arrow-left")] }),
               this.createElement("div", { children: [
                 this.createElement("h2", { id: "presetsDialogTitle", children: [document.createTextNode("Presets")] }),
                 this.createElement("p", { id: "presetsDialogDescription", children: [document.createTextNode("Manage shared provider, prompt, tool, MCP, and workflow configurations")] }),
               ] }),
             ] }),
-            this.createElement("button", { id: "closePresetsButton", class: "iconButton", type: "button", "aria-label": "Close presets", children: [document.createTextNode("×")] }),
+            this.createElement("button", { id: "closePresetsButton", class: "iconButton", type: "button", "aria-label": "Close presets", children: [bootstrapIcon("x-lg")] }),
           ] }),
           this.createElement("div", { id: "presetsListView", class: "presetsListView", children: [
             this.createElement("div", { class: "presetsToolbar", children: [

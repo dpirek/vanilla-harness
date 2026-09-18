@@ -1,3 +1,4 @@
+import { bootstrapIcon } from "./icons.js";
 function readFileAsDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -13,7 +14,7 @@ function renderImagePreviews(element, images, onRemove) {
     const item = document.createElement("div"); item.className = "imagePreview";
     const img = document.createElement("img"); img.src = image.dataUrl; img.alt = image.name;
     const remove = document.createElement("button"); remove.type = "button";
-    remove.ariaLabel = `Remove ${image.name}`; remove.textContent = "×";
+    remove.ariaLabel = `Remove ${image.name}`; remove.append(bootstrapIcon("x-lg"));
     remove.addEventListener("click", () => onRemove(index));
     item.append(img, remove); element.append(item);
   });

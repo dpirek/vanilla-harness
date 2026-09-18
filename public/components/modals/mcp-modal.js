@@ -1,3 +1,4 @@
+import { bootstrapIcon } from "../../lib/icons.js";
 import BaseComponent from "../base-component.js";
 
 class McpModal extends BaseComponent {
@@ -18,7 +19,7 @@ class McpModal extends BaseComponent {
               element("h2", { children: [text("MCP Configuration")] }),
               element("p", { children: [text("Manage MCP servers stored in SQLite")] }),
             ] }),
-            element("button", { id: "closeMcpButton", class: "iconButton", type: "button", "aria-label": "Close MCP configuration", children: [text("×")] }),
+            element("button", { id: "closeMcpButton", class: "iconButton", type: "button", "aria-label": "Close MCP configuration", children: [bootstrapIcon("x-lg")] }),
           ] }),
           element("div", { id: "mcpTableToolbar", class: "providerTableToolbar", children: [
             element("strong", { children: [text("Configured servers")] }),

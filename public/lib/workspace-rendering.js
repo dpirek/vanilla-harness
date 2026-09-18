@@ -1,8 +1,9 @@
-import { workspaceExplorerIcon } from "./icons.js";
+import { bootstrapIcon, workspaceExplorerIcon } from "./icons.js";
 
 const FILE_ICONS = {
-  js: "JS", mjs: "JS", cjs: "JS", json: "{}", html: "‹›", css: "#",
-  md: "ⓘ", png: "▧", jpg: "▧", jpeg: "▧", svg: "◇",
+  js: "filetype-js", mjs: "filetype-js", cjs: "filetype-js",
+  json: "filetype-json", html: "filetype-html", css: "filetype-css", md: "filetype-md",
+  png: "file-earmark-image", jpg: "file-earmark-image", jpeg: "file-earmark-image", svg: "file-earmark-image",
 };
 
 function renderWorkspaceNodes(nodes, parent, { onOpenFile, onSelectFolder }) {
@@ -12,11 +13,11 @@ function renderWorkspaceNodes(nodes, parent, { onOpenFile, onSelectFolder }) {
       const summary = document.createElement("summary");
       summary.setAttribute("aria-expanded", "false");
       details.addEventListener("toggle", () => summary.setAttribute("aria-expanded", String(details.open)));
-      const chevron = document.createElement("span"); chevron.className = "treeChevron"; chevron.textContent = "›";
+      const chevron = document.createElement("span"); chevron.className = "treeChevron"; chevron.append(bootstrapIcon("chevron-right"));
       const icon = workspaceExplorerIcon("workspaceExplorerIcon treeIcon");
       const name = document.createElement("span"); name.className = "workspaceFileName"; name.textContent = node.name;
       const select = document.createElement("button"); select.type = "button"; select.className = "selectFolderButton";
-      select.textContent = "✓"; select.title = `Use ${node.name} as workspace`; select.setAttribute("aria-label", select.title);
+      select.append(bootstrapIcon("check-lg")); select.title = `Use ${node.name} as workspace`; select.setAttribute("aria-label", select.title);
       select.addEventListener("click", (event) => {
         event.preventDefault(); event.stopPropagation(); onSelectFolder(node.path);
       });
@@ -31,7 +32,7 @@ function renderWorkspaceNodes(nodes, parent, { onOpenFile, onSelectFolder }) {
     const spacer = document.createElement("span"); spacer.className = "treeChevron";
     const extension = node.name.split(".").pop().toLowerCase();
     const icon = document.createElement("span"); icon.className = `treeIcon treeIcon-${extension}`;
-    icon.textContent = FILE_ICONS[extension] || "·";
+    icon.append(bootstrapIcon(FILE_ICONS[extension] || "file-earmark"));
     const name = document.createElement("span"); name.className = "workspaceFileName"; name.textContent = node.name;
     file.tabIndex = 0; file.setAttribute("role", "button"); file.setAttribute("aria-label", `Edit ${node.name}`);
     file.addEventListener("click", () => onOpenFile(node));
@@ -50,7 +51,7 @@ function renderWorkspacePicker(element, rootPath, nodes, { onChoose, onConfirm }
       const details = document.createElement("details");
       const summary = document.createElement("summary"); summary.className = "workspacePickerOption";
       summary.dataset.path = node.path; summary.setAttribute("aria-expanded", "false");
-      const chevron = document.createElement("span"); chevron.className = "workspacePickerChevron"; chevron.setAttribute("aria-hidden", "true"); chevron.textContent = "›";
+      const chevron = document.createElement("span"); chevron.className = "workspacePickerChevron"; chevron.setAttribute("aria-hidden", "true"); chevron.append(bootstrapIcon("chevron-right"));
       const name = document.createElement("span"); name.textContent = node.name;
       summary.append(chevron, workspaceExplorerIcon(), name);
       summary.addEventListener("click", () => onChoose(node.path));

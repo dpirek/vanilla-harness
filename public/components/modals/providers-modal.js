@@ -1,3 +1,4 @@
+import { bootstrapIcon } from "../../lib/icons.js";
 import BaseComponent from "../base-component.js";
 
 class ProvidersModal extends BaseComponent {
@@ -11,7 +12,7 @@ class ProvidersModal extends BaseComponent {
     const element = (tag, attributes = {}) => this.createElement(tag, attributes);
     const text = (value) => document.createTextNode(value);
     const button = (id, label, attributes = {}) => element("button", {
-      id, type: "button", ...attributes, children: [text(label)],
+      id, type: "button", ...attributes, children: [typeof label === "string" ? text(label) : label],
     });
     const providersTable = element("table", { class: "providerTable", children: [
       element("thead", { children: [element("tr", { children: ["Use", "Name", "Type", "Model", "API key", ""].map((label) =>
@@ -40,7 +41,7 @@ class ProvidersModal extends BaseComponent {
       element("form", { id: "settingsForm", class: "settingsPanel", method: "dialog", children: [
         element("header", { class: "settingsHeader", children: [
           element("div", { children: [element("h2", { children: [text("Providers")] }), element("p", { children: [text("Manage AI providers and credentials")] })] }),
-          button("closeSettingsButton", "×", { class: "iconButton", "aria-label": "Close providers" }),
+          button("closeSettingsButton", bootstrapIcon("x-lg"), { class: "iconButton", "aria-label": "Close providers" }),
         ] }),
         element("div", { class: "providerTabContent", children: [providerSettings] }),
         element("footer", { class: "settingsFooter", children: [

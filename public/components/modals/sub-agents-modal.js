@@ -1,3 +1,4 @@
+import { bootstrapIcon } from "../../lib/icons.js";
 import BaseComponent from "../base-component.js";
 
 class SubAgentsModal extends BaseComponent {
@@ -17,7 +18,7 @@ class SubAgentsModal extends BaseComponent {
             element("h2", { children: [text("Sub-agents")] }),
             element("p", { id: "subAgentsDialogDescription", children: [text("Configure asynchronous Agent Workers for the active preset")] }),
           ] }),
-          element("button", { id: "closeSubAgentsButton", class: "iconButton", type: "button", "aria-label": "Close sub-agent configuration", children: [text("×")] }),
+          element("button", { id: "closeSubAgentsButton", class: "iconButton", type: "button", "aria-label": "Close sub-agent configuration", children: [bootstrapIcon("x-lg")] }),
         ] }),
         element("div", { class: "providerTableToolbar", children: [
           element("strong", { children: [text("Configured workers")] }),

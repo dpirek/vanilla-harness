@@ -1,3 +1,4 @@
+import { bootstrapIcon } from "../../lib/icons.js";
 import BaseComponent from "../base-component.js";
 
 class SkillsModal extends BaseComponent {
@@ -15,15 +16,15 @@ class SkillsModal extends BaseComponent {
         element("form", { id: "skillsForm", class: "settingsPanel", method: "dialog", children: [
           element("header", { class: "settingsHeader", children: [
             element("div", { class: "skillModalIdentity", children: [
-              element("button", { id: "backToSkillsButton", class: "iconButton", type: "button", hidden: "", "aria-label": "Back to skills", children: [text("←")] }),
+              element("button", { id: "backToSkillsButton", class: "iconButton", type: "button", hidden: "", "aria-label": "Back to skills", children: [bootstrapIcon("arrow-left")] }),
               element("div", { children: [
                 element("h2", { id: "skillsDialogTitle", children: [text("Skills")] }),
                 element("p", { id: "skillsDialogDescription", children: [text("Choose which SKILL.md guides are injected into new agent sessions")] }),
               ] }),
             ] }),
             element("div", { class: "settingsHeaderActions", children: [
-              element("button", { id: "toggleSkillColumnButton", class: "iconButton", type: "button", "aria-label": "Hide skill column", "aria-pressed": "true", title: "Hide skill column", children: [text("☷")] }),
-              element("button", { id: "closeSkillsButton", class: "iconButton", type: "button", "aria-label": "Close skills", children: [text("×")] }),
+              element("button", { id: "toggleSkillColumnButton", class: "iconButton", type: "button", "aria-label": "Hide skill column", "aria-pressed": "true", title: "Hide skill column", children: [bootstrapIcon("columns-gap")] }),
+              element("button", { id: "closeSkillsButton", class: "iconButton", type: "button", "aria-label": "Close skills", children: [bootstrapIcon("x-lg")] }),
             ] }),
           ] }),
           element("section", { class: "skillLibrary", "aria-label": "Skill library", children: [

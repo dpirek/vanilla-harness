@@ -1,3 +1,4 @@
+import { bootstrapIcon } from "../../lib/icons.js";
 import BaseComponent from "../base-component.js";
 
 const WORKFLOW_STEPS = [
@@ -68,7 +69,7 @@ class WorkflowModal extends BaseComponent {
               this.createElement("h2", { textContent: "Workflow configuration" }),
               this.createElement("p", { id: "workflowDialogDescription", textContent: "Configure the active preset's processing stages" }),
             ] }),
-            this.createElement("button", { id: "closeWorkflowButton", class: "iconButton", type: "button", "aria-label": "Close workflow configuration", textContent: "×" }),
+            this.createElement("button", { id: "closeWorkflowButton", class: "iconButton", type: "button", "aria-label": "Close workflow configuration", children: [bootstrapIcon("x-lg")] }),
           ] }),
           this.createElement("section", { class: "workflowDiagramPanel", children: [
             this.createElement("div", { class: "workflowDiagramHeading", children: [

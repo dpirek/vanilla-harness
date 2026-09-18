@@ -1,5 +1,5 @@
 import BaseComponent from "../base-component.js";
-import { newWorkspaceIcon } from "../../lib/icons.js";
+import { bootstrapIcon, newWorkspaceIcon } from "../../lib/icons.js";
 
 class WorkspacePickerModal extends BaseComponent {
   connectedCallback() {
@@ -29,13 +29,13 @@ class WorkspacePickerModal extends BaseComponent {
       type: "button",
       title: "Go to parent folder",
       "aria-label": "Go to parent folder",
-      textContent: "↑",
+      children: [bootstrapIcon("arrow-up")],
     });
     const closeButton = this.createElement("button", {
       id: "closeWorkspacePickerButton",
       type: "button",
       "aria-label": "Close folder picker",
-      textContent: "×",
+      children: [bootstrapIcon("x-lg")],
     });
     const cancelButton = this.createElement("button", {
       id: "cancelWorkspacePickerButton",

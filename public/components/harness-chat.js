@@ -1,6 +1,6 @@
 import BaseComponent from "./base-component.js";
 import "./dropdown-button.js";
-import { microphoneIcon, workspaceExplorerIcon } from "../lib/icons.js";
+import { bootstrapIcon, microphoneIcon, workspaceExplorerIcon } from "../lib/icons.js";
 import { shouldSubmitPrompt } from "../lib/prompt-keyboard.js";
 import { commandMenuItems, parsePromptCommand } from "../lib/prompt-commands.js";
 
@@ -68,7 +68,7 @@ class HarnessChat extends BaseComponent {
           }),
           this.createElement("div", { "id": "imagePreviewList", "class": "imagePreviewList", "aria-live": "polite" }), 
         this.createElement("input", { "id": "imageInput", "type": "file", "accept": "image/*", "multiple": "", "hidden": "" }), 
-        this.createElement("button", { "id": "addImageButton", "class": "composerIcon", "type": "button", "aria-label": "Add image", "title": "Add image", children: [document.createTextNode("＋")] }), 
+        this.createElement("button", { "id": "addImageButton", "class": "composerIcon", "type": "button", "aria-label": "Add image", "title": "Add image", children: [bootstrapIcon("plus-lg")] }),
       this.createElement("textarea", { 
         "id": "promptInput", 
         "name": "prompt", 
@@ -90,7 +90,7 @@ class HarnessChat extends BaseComponent {
         "title": "Start voice input",
         children: [microphoneIcon()],
       }),
-      this.createElement("button", { "id": "sendButton", "class": "sendButton", "type": "submit", "aria-label": "Send", children: [document.createTextNode("↑")] })] })] }),
+      this.createElement("button", { "id": "sendButton", "class": "sendButton", "type": "submit", "aria-label": "Send", children: [bootstrapIcon("arrow-up")] })] })] }),
       this.createElement("button", { "id": "resetButton", "class": "resetFab", "type": "button", children: [document.createTextNode("Reset")] })
     ]);
     const form = this.querySelector("#promptForm");

@@ -26,7 +26,7 @@ import {
 import { describeAgentEvent } from "./lib/agent-events.js";
 import { readFileAsDataUrl, renderImagePreviews as renderImagePreviewList } from "./lib/image-attachments.js";
 import { randomUuid } from "./lib/ids.js";
-import { modelTestIcon } from "./lib/icons.js";
+import { bootstrapIcon, modelTestIcon } from "./lib/icons.js";
 import { normalizeSkillName, skillDraft, syncSkillContentName, validateSkillContent } from "./lib/skill-content.js";
 import { clearSessionHistory, createSession, promptHistoryFromSessions, titleFromPrompt } from "./lib/sessions.js";
 import { calculateTokenCost, formatStepDuration, formatTokenCount, sessionActivityRuns } from "./lib/session-activity.js";
@@ -1963,7 +1963,7 @@ function createSessionActivityCard(activity, { active = false, sessionId = activ
     const button = document.createElement("button");
     button.type = "button";
     button.dataset.rating = String(value);
-    button.textContent = "★";
+    button.append(bootstrapIcon("star-fill"));
     button.setAttribute("aria-label", `Rate this task ${value} out of 5`);
     button.addEventListener("click", async (event) => {
       event.preventDefault();
@@ -1974,7 +1974,7 @@ function createSessionActivityCard(activity, { active = false, sessionId = activ
   }
   const chevron = document.createElement("span");
   chevron.className = "sessionActivityChevron";
-  chevron.textContent = "›";
+  chevron.append(bootstrapIcon("chevron-right"));
   chevron.setAttribute("aria-hidden", "true");
   summary.append(visualization, eyebrow, current, count, rating, chevron);
   summary.addEventListener("click", (event) => {
@@ -2039,7 +2039,7 @@ function createStepDetailsButton(task, details, expanded = false) {
   button.type = "button";
   button.setAttribute("aria-label", `Show details for ${task.label}`);
   const setExpanded = (open) => {
-    button.textContent = open ? "−" : "+";
+    button.replaceChildren(bootstrapIcon(open ? "dash-lg" : "plus-lg"));
     button.setAttribute("aria-expanded", String(open));
     button.setAttribute("aria-label", `${open ? "Hide" : "Show"} details for ${task.label}`);
     details.hidden = !open;
@@ -2091,7 +2091,7 @@ function updateSessionActivityCard(card, activity, { active = false } = {}) {
     const marker = document.createElement("span");
     marker.className = "sessionTaskMarker";
     marker.setAttribute("aria-hidden", "true");
-    marker.textContent = task.status === "running" ? "•" : task.status === "failed" ? "!" : "✓";
+    marker.append(bootstrapIcon(task.status === "running" ? "circle-fill" : task.status === "failed" ? "exclamation-lg" : "check-lg"));
     const label = document.createElement("span");
     label.className = "sessionTaskLabel";
     label.textContent = task.label;
@@ -2309,7 +2309,7 @@ function renderRecents() {
     deleteButton.className = "deleteConversationButton";
     deleteButton.title = `Delete ${session.title || "conversation"}`;
     deleteButton.setAttribute("aria-label", `Delete ${session.title || "conversation"}`);
-    deleteButton.textContent = "×";
+    deleteButton.append(bootstrapIcon("x-lg"));
     deleteButton.addEventListener("click", async () => {
       if (microphoneState !== "idle" || (runActive && session.id === activeSessionId)) return;
       if (!window.confirm(`Delete conversation “${session.title || "New chat"}” and all files in its workspace? This cannot be undone.`)) return;
@@ -2954,7 +2954,14 @@ function renderProviderModelsTable() {
     actionsCell.append(useActions);
     row.append(modelCell, providersCell, ...metadata.map((value, index) => {
       const cell = document.createElement("td");
-      cell.textContent = value;
+      if (index === 6 && value.includes("★")) {
+        value.split("★").forEach((part, partIndex) => {
+          if (partIndex > 0) cell.append(bootstrapIcon("star-fill", "modelRatingIcon"));
+          cell.append(document.createTextNode(part));
+        });
+      } else {
+        cell.textContent = value;
+      }
       if ((index === 4 || index === 5) && item.details.some((detail) => {
         const provider = providers.find((entry) => String(entry.id) === String(detail.providerId));
         try { return new URL(provider?.baseUrl).hostname === "api.deepseek.com"; } catch { return false; }

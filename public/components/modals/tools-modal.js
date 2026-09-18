@@ -1,3 +1,4 @@
+import { bootstrapIcon } from "../../lib/icons.js";
 import BaseComponent from "../base-component.js";
 
 const TOOL_ROWS = [
@@ -51,7 +52,7 @@ class ToolsModal extends BaseComponent {
                 class: "iconButton",
                 type: "button",
                 "aria-label": "Close tools",
-                children: [document.createTextNode("×")],
+                children: [bootstrapIcon("x-lg")],
               }),
             ],
           }),

@@ -1,3 +1,4 @@
+import { bootstrapIcon } from "../../lib/icons.js";
 import BaseComponent from "../base-component.js";
 
 class CreateWorkspaceModal extends BaseComponent {
@@ -16,7 +17,7 @@ class CreateWorkspaceModal extends BaseComponent {
               this.createElement("h2", { children: [document.createTextNode("Create new workspace")] }),
               this.createElement("p", { id: "createWorkspaceParent", children: [document.createTextNode("Choose a folder name")] }),
             ] }),
-            this.createElement("button", { id: "closeCreateWorkspaceButton", type: "button", "aria-label": "Close create workspace dialog", children: [document.createTextNode("×")] }),
+            this.createElement("button", { id: "closeCreateWorkspaceButton", type: "button", "aria-label": "Close create workspace dialog", children: [bootstrapIcon("x-lg")] }),
           ] }),
           this.createElement("label", { children: [
             document.createTextNode("Folder name"),

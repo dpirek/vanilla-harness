@@ -1,5 +1,5 @@
 import BaseComponent from "./base-component.js";
-import { panelIcon } from "../lib/icons.js";
+import { bootstrapIcon, panelIcon } from "../lib/icons.js";
 
 class HarnessSidebar extends BaseComponent {
   connectedCallback() {
@@ -14,7 +14,7 @@ class HarnessSidebar extends BaseComponent {
       title: label,
       "aria-label": label,
       children: [
-        this.createElement("span", { class: "navIcon", children: [document.createTextNode(icon)] }),
+        this.createElement("span", { class: "navIcon", children: [bootstrapIcon(icon)] }),
         this.createElement("span", { class: "navLabel", textContent: label }),
       ],
     });
@@ -76,7 +76,7 @@ class HarnessSidebar extends BaseComponent {
         class: "sidebarSection recents conversationMenu",
         "aria-label": "Conversations",
         children: [
-          this.navButton("newChatButton", "✎", "New chat"),
+          this.navButton("newChatButton", "pencil-square", "New chat"),
           this.createElement("div", { id: "recentsList", class: "recentsList" }),
         ],
       }),
@@ -85,16 +85,7 @@ class HarnessSidebar extends BaseComponent {
         this.createElement("a", {
           id: "collapsedModelsLink", class: "collapsedModelsLink",
           href: "/models", "data-app-route": "", title: "Models", "aria-label": "Models",
-          children: [this.createElement("svg", {
-            viewBox: "0 0 24 24", width: "20", height: "20", fill: "none",
-            stroke: "currentColor", "stroke-width": "1.5", "aria-hidden": "true",
-            children: [
-              this.createElement("rect", { x: "3", y: "3", width: "7", height: "7", rx: "1.5" }),
-              this.createElement("rect", { x: "14", y: "3", width: "7", height: "7", rx: "1.5" }),
-              this.createElement("rect", { x: "3", y: "14", width: "7", height: "7", rx: "1.5" }),
-              this.createElement("rect", { x: "14", y: "14", width: "7", height: "7", rx: "1.5" }),
-            ],
-          })],
+          children: [bootstrapIcon("grid")],
         }),
       ] }),
     ]);
