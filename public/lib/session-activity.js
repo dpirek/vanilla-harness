@@ -116,6 +116,7 @@ function sessionActivities(events = [], now = Date.now()) {
   const items = [];
   let sequence = 0;
   let complete = false;
+  let stopped = false;
   let runContext = null;
   const timestampFor = (event) => {
     const timestamp = Number(event?.timestamp);
@@ -309,6 +310,11 @@ function sessionActivities(events = [], now = Date.now()) {
       ]);
     } else if (type === "response_stream") {
       if (!findRunning((item) => item.key === "response")) add("Write response", "running", event, "response");
+    } else if (type === "run_stopped") {
+      finishAll(event, "stopped");
+      add("Run stopped", "stopped", event, "stopped");
+      stopped = true;
+      complete = true;
     } else if (type === "response_complete") {
       finish((item) => item.key === "response", event, "completed", "Response completed");
       complete = true;
@@ -347,6 +353,7 @@ function sessionActivities(events = [], now = Date.now()) {
   return {
     current: [...items].reverse().find((item) => item.status === "running") || null,
     complete,
+    stopped,
     items,
     runId: runContext?.runId || String(items[0]?.startedAt || ""),
     runContext,

@@ -255,6 +255,7 @@ const fileEditorStatus = appRoot.querySelector("#fileEditorStatus");
 
 let socketService;
 let runActive = false;
+let stopRequested = false;
 let creatingConversation = false;
 let activeSessionId = null;
 let pendingSessionId = null;
@@ -1681,7 +1682,7 @@ function setMicrophoneState(state) {
   microphoneButton.setAttribute("aria-label", labels[state]);
   microphoneButton.setAttribute("aria-pressed", String(state === "recording"));
   microphoneButton.disabled = runActive || state === "requesting" || state === "transcribing";
-  sendButton.disabled = runActive || state !== "idle" || !socketService?.isOpen;
+  renderSendButton();
 }
 
 function releaseMicrophone() {
@@ -1836,9 +1837,19 @@ function resizePromptInput() {
   promptInput.style.overflowY = promptInput.scrollHeight > 168 ? "auto" : "hidden";
 }
 
+function renderSendButton() {
+  sendButton.type = runActive ? "button" : "submit";
+  const label = runActive ? (stopRequested ? "Stopping…" : "Stop") : "Send";
+  sendButton.setAttribute("aria-label", label);
+  sendButton.title = label;
+  sendButton.disabled = !socketService?.isOpen || stopRequested || (!runActive && microphoneState !== "idle");
+  sendButton.replaceChildren(bootstrapIcon(runActive ? "stop-fill" : "arrow-up"));
+}
+
 function setBusy(value) {
   runActive = value;
-  sendButton.disabled = value || microphoneState !== "idle" || !socketService?.isOpen;
+  if (!value) stopRequested = false;
+  renderSendButton();
   microphoneButton.disabled = value || microphoneState === "requesting" || microphoneState === "transcribing";
   promptInput.disabled = value;
   workspaceInput.disabled = value;
@@ -2062,7 +2073,7 @@ function updateSessionActivityCard(card, activity, { active = false } = {}) {
   const list = card.querySelector(".sessionTaskList");
   eyebrow.textContent = isRunning ? "Current step" : "Step summary";
   updateStepVisualization(visualization, activity, { active });
-  current.textContent = isRunning ? activity.current?.label || "Working…" : failed ? "Run completed with errors" : "Run completed";
+  current.textContent = isRunning ? activity.current?.label || "Working…" : failed ? "Run completed with errors" : activity.stopped ? "Run stopped" : "Run completed";
   current.dataset.state = isRunning ? "running" : failed ? "failed" : "idle";
   const taskCount = `${activity.items.length} task${activity.items.length === 1 ? "" : "s"}`;
   const runCost = calculateActivityRunCost(activity);
@@ -2091,7 +2102,7 @@ function updateSessionActivityCard(card, activity, { active = false } = {}) {
     const marker = document.createElement("span");
     marker.className = "sessionTaskMarker";
     marker.setAttribute("aria-hidden", "true");
-    marker.append(bootstrapIcon(task.status === "running" ? "circle-fill" : task.status === "failed" ? "exclamation-lg" : "check-lg"));
+    marker.append(bootstrapIcon(task.status === "running" ? "circle-fill" : task.status === "failed" ? "exclamation-lg" : task.status === "stopped" ? "stop-fill" : "check-lg"));
     const label = document.createElement("span");
     label.className = "sessionTaskLabel";
     label.textContent = task.label;
@@ -3507,6 +3518,18 @@ async function handleSocketMessage(payload) {
       appendStreamingAnswer(payload.sessionId || pendingSessionId || activeSessionId, payload.text || "");
       return;
     }
+    if (payload.type === "stopped") {
+      const targetSessionId = payload.sessionId || pendingSessionId || activeSessionId;
+      const partial = streamingAnswer?.sessionId === targetSessionId ? streamingAnswer.text : "";
+      if (partial) await addMessageToSession(targetSessionId, "agent", partial);
+      addEvent("Run stopped", { type: "run_stopped" });
+      finishStreamingAnswer();
+      pendingSessionId = null;
+      setBusy(false);
+      if (targetSessionId === activeSessionId) renderMessages();
+      scheduleWorkspaceTreeRefresh(0);
+      return;
+    }
     if (payload.type === "done") {
       const targetSessionId = payload.sessionId || pendingSessionId || activeSessionId;
       addEvent("Response completed", { type: "response_complete" });
@@ -3556,9 +3579,17 @@ function connect() {
   socketService.connect();
 }
 
+chatComponent.addEventListener("stop-run", () => {
+  if (!runActive || stopRequested || !socketService?.isOpen) return;
+  if (socketService.send({ type: "stop", sessionId: pendingSessionId || activeSessionId })) {
+    stopRequested = true;
+    renderSendButton();
+  }
+});
+
 chatComponent.addEventListener("submit-prompt", () => {
   const prompt = promptInput.value.trim();
-  if ((!prompt && attachedImages.length === 0) || runActive) return;
+  if ((!prompt && attachedImages.length === 0) || runActive || !socketService?.isOpen) return;
   const sessionId = activeSessionId;
   const session = activeSession();
   const history = session ? session.messages.slice(-20) : [];

@@ -90,12 +90,15 @@ class HarnessChat extends BaseComponent {
         "title": "Start voice input",
         children: [microphoneIcon()],
       }),
-      this.createElement("button", { "id": "sendButton", "class": "sendButton", "type": "submit", "aria-label": "Send", children: [bootstrapIcon("arrow-up")] })] })] }),
+      this.createElement("button", { "id": "sendButton", "class": "sendButton", "type": "submit", disabled: "", "aria-label": "Send", children: [bootstrapIcon("arrow-up")] })] })] }),
       this.createElement("button", { "id": "resetButton", "class": "resetFab", "type": "button", children: [document.createTextNode("Reset")] })
     ]);
     const form = this.querySelector("#promptForm");
     const input = this.querySelector("#promptInput");
     const imageInput = this.querySelector("#imageInput");
+    this.querySelector("#sendButton").addEventListener("click", () => {
+      if (this.querySelector("#sendButton").type === "button") this.emit("stop-run");
+    });
     form.addEventListener("submit", (event) => {
       event.preventDefault();
       if (!this.querySelector("#promptCommandMenu").hidden) {

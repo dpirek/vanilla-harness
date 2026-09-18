@@ -357,3 +357,16 @@ test("failed runs without a completed command still expose useful details", () =
     { title: "Response", text: "Provider request timed out." },
   ]);
 });
+
+test("stopped runs finish pending steps without reporting success or failure", () => {
+  const activity = sessionActivities([
+    { title: "Prompt sent", timestamp: 1 },
+    { detail: { type: "turn_start", turn: 1, model: "test" }, timestamp: 2 },
+    { title: "Run stopped", detail: { type: "run_stopped" }, timestamp: 3 },
+  ], 4);
+  assert.equal(activity.complete, true);
+  assert.equal(activity.stopped, true);
+  assert.equal(activity.current, null);
+  assert.equal(activity.items.at(-1).label, "Run stopped");
+  assert.equal(activity.items.find(item => item.label.includes("Model turn")).status, "stopped");
+});

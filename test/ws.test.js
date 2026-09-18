@@ -67,3 +67,88 @@ test("execution control pauses once and resumes pending work", async () => {
   assert.equal(control.state, "running");
   assert.deepEqual(events, ["paused", "resumed"]);
 });
+
+test("stop aborts paused execution and cannot be resumed", async () => {
+  const control = createExecutionControl();
+  control.requestPause();
+  const waiting = control.waitIfPaused();
+  assert.equal(control.stop(), true);
+  assert.equal(control.stop(), false);
+  assert.equal(control.signal.aborted, true);
+  assert.equal(control.resume(), false);
+  await assert.rejects(waiting, { name: "AbortError" });
+  await assert.rejects(control.waitIfPaused(), { name: "AbortError" });
+});
+
+test("stop interrupts a websocket run, ignores late output, and allows another prompt", async () => {
+  const { EventEmitter } = await import("node:events");
+  const { createWebSocketHandler } = await import("../lib/ws.js");
+  const socket = new EventEmitter();
+  const events = [];
+  socket.destroyed = false;
+  socket.end = () => {};
+  socket.write = (data) => {
+    if (typeof data === "string") return;
+    const offset = data[1] === 126 ? 4 : data[1] === 127 ? 10 : 2;
+    events.push(JSON.parse(data.subarray(offset).toString()));
+  };
+  let firstControl;
+  let lateOutput;
+  let finishOldRun;
+  let runCount = 0;
+  const handler = createWebSocketHandler({
+    normalizeToolPermissions: () => ({}),
+    resolveWorkspace: async () => "/tmp",
+    getRigConfigurations: () => ({ configurations: [] }),
+    createAgentSession: async ({ onTextDelta }) => ({
+      refinePrompt: async (prompt) => prompt,
+      run: async (_prompt, { executionControl }) => {
+        runCount++;
+        if (runCount > 1) return "next answer";
+        firstControl = executionControl;
+        lateOutput = onTextDelta;
+        onTextDelta("partial");
+        return new Promise(resolve => { finishOldRun = resolve; });
+      },
+    }),
+  });
+  handler(socket, { headers: { "sec-websocket-key": "test" } });
+  const send = payload => socket.emit("data", maskedTextFrame(JSON.stringify(payload)));
+  const tick = () => new Promise(resolve => setImmediate(resolve));
+  send({ type: "prompt", prompt: "hello", sessionId: "one" });
+  await tick();
+  send({ type: "stop", sessionId: "wrong" });
+  assert.equal(firstControl.signal.aborted, false);
+  send({ type: "stop", sessionId: "one" });
+  await tick();
+  assert.equal(firstControl.signal.aborted, true);
+  assert.equal(events.filter(event => event.type === "stopped").length, 1);
+  lateOutput("should not appear");
+  finishOldRun("late final");
+  await tick();
+  assert.equal(events.some(event => event.text === "should not appear" || event.text === "late final"), false);
+  send({ type: "prompt", prompt: "again", sessionId: "one" });
+  await tick();
+  assert.ok(events.some(event => event.type === "done" && event.text === "next answer"));
+});
+
+test("stop coalesced with a prompt cancels initialization", async () => {
+  const { EventEmitter } = await import("node:events");
+  const { createWebSocketHandler } = await import("../lib/ws.js");
+  const socket = new EventEmitter();
+  let created = false;
+  socket.write = () => {};
+  socket.end = () => {};
+  createWebSocketHandler({
+    normalizeToolPermissions: () => ({}),
+    resolveWorkspace: async () => "/tmp",
+    getRigConfigurations: () => ({ configurations: [] }),
+    createAgentSession: async () => { created = true; },
+  })(socket, { headers: { "sec-websocket-key": "test" } });
+  socket.emit("data", Buffer.concat([
+    maskedTextFrame(JSON.stringify({ type: "prompt", prompt: "hello" })),
+    maskedTextFrame(JSON.stringify({ type: "stop" })),
+  ]));
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(created, false);
+});
