@@ -1,13 +1,19 @@
 import BaseComponent from "./base-component.js";
-import "./dropdown-button.js";
 import { bootstrapIcon, microphoneIcon, workspaceExplorerIcon } from "../lib/icons.js";
 import { shouldSubmitPrompt } from "../lib/prompt-keyboard.js";
 import { commandMenuItems, parsePromptCommand } from "../lib/prompt-commands.js";
 
 class HarnessChat extends BaseComponent {
   connectedCallback() {
-    if (this.childElementCount) return;
+    if (this.childElementCount) {
+      this.composerObserver?.observe(this.querySelector(".composerWrap"));
+      return;
+    }
     this.render();
+  }
+
+  disconnectedCallback() {
+    this.composerObserver?.disconnect();
   }
 
   render() {
@@ -20,25 +26,6 @@ class HarnessChat extends BaseComponent {
             class: "columnVisibilityControls",
             "aria-label": "Chat controls",
             children: [
-              this.createElement("div", {
-                id: "presetStatusBar",
-                class: "presetStatusBar",
-                hidden: "",
-                role: "group",
-                "aria-live": "polite",
-                "aria-label": "Active preset settings",
-                children: [
-                  this.createElement("div", {
-                    id: "presetStatusItems",
-                    class: "presetStatusItems",
-                  }),
-                  this.createElement("dropdown-button", {
-                    id: "presetDropdown",
-                    placeholder: "Presets",
-                    "aria-label": "Select preset",
-                  }),
-                ],
-              }),
               this.createElement("button", {
                 id: "toggleFilesColumnButton",
                 class: "columnToggleButton",
@@ -59,6 +46,15 @@ class HarnessChat extends BaseComponent {
             children: [document.createTextNode("Ask the harness to inspect, edit, or explain this workspace.")] })] }),
       this.createElement("footer", { "class": "composerWrap", children: [
         this.createElement("form", { "id": "promptForm", "class": "composer", children: [
+          this.createElement("div", {
+            id: "presetStatusBar",
+            class: "presetStatusBar",
+            hidden: "",
+            role: "group",
+            "aria-live": "polite",
+            "aria-label": "Harness configuration",
+            children: [this.createElement("div", { id: "presetStatusItems", class: "presetStatusItems" })],
+          }),
           this.createElement("div", {
             id: "promptCommandMenu",
             class: "promptCommandMenu",
@@ -82,6 +78,14 @@ class HarnessChat extends BaseComponent {
         "required": "" 
       }), 
       this.createElement("button", {
+        id: "resetButton",
+        class: "composerResetButton",
+        type: "button",
+        "aria-label": "Reset chat",
+        title: "Reset chat",
+        children: [bootstrapIcon("arrow-clockwise"), this.createElement("span", { textContent: "Reset" })],
+      }),
+      this.createElement("button", {
         "id": "microphoneButton",
         "class": "composerIcon microphoneButton",
         "type": "button",
@@ -90,9 +94,29 @@ class HarnessChat extends BaseComponent {
         "title": "Start voice input",
         children: [microphoneIcon()],
       }),
-      this.createElement("button", { "id": "sendButton", "class": "sendButton", "type": "submit", disabled: "", "aria-label": "Send", children: [bootstrapIcon("arrow-up")] })] })] }),
-      this.createElement("button", { "id": "resetButton", "class": "resetFab", "type": "button", children: [document.createTextNode("Reset")] })
+      this.createElement("button", { "id": "sendButton", "class": "sendButton", "type": "submit", disabled: "", "aria-label": "Send", children: [bootstrapIcon("arrow-up")] }),
+      this.createElement("div", {
+        id: "workspaceMeta", class: "composerProviderSummary",
+        "aria-label": "Active provider, model, and pricing",
+        children: [
+          this.createElement("button", {
+            id: "providerShortcutButton", type: "button", title: "Manage providers",
+            children: [this.createElement("span", { id: "providerShortcutName", textContent: "Connecting…" })],
+          }),
+          this.createElement("a", {
+            id: "providerShortcutModel", href: "/models", "data-app-route": "",
+            title: "Browse models", textContent: "Models",
+          }),
+          this.createElement("a", {
+            id: "providerShortcutPrice", href: "/models", "data-app-route": "", title: "View model pricing",
+          }),
+        ],
+      })] })] })
     ]);
+    this.composerObserver = new ResizeObserver(([entry]) => {
+      this.querySelector("#messages").style.paddingBottom = `${entry.target.getBoundingClientRect().height + 24}px`;
+    });
+    this.composerObserver.observe(this.querySelector(".composerWrap"));
     const form = this.querySelector("#promptForm");
     const input = this.querySelector("#promptInput");
     const imageInput = this.querySelector("#imageInput");

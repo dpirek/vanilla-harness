@@ -35,29 +35,6 @@ class HarnessSidebar extends BaseComponent {
         panelIcon(),
       ],
     });
-    const providerShortcut = this.createElement("button", {
-      id: "providerShortcutButton",
-      class: "providerShortcutButton",
-      type: "button",
-      title: "Manage providers",
-      "aria-label": "Manage providers",
-      children: [
-        this.createElement("span", { id: "providerShortcutName", class: "providerShortcutName", textContent: "Connecting..." }),
-      ],
-    });
-    const providerSummary = this.createElement("div", {
-      id: "workspaceMeta",
-      class: "providerShortcutSummary",
-      children: [
-        providerShortcut,
-        this.createElement("a", {
-          id: "providerShortcutModel", class: "providerShortcutModel",
-          href: "/models", "data-app-route": "", title: "Browse models", textContent: "Models",
-        }),
-        this.createElement("span", { id: "providerShortcutPrice", class: "providerShortcutPrice" }),
-      ],
-    });
-
     this.appendChildren(this, [
       this.createElement("header", {
         class: "sidebarTop",
@@ -81,7 +58,6 @@ class HarnessSidebar extends BaseComponent {
         ],
       }),
       this.createElement("footer", { class: "account", children: [
-        providerSummary,
         this.createElement("a", {
           id: "collapsedModelsLink", class: "collapsedModelsLink",
           href: "/models", "data-app-route": "", title: "Models", "aria-label": "Models",
@@ -92,7 +68,6 @@ class HarnessSidebar extends BaseComponent {
 
     this.querySelector("#newChatButton").addEventListener("click", () => this.emit("new-chat"));
     sidebarToggle.addEventListener("click", () => this.emit("toggle-sidebar"));
-    providerShortcut.addEventListener("click", () => this.emit("open-modal", { modal: "providers" }));
   }
 }
 

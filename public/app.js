@@ -220,7 +220,6 @@ const toolPermissionInputs = [...appRoot.querySelectorAll("[data-tool-permission
 const sidebarToggleButton = appRoot.querySelector("#sidebarToggleButton");
 const sidebarResizeHandle = appRoot.querySelector("#sidebarResizeHandle");
 const toggleFilesColumnButton = appRoot.querySelector("#toggleFilesColumnButton");
-const presetDropdown = appRoot.querySelector("#presetDropdown");
 const presetStatusItems = appRoot.querySelector("#presetStatusItems");
 const filesResizeHandle = appRoot.querySelector("#filesResizeHandle");
 const workspaceTreeElement = appRoot.querySelector("#workspaceTree");
@@ -663,20 +662,24 @@ function appendPresetStatusItem(label, values, compactValue = null, openSettings
   const valueElement = document.createElement("span");
   valueElement.className = "presetStatusValue";
   valueElement.textContent = compactValue ?? value;
-  item.append(labelElement, valueElement);
+  const icon = {
+    "Sys prompts": "file-text", Skills: "star", Tools: "wrench",
+    "Sub-agents": "people", MCP: "database", Workflow: "diagram-3", Preset: "sliders",
+  }[label];
+  item.append(bootstrapIcon(icon), labelElement, valueElement);
   presetStatusItems.append(item);
 }
 
 function renderPresetStatusBar() {
   presetStatusItems.replaceChildren();
   const active = presetConfigurations.find((configuration) => configuration.id === activePresetId);
+  appendPresetStatusItem("Preset", active?.name || "Default", null, openPresetsModal);
   if (!active) {
     appendPresetStatusItem("Sys prompts", [], "0", openSystemPromptsModal);
     appendPresetStatusItem("Skills", [], "0", openSkillsModal);
     appendPresetStatusItem("Tools", [], "0", openToolsModal);
     appendPresetStatusItem("Sub-agents", [], "0", openSubAgentsModal);
     appendPresetStatusItem("MCP", [], "None", openMcpModal);
-    appendPresetStatusItem("Provider", [], "None", openProvidersModal);
     appendPresetStatusItem("Workflow", [], "0/4", openWorkflowSettings);
     return;
   }
@@ -699,10 +702,6 @@ function renderPresetStatusBar() {
   const selectedWorkflowItems = Object.entries(component.effects)
     .filter(([, selected]) => selected !== false)
     .map(([name]) => PRESET_STATUS_WORKFLOW_LABELS[name] || titleCaseIdentifier(name));
-  const providerSnapshot = providerSettingsFromRecord(active.providerSettings || providerSettings);
-  const matchedProviderId = matchingProviderId(providers, providerSnapshot);
-  const matchedProvider = providers.find((provider) => String(provider.id) === matchedProviderId);
-  const providerName = matchedProvider?.name || titleCaseIdentifier(providerSnapshot.provider);
 
   const skillStatus = selectedSkills.length > 0 ? selectedSkills : activeSkillIds.size > 0 ? `${activeSkillIds.size} selected` : [];
   appendPresetStatusItem("Sys prompts", configuredPrompts, String(configuredPrompts.length), openSystemPromptsModal);
@@ -710,7 +709,6 @@ function renderPresetStatusBar() {
   appendPresetStatusItem("Tools", selectedTools, String(selectedTools.length), openToolsModal);
   appendPresetStatusItem("Sub-agents", (active.subAgents || []).map(({ name }) => name), String((active.subAgents || []).length), openSubAgentsModal);
   appendPresetStatusItem("MCP", selectedMcp, selectedMcp.length > 0 ? String(selectedMcp.length) : "None", openMcpModal);
-  appendPresetStatusItem("Provider", providerName, null, openProvidersModal);
   appendPresetStatusItem("Workflow", selectedWorkflowItems, `${selectedWorkflowItems.length}/4`, openWorkflowSettings);
 }
 
@@ -1095,31 +1093,6 @@ function renderPresets() {
   }
 }
 
-function closePresetDropdown({ restoreFocus = false } = {}) {
-  presetDropdown.close({ restoreFocus });
-}
-
-function renderPresetDropdown() {
-  const active = presetConfigurations.find((configuration) => configuration.id === activePresetId);
-  presetDropdown.setLabel(active?.name || "Presets", {
-    title: active ? `Current preset: ${active.name}` : "Select preset",
-  });
-  const items = presetConfigurations.length === 0
-    ? [{ type: "status", label: "No presets available" }]
-    : presetConfigurations.map((configuration) => ({
-      value: configuration.id,
-      label: configuration.name,
-      selected: configuration.id === activePresetId,
-      disabled: presetMutationPending || runActive,
-    }));
-  presetDropdown.setItems([
-    ...items,
-    { type: "separator" },
-    { value: "manage-presets", label: "Manage presets…", action: true },
-  ]);
-  renderPresetStatusBar();
-}
-
 async function loadPresetSummary() {
   const skillsPromise = fetchSkills().catch(() => null);
   try {
@@ -1134,7 +1107,7 @@ async function loadPresetSummary() {
   }
   const storedSkills = await skillsPromise;
   if (Array.isArray(storedSkills)) skills = storedSkills;
-  renderPresetDropdown();
+  renderPresetStatusBar();
 }
 
 async function syncPresetRuntimeState() {
@@ -1181,7 +1154,7 @@ async function savePresetConfigurations(configurations, nextActivePresetId, { sy
   } finally {
     presetMutationPending = false;
     renderPresets();
-    renderPresetDropdown();
+    renderPresetStatusBar();
   }
 }
 
@@ -1201,7 +1174,7 @@ async function loadPresets() {
     setPresetsStatus(error.message, "error");
   }
   renderPresets();
-  renderPresetDropdown();
+  renderPresetStatusBar();
 }
 
 async function activatePreset(configurationId) {
@@ -2567,12 +2540,12 @@ function currentProviderSettings() {
 
 function applyActiveProviderSettings(settings) {
   providerSettings = { ...defaultProviderSettings(), ...(settings || {}) };
-  renderSidebarProviderSummary(providerSettings);
+  renderProviderSummary(providerSettings);
   updateActivePresetSnapshot({ providerSettings });
   send({ type: "provider_settings", ...providerSettings });
 }
 
-function renderSidebarProviderSummary(settings = providerSettings, fallback = {}) {
+function renderProviderSummary(settings = providerSettings, fallback = {}) {
   const matchedProviderId = matchingProviderId(providers, settings);
   const matchedProvider = providers.find((provider) => String(provider.id) === matchedProviderId);
   const providerName = matchedProvider?.name || titleCaseIdentifier(settings.provider || fallback.provider || "Provider");
@@ -2588,10 +2561,13 @@ function renderSidebarProviderSummary(settings = providerSettings, fallback = {}
 
   providerShortcutName.textContent = providerName;
   providerShortcutModel.textContent = modelName;
+  const catalogPath = modelsRoutePath(matchedProviderId);
+  providerShortcutModel.href = catalogPath;
+  providerShortcutPrice.href = catalogPath;
   providerShortcutPrice.textContent = `Input ${inputPrice} / Output ${outputPrice} per 1M`;
   const summary = `${providerName} · ${modelName} · Input ${inputPrice} / Output ${outputPrice} per 1M tokens`;
   workspaceMeta.title = summary;
-  workspaceMeta.closest("button")?.setAttribute("aria-label", `Manage providers. ${summary}`);
+  appRoot.querySelector("#providerShortcutButton").setAttribute("aria-label", `Manage providers. ${summary}`);
 }
 
 function providerFormRecord(existing = {}) {
@@ -3167,7 +3143,7 @@ async function loadAllProviderModels({ missingOnly = false } = {}) {
   try {
     await persistUiState({ providers });
     renderProviderModelsTable();
-    renderSidebarProviderSummary();
+    renderProviderSummary();
     const failed = results.filter((result) => result.error).length;
     const count = groupedProviderModels(providers).length;
     allProviderModelsStatus.textContent = `${count} unique model${count === 1 ? "" : "s"} saved to SQLite${failed ? ` · ${failed} provider${failed === 1 ? "" : "s"} failed` : ""}.`;
@@ -3457,13 +3433,13 @@ async function loadHealth(initialHealth = null) {
     if (changed) saveSessions();
     renderWorkspace();
     const settings = providerSettings;
-    renderSidebarProviderSummary(settings, health);
+    renderProviderSummary(settings, health);
   } catch {
     providerShortcutName.textContent = "Server health unavailable";
     providerShortcutModel.textContent = "Models";
     providerShortcutPrice.textContent = "";
     workspaceMeta.title = "Server health unavailable";
-    workspaceMeta.closest("button")?.setAttribute("aria-label", "Manage providers. Server health unavailable");
+    appRoot.querySelector("#providerShortcutButton").setAttribute("aria-label", "Manage providers. Server health unavailable");
   }
 }
 
@@ -3682,13 +3658,6 @@ chatComponent.addEventListener("navigate-prompt-history", (event) => navigatePro
 chatComponent.addEventListener("toggle-files-column", toggleFilesColumn);
 sidebarComponent.addEventListener("new-chat", startNewChat);
 sidebarComponent.addEventListener("toggle-sidebar", toggleSidebar);
-presetDropdown.addEventListener("dropdown-select", async (event) => {
-  if (event.detail.value === "manage-presets") {
-    await openPresetsModal();
-    return;
-  }
-  if (event.detail.value !== activePresetId) await activatePreset(event.detail.value);
-});
 
 sidebarResizeHandle.addEventListener("column-resize-start", (event) => startSidebarResize(event.detail.sourceEvent));
 sidebarResizeHandle.addEventListener("column-resize-key", (event) => {
@@ -3871,7 +3840,6 @@ function addSubAgentDraft() {
 function openSubAgentsModal() {
   const active = presetConfigurations.find((configuration) => configuration.id === activePresetId);
   if (!active) return;
-  closePresetDropdown();
   closeSubAgentEditor();
   subAgentDrafts = structuredClone(active.subAgents || []);
   renderSubAgents();
@@ -3925,7 +3893,6 @@ async function openMcpModal() {
 }
 
 async function openPresetsModal() {
-  closePresetDropdown();
   if (!presetsDialog.open) presetsDialog.showModal();
   await loadPresets();
 }
@@ -3940,7 +3907,6 @@ function setWorkflowPending(pending) {
 function openWorkflowSettings() {
   const active = presetConfigurations.find((configuration) => configuration.id === activePresetId);
   if (!active) return;
-  closePresetDropdown();
   const component = normalizeRigComponentState(active.componentState);
   workflowDialogDescription.textContent = `${active.name} · configure the active preset's processing stages`;
   workflowInputSource.value = component.inputSource;
@@ -3985,6 +3951,8 @@ async function saveWorkflowSettings() {
     workflowStatus.dataset.state = "error";
   }
 }
+
+appRoot.querySelector("#providerShortcutButton").addEventListener("click", openProvidersModal);
 
 sidebarComponent.addEventListener("open-modal", async (event) => {
   if (event.detail.modal === "providers") openProvidersModal();
@@ -4108,7 +4076,7 @@ async function initialize() {
     : localStorage.getItem(FILES_VISIBLE_STORAGE_KEY) !== "false");
   setSidebarWidth(sidebarWidth);
   setFilesWidth(filesWidth);
-  renderPresetDropdown();
+  renderPresetStatusBar();
   try {
     state = await loadUiState();
     sessions = Array.isArray(state.sessions) && state.sessions.length > 0
