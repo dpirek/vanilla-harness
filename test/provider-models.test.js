@@ -139,3 +139,13 @@ test("models routes round-trip provider IDs and distinguish non-model paths", ()
   assert.equal(modelsRouteProviderId("/"), null);
   assert.equal(modelsRouteProviderId("/models/provider/extra"), null);
 });
+
+test("cached OpenAI catalogs without prices refresh even when configured as custom", () => {
+  const providers = [
+    { id: "openai-custom", type: "custom", baseUrl: "https://api.openai.com/v1", models: ["gpt-5"], modelsLoadedAt: 1 },
+    { id: "priced", type: "openai", models: [{ id: "gpt-5", inputCost: 0.000001 }], modelsLoadedAt: 1 },
+    { id: "gateway", type: "openai", baseUrl: "https://gateway.example/v1", models: ["gpt-5"], modelsLoadedAt: 1 },
+    { id: "recent-attempt", type: "openai", models: ["gpt-5"], modelsLoadedAt: Date.now() },
+  ];
+  assert.deepEqual(providersNeedingInitialModelLoad(providers).map(({ id }) => id), ["openai-custom"]);
+});

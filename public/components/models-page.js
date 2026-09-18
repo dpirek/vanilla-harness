@@ -35,7 +35,7 @@ class ModelsPage extends BaseComponent {
     ] });
     const modelsSection = element("section", { id: "providerModelsSection", class: "providerModelsSection", "aria-label": "Models", children: [
       element("div", { class: "providerTableToolbar", children: [
-        element("div", { class: "providerModelsHeading", children: [element("strong", { children: [text("Models")] }), element("span", { id: "allProviderModelsStatus", children: [text("Models are cached in SQLite.")] })] }),
+        element("div", { class: "providerModelsHeading", children: [element("span", { id: "allProviderModelsStatus", children: [text("Models are cached in SQLite.")] })] }),
         element("div", { class: "providerModelsControls", children: [
           element("select", { id: "providerModelsFilter", "aria-label": "Filter models by provider", children: [
             element("option", { value: "", textContent: "All providers" }),
@@ -47,14 +47,7 @@ class ModelsPage extends BaseComponent {
       element("div", { class: "providerTableWrap", children: [modelsTable] }),
     ] });
 
-    this.appendChildren(this, [
-      element("header", { class: "modelsPageHeader", children: [
-        element("h1", { textContent: "Models" }),
-        button("modelsProvidersButton", "Manage providers"),
-      ] }),
-      modelsSection,
-    ]);
-    this.querySelector("#modelsProvidersButton").addEventListener("click", () => this.emit("open-providers"));
+    this.appendChildren(this, [modelsSection]);
     this.querySelector("#refreshAllProviderModelsButton").addEventListener("click", () => this.emit("refresh-all-provider-models"));
     this.querySelector("#providerModelsSearch").addEventListener("input", (event) => this.emit("provider-model-search", { query: event.target.value }));
     this.querySelector("#providerModelsFilter").addEventListener("change", (event) => this.emit("provider-model-filter", { providerId: event.target.value }));

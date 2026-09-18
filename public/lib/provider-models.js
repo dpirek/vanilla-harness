@@ -59,9 +59,18 @@ function groupedProviderModels(providers) {
 }
 
 function providersNeedingInitialModelLoad(providers) {
-  return (Array.isArray(providers) ? providers : []).filter((provider) => (
-    !Number(provider?.modelsLoadedAt) && normalizeProviderModels(provider?.models).length === 0
-  ));
+  return (Array.isArray(providers) ? providers : []).filter((provider) => {
+    const models = normalizeProviderModels(provider?.models);
+    const loadedAt = Number(provider?.modelsLoadedAt);
+    if (!loadedAt && models.length === 0) return true;
+    let isOpenAi = false;
+    try {
+      isOpenAi = new URL(provider.baseUrl || (provider.type === "openai" ? "https://api.openai.com/v1" : "")).hostname === "api.openai.com";
+    } catch {}
+    return isOpenAi
+      && !models.some((model) => model.inputCost !== null || model.outputCost !== null)
+      && (!loadedAt || Date.now() - loadedAt > 60 * 60 * 1000);
+  });
 }
 
 function mergeRefreshedProviderModels(existingModels, refreshedModels) {

@@ -1,3 +1,4 @@
+import { enrichOpenAiPrices } from "../lib/openai-pricing.js";
 import {
   defaultBaseUrlForProvider,
   defaultModelForProvider,
@@ -32,45 +33,6 @@ export function catalogModel(model) {
     inputCost: firstNonNegative(pricing.prompt, pricing.input, model.input_cost_per_token),
     outputCost: firstNonNegative(pricing.completion, pricing.output, model.output_cost_per_token),
   };
-}
-
-export function openAiPricingCatalog(payload) {
-  const source = Array.isArray(payload?.data)
-    ? payload.data
-    : Array.isArray(payload?.prices)
-      ? payload.prices
-      : Array.isArray(payload?.models)
-        ? payload.models
-        : payload?.data && typeof payload.data === "object"
-          ? Object.entries(payload.data).map(([id, value]) => ({ id, ...value }))
-          : [];
-  return source.flatMap((entry) => {
-    const ids = Array.isArray(entry?.model_ids)
-      ? entry.model_ids
-      : [entry?.model || entry?.model_id || entry?.id || entry?.name];
-    const inputCost = pricingCostPerToken(entry, "input");
-    const outputCost = pricingCostPerToken(entry, "output");
-    return ids.filter(Boolean).map((id) => ({ id: String(id), inputCost, outputCost }));
-  });
-}
-
-function pricingCostPerToken(entry, kind) {
-  const pricing = entry?.pricing && typeof entry.pricing === "object" ? entry.pricing : {};
-  const perToken = firstNonNegative(
-    entry?.[`${kind}_cost_per_token`],
-    entry?.[`${kind}_price_per_token`],
-    kind === "input" ? pricing.prompt : pricing.completion,
-  );
-  if (perToken !== null) return perToken;
-  const perMillion = firstNonNegative(
-    entry?.[kind],
-    entry?.[`${kind}_price`],
-    entry?.[`${kind}_cost_per_million_tokens`],
-    entry?.[`${kind}_price_per_million_tokens`],
-    entry?.[`${kind}_price_per_1m_tokens`],
-    pricing[kind],
-  );
-  return perMillion === null ? null : perMillion / 1_000_000;
 }
 
 function firstFinite(...values) {
@@ -200,24 +162,8 @@ export function createSettingsApiHandlers({
         .map(catalogModel)
         .filter(Boolean)
         .sort((a, b) => a.id.localeCompare(b.id));
-      if (provider === "openai") {
-        const pricingResponse = await fetch("https://api.openai.com/v1/pricing", { headers });
-        const pricingText = await pricingResponse.text();
-        let pricingData;
-        try {
-          pricingData = JSON.parse(pricingText);
-        } catch {
-          throw new Error(`OpenAI pricing returned invalid JSON (HTTP ${pricingResponse.status}): ${pricingText}`);
-        }
-        if (!pricingResponse.ok) {
-          const message = pricingData.error?.message || JSON.stringify(pricingData);
-          throw new Error(`OpenAI pricing API error (HTTP ${pricingResponse.status}): ${message}`);
-        }
-        const prices = new Map(openAiPricingCatalog(pricingData).map((price) => [price.id, price]));
-        modelDetails = modelDetails.map((model) => {
-          const price = prices.get(model.id);
-          return price ? { ...model, inputCost: price.inputCost, outputCost: price.outputCost } : model;
-        });
+      if (new URL(origin).hostname === "api.openai.com") {
+        modelDetails = await enrichOpenAiPrices(modelDetails);
       }
       json(res, 200, { ok: true, provider, models: modelDetails.map((model) => model.id), modelDetails });
     } catch (error) {

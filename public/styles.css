@@ -1859,7 +1859,14 @@ textarea:disabled {
   padding: 0 13px;
   outline: 0;
 }
-.providerModelsControls select { max-width: 220px; }
+.providerModelsControls select {
+  max-width: 220px;
+  appearance: none;
+  padding-right: 36px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='m3 4.5 3 3 3-3' fill='none' stroke='%239b9b9b' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 13px center;
+}
 .providerModelsControls input:focus,
 .providerModelsControls select:focus { border-color: var(--strong-line); }
 .providerModelsTable { min-width: 1320px; }
@@ -3078,10 +3085,6 @@ textarea,
 .app.models-route .filesResizeHandle { display: none; }
 models-page { display: flex; flex-direction: column; min-width: 0; min-height: 0; padding: 24px; gap: 20px; overflow: auto; }
 models-page[hidden] { display: none; }
-.modelsPageHeader { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
-.modelsPageHeader h1 { margin: 0; margin-right: auto; font-size: 1.4rem; }
-.modelsPageHeader a { color: var(--muted); }
-.modelsPageHeader button { padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--text); cursor: pointer; }
 models-page .providerModelsSection { min-height: 0; }
 models-page .providerTableWrap { max-height: none; }
 @media (max-width: 900px) {

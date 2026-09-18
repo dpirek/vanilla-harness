@@ -3084,7 +3084,6 @@ appRoot.addEventListener("click", (event) => {
   navigateRoute(link.getAttribute("href"));
 });
 window.addEventListener("popstate", renderRoute);
-modelsPage.addEventListener("open-providers", openProvidersModal);
 renderRoute();
 
 async function loadAllProviderModels({ missingOnly = false } = {}) {

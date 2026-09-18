@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { catalogModel, openAiPricingCatalog } from "../api/settings.js";
+import { catalogModel } from "../api/settings.js";
 
 test("provider model metadata is normalized for the models table", () => {
   assert.deepEqual(catalogModel({
@@ -28,12 +28,33 @@ test("provider negative pricing sentinels are treated as unavailable", () => {
   assert.equal(model.outputCost, null);
 });
 
-test("OpenAI pricing normalizes per-million and per-token response fields", () => {
-  assert.deepEqual(openAiPricingCatalog({ data: [
-    { model: "gpt-6-astra", input: 10, output: 50 },
-    { model_id: "gpt-5.6-sol", input_cost_per_token: 0.000004, output_cost_per_token: 0.00002 },
-  ] }), [
-    { id: "gpt-6-astra", inputCost: 0.00001, outputCost: 0.00005 },
-    { id: "gpt-5.6-sol", inputCost: 0.000004, outputCost: 0.00002 },
-  ]);
+test("custom providers using the OpenAI endpoint receive OpenAI prices", async (t) => {
+  const { Readable } = await import("node:stream");
+  const { createSettingsApiHandlers } = await import("../api/settings.js");
+  const calls = [];
+  t.mock.method(globalThis, "fetch", async (url, options) => {
+    calls.push(url);
+    if (url === "https://api.openai.com/v1/models") {
+      return new Response(JSON.stringify({ data: [{ id: "test-model" }] }));
+    }
+    assert.equal(options.headers, undefined);
+    assert.equal(url, "https://developers.openai.com/api/docs/pricing.md");
+    return new Response([
+      "### Standard pricing data", "",
+      "| Model | Short context input | Short context output |",
+      "| --- | --- | --- |",
+      "| test-model | $2 | $8 |",
+    ].join("\n"));
+  });
+  const handlers = createSettingsApiHandlers({ uiStateStore: { getAll: () => ({}) } });
+  const req = Readable.from([Buffer.from(JSON.stringify({
+    provider: "custom", baseUrl: "https://api.openai.com/v1", apiKey: "test-key",
+  }))]);
+  req.method = "POST";
+  const res = { writeHead(status) { this.status = status; }, end(body) { this.body = JSON.parse(body); } };
+  await handlers["/api/models"](req, res);
+  assert.equal(res.status, 200);
+  assert.equal(res.body.modelDetails[0].inputCost, 0.000002);
+  assert.equal(res.body.modelDetails[0].outputCost, 0.000008);
+  assert.equal(calls.length, 2);
 });
