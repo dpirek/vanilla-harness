@@ -225,6 +225,52 @@ function setToolBlockEnabled(content, block, enabled) {
   return lines.join("\n");
 }
 
+function importMcpConfig(raw, content = "") {
+  let config;
+  try { config = JSON.parse(raw); } catch { throw new Error("Enter valid JSON with an mcpServers object."); }
+  const object = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+  if (!object(config) || !object(config.mcpServers) || !Object.keys(config.mcpServers).length) {
+    throw new Error("Configuration must contain a non-empty mcpServers object.");
+  }
+  const existing = new Set(mcpBlocks(content).map((block) => block.label));
+  const string = (value) => {
+    if (typeof value !== "string" || /[\r\n\x00-\x08\x0b-\x1f]/.test(value)) throw new Error("Configuration values must be single-line strings.");
+    return `"${quoteToml(value)}"`;
+  };
+  const snippets = Object.entries(config.mcpServers).map(([label, server]) => {
+    if (!/^[A-Za-z0-9_-]+$/.test(label)) throw new Error(`Invalid server name "${label}". Use letters, numbers, _ or -.`);
+    if (existing.has(label)) throw new Error(`An MCP server named ${label} already exists.`);
+    if (!object(server)) throw new Error(`Server ${label} must be an object.`);
+    const remote = server.url !== undefined;
+    const supported = remote ? ["url", "headers", "type"] : ["command", "args", "cwd", "env", "type"];
+    for (const key of Object.keys(server)) {
+      if (!supported.includes(key)) throw new Error(`Unsupported field "${key}" for server ${label}.`);
+    }
+    if (server.type !== undefined && !(remote ? ["http", "sse", "streamable-http"] : ["stdio"]).includes(server.type)) {
+      throw new Error(`Unsupported type for server ${label}.`);
+    }
+    const target = remote ? server.url : server.command;
+    if (typeof target !== "string" || !target.trim()) throw new Error(`Server ${label} requires ${remote ? "a URL" : "a command"}.`);
+    const lines = remote
+      ? ["[[mcp.servers]]", `server_label = ${string(label)}`, `server_url = ${string(target)}`]
+      : [`[mcp_servers.${label}]`, `command = ${string(target)}`];
+    if (!remote) {
+      if (server.args !== undefined && !Array.isArray(server.args)) throw new Error(`Args for ${label} must be an array of strings.`);
+      lines.push(`args = [${(server.args || []).map(string).join(", ")}]`);
+      if (server.cwd !== undefined) lines.push(`cwd = ${string(server.cwd)}`);
+    }
+    lines.push('require_approval = "never"');
+    const map = remote ? server.headers : server.env;
+    if (map !== undefined) {
+      if (!object(map)) throw new Error(`${remote ? "Headers" : "Env"} for ${label} must be an object of strings.`);
+      lines.push(remote ? "[mcp.servers.headers]" : `[mcp_servers.${label}.env]`);
+      for (const [key, value] of Object.entries(map)) lines.push(`${string(key)} = ${string(value)}`);
+    }
+    return lines.join("\n");
+  });
+  return `${content.trimEnd()}${content.trim() ? "\n\n" : ""}${snippets.join("\n\n")}\n`;
+}
+
 function quoteToml(value) {
   return String(value || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
@@ -233,6 +279,7 @@ export {
   CONFIG_TEMPLATES,
   formatHttpHeaders,
   httpHeadersToml,
+  importMcpConfig,
   mcpBlocks,
   parseHttpHeaders,
   quoteToml,

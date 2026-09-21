@@ -26,6 +26,17 @@ class McpModal extends BaseComponent {
             element("div", { children: [
               element("button", { id: "reloadToolsButton", type: "button", children: [text("Reload")] }),
               element("button", { id: "showAddToolButton", type: "button", children: [text("Add server")] }),
+              element("button", { id: "showMcpConfigImportButton", type: "button", children: [text("Add from config")] }),
+            ] }),
+          ] }),
+          element("section", { id: "mcpConfigImport", class: "toolsAddPanel", "aria-label": "Add from config", hidden: "", children: [
+            element("label", { children: [
+              element("span", { children: [text("MCP configuration JSON")] }),
+              element("textarea", { id: "mcpConfigImportInput", rows: "12", spellcheck: "false", placeholder: JSON.stringify({ mcpServers: { playwright: { command: "npx", args: ["@playwright/mcp@latest"] } } }, null, 2) }),
+            ] }),
+            element("div", { class: "mcpEditorActions", children: [
+              element("button", { id: "cancelMcpConfigImportButton", type: "button", children: [text("Cancel")] }),
+              element("button", { id: "importMcpConfigButton", class: "primaryButton", type: "button", children: [text("Add servers")] }),
             ] }),
           ] }),
           element("section", { id: "mcpEditor", class: "toolsAddPanel", "aria-label": "Add MCP server", hidden: "", children: [
@@ -76,6 +87,9 @@ class McpModal extends BaseComponent {
     this.querySelector("#saveConfigButton").addEventListener("click", () => this.emit("save-mcp-config"));
     this.querySelector("#reloadToolsButton").addEventListener("click", () => this.emit("reload-mcp-tools"));
     this.querySelector("#showAddToolButton").addEventListener("click", () => this.emit("show-mcp-editor"));
+    this.querySelector("#showMcpConfigImportButton").addEventListener("click", () => this.emit("show-mcp-config-import"));
+    this.querySelector("#cancelMcpConfigImportButton").addEventListener("click", () => this.emit("cancel-mcp-editor"));
+    this.querySelector("#importMcpConfigButton").addEventListener("click", () => this.emit("import-mcp-config"));
     this.querySelector("#cancelMcpEditorButton").addEventListener("click", () => this.emit("cancel-mcp-editor"));
     this.querySelector("#toolTypeSelect").addEventListener("change", () => this.emit("mcp-type-change"));
     this.querySelector("form").addEventListener("submit", (event) => { event.preventDefault(); this.emit("add-mcp-tool"); });

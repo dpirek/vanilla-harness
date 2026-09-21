@@ -18,6 +18,7 @@ import {
   CONFIG_TEMPLATES,
   formatHttpHeaders,
   httpHeadersToml,
+  importMcpConfig,
   mcpBlocks,
   quoteToml,
   replaceToolBlock,
@@ -192,6 +193,9 @@ const toolArgsInput = appRoot.querySelector("#toolArgsInput");
 const toolCwdInput = appRoot.querySelector("#toolCwdInput");
 const addToolButton = appRoot.querySelector("#addToolButton");
 const mcpTableToolbar = appRoot.querySelector("#mcpTableToolbar");
+const mcpConfigImport = appRoot.querySelector("#mcpConfigImport");
+const mcpConfigImportInput = appRoot.querySelector("#mcpConfigImportInput");
+const importMcpConfigButton = appRoot.querySelector("#importMcpConfigButton");
 const mcpEditor = appRoot.querySelector("#mcpEditor");
 const mcpEditorTitle = appRoot.querySelector("#mcpEditorTitle");
 const reloadToolsButton = appRoot.querySelector("#reloadToolsButton");
@@ -3263,6 +3267,7 @@ function clearMcpEditor() {
 }
 
 function openMcpEditor(block = null) {
+  mcpConfigImport.hidden = true;
   clearMcpEditor();
   editingMcpBlock = block;
   if (block) {
@@ -3286,6 +3291,7 @@ function openMcpEditor(block = null) {
 }
 
 function closeMcpEditor() {
+  mcpConfigImport.hidden = true;
   clearMcpEditor();
   mcpEditor.hidden = true;
   mcpTableToolbar.hidden = false;
@@ -3377,6 +3383,24 @@ async function loadTools() {
     setToolsStatus(error.message, "error");
   } finally {
     reloadToolsButton.disabled = false;
+  }
+}
+
+async function addMcpServersFromConfig() {
+  importMcpConfigButton.disabled = true;
+  try {
+    const nextContent = importMcpConfig(mcpConfigImportInput.value, toolsConfigContent);
+    const count = mcpBlocks(nextContent).length - mcpBlocks(toolsConfigContent).length;
+    setToolsStatus("Adding servers...");
+    await saveConfigContent(nextContent);
+    renderTools();
+    closeMcpEditor();
+    mcpConfigImportInput.value = "";
+    setToolsStatus(`${count} MCP server${count === 1 ? "" : "s"} added`, "success");
+  } catch (error) {
+    setToolsStatus(error.message, "error");
+  } finally {
+    importMcpConfigButton.disabled = false;
   }
 }
 
@@ -4023,6 +4047,15 @@ mcpModal.addEventListener("save-mcp-config", saveConfig);
 mcpModal.addEventListener("reload-mcp-tools", loadTools);
 mcpModal.addEventListener("show-mcp-editor", () => openMcpEditor());
 mcpModal.addEventListener("cancel-mcp-editor", closeMcpEditor);
+mcpModal.addEventListener("show-mcp-config-import", () => {
+  closeMcpEditor();
+  mcpConfigImport.hidden = false;
+  mcpTableToolbar.hidden = true;
+  toolsListPanel.hidden = true;
+  setToolsStatus("Paste JSON containing an mcpServers object.");
+  mcpConfigImportInput.focus();
+});
+mcpModal.addEventListener("import-mcp-config", addMcpServersFromConfig);
 providersModal.addEventListener("save-provider-settings", saveProviderSettings);
 toolsModal.addEventListener("save-tool-permissions", saveToolPermissions);
 toolsModal.addEventListener('load-change-history', loadChangeHistory);
@@ -4091,7 +4124,7 @@ presetsModal.addEventListener("preset-provider-change", selectPresetProvider);
 presetsModal.addEventListener("preset-skill-search", renderPresetSkills);
 presetsModal.addEventListener("preset-mcp-type-change", renderPresetMcpTypeFields);
 presetsModal.addEventListener("add-preset-mcp-server", addPresetMcpServer);
-mcpModal.addEventListener("add-mcp-tool", saveTool);
+mcpModal.addEventListener("add-mcp-tool", () => { if (mcpConfigImport.hidden) saveTool(); });
 mcpModal.addEventListener("mcp-type-change", renderToolTypeFields);
 providersModal.addEventListener("provider-type-change", async () => {
   const nextProvider = providerSelect.value;

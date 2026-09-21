@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   formatHttpHeaders,
   httpHeadersToml,
+  importMcpConfig,
   mcpBlocks,
   parseHttpHeaders,
   replaceToolBlock,
@@ -105,4 +106,40 @@ test("HTTP header helpers reject malformed and duplicate headers", () => {
     () => parseHttpHeaders("Authorization: Bearer one\nauthorization: Bearer two"),
     /Duplicate HTTP header/,
   );
+});
+
+
+test("JSON MCP import adds Playwright and preserves existing configuration", () => {
+  const result = importMcpConfig(JSON.stringify({ mcpServers: {
+    playwright: { command: "npx", args: ["@playwright/mcp@latest", "--name=two words"] },
+  } }), configuration);
+  assert.ok(result.startsWith(configuration.trimEnd()));
+  const imported = mcpBlocks(result).at(-1);
+  assert.equal(imported.label, "playwright");
+  assert.equal(imported.command, "npx");
+  assert.deepEqual(imported.args, ["@playwright/mcp@latest", "--name=two words"]);
+});
+
+test("JSON MCP import supports multiple servers, environment and remote headers", () => {
+  const result = importMcpConfig(JSON.stringify({ mcpServers: {
+    local: { command: "node", cwd: "/workspace", env: { TOKEN: "secret" } },
+    docs: { url: "https://example.com/mcp", headers: { Authorization: "Bearer token" } },
+  } }));
+  assert.equal(mcpBlocks(result).length, 2);
+  assert.match(result, /\[mcp_servers.local.env\]/);
+  assert.match(result, /"TOKEN" = "secret"/);
+  assert.deepEqual(mcpBlocks(result)[1].headers, { Authorization: "Bearer token" });
+});
+
+test("JSON MCP import rejects malformed, duplicate and unsupported entries", () => {
+  assert.throws(() => importMcpConfig("{"), /valid JSON/);
+  for (const value of [null, [], {}, { mcpServers: {} }, { mcpServers: [] }]) {
+    assert.throws(() => importMcpConfig(JSON.stringify(value)), /mcpServers/);
+  }
+  const wrap = (servers) => JSON.stringify({ mcpServers: servers });
+  assert.throws(() => importMcpConfig(wrap({ local: { command: "node" } }), configuration), /already exists/);
+  assert.throws(() => importMcpConfig(wrap({ invalid: { command: "node", args: "script.js" } })), /array/);
+  assert.throws(() => importMcpConfig(wrap({ invalid: { command: "node", args: [42] } })), /strings/);
+  assert.throws(() => importMcpConfig(wrap({ invalid: { command: "node", disabled: true } })), /Unsupported field/);
+  assert.throws(() => importMcpConfig(wrap({ "invalid.name": { command: "node" } })), /Invalid server name/);
 });
