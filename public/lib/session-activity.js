@@ -182,6 +182,7 @@ function sessionActivities(events = [], now = Date.now()) {
       if (promptDetail) {
         runContext = {
           runId: String(promptDetail.runId || ""),
+          ...(Number.isInteger(promptDetail.messageIndex) ? { messageIndex: promptDetail.messageIndex } : {}),
           providerId: String(promptDetail.providerId || ""),
           providerName: String(promptDetail.providerName || promptDetail.provider || ""),
           provider: String(promptDetail.provider || ""),
@@ -375,7 +376,37 @@ function sessionActivityRuns(events = [], now = Date.now()) {
   ).filter((activity) => activity.items.length > 0);
 }
 
+// Anchor runs to their initiating user messages, independently of whether a run
+// produced an assistant reply. Older saved events have only prompt text.
+function activityMessageIndices(messages = [], activities = []) {
+  const users = messages.flatMap((message, index) => message.role === 'user' ? [index] : []);
+  const indices = Array(activities.length).fill(-1);
+  let cursor = users.length - 1;
+  for (let index = activities.length - 1; index >= 0; index--) {
+    const context = activities[index].runContext;
+    const explicit = context?.messageIndex;
+    if (Number.isInteger(explicit) && messages[explicit]?.role === 'user') {
+      indices[index] = explicit;
+      cursor = users.indexOf(explicit) - 1;
+      continue;
+    }
+    const prompt = context?.inputPrompt;
+    let match = -1;
+    if (prompt) {
+      for (let user = cursor; user >= 0; user--) {
+        const message = messages[users[user]];
+        const imagePrompt = `${message.text} (${message.images?.length || 0} image)`;
+        if (message.text === prompt || (message.images?.length && imagePrompt === prompt)) { match = user; break; }
+      }
+    }
+    if (match < 0) match = cursor;
+    if (match >= 0) { indices[index] = users[match]; cursor = match - 1; }
+  }
+  return indices;
+}
+
 export {
+  activityMessageIndices,
   calculateTokenCost,
   formatModelTurnInput,
   formatModelTurnOutput,

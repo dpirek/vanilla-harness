@@ -1,3 +1,4 @@
+import { activityMessageIndices } from "./lib/session-activity.js";
 import HarnessSidebar from "./components/harness-sidebar.js";
 import HarnessChat from "./components/harness-chat.js";
 import WorkspacePanel from "./components/workspace-panel.js";
@@ -678,7 +679,6 @@ function renderPresetStatusBar() {
     appendPresetStatusItem("Sys prompts", [], "0", openSystemPromptsModal);
     appendPresetStatusItem("Skills", [], "0", openSkillsModal);
     appendPresetStatusItem("Tools", [], "0", openToolsModal);
-    appendPresetStatusItem("Sub-agents", [], "0", openSubAgentsModal);
     appendPresetStatusItem("MCP", [], "None", openMcpModal);
     appendPresetStatusItem("Workflow", [], "0/4", openWorkflowSettings);
     return;
@@ -707,7 +707,6 @@ function renderPresetStatusBar() {
   appendPresetStatusItem("Sys prompts", configuredPrompts, String(configuredPrompts.length), openSystemPromptsModal);
   appendPresetStatusItem("Skills", skillStatus, String(selectedSkills.length || activeSkillIds.size), openSkillsModal);
   appendPresetStatusItem("Tools", selectedTools, String(selectedTools.length), openToolsModal);
-  appendPresetStatusItem("Sub-agents", (active.subAgents || []).map(({ name }) => name), String((active.subAgents || []).length), openSubAgentsModal);
   appendPresetStatusItem("MCP", selectedMcp, selectedMcp.length > 0 ? String(selectedMcp.length) : "None", openMcpModal);
   appendPresetStatusItem("Workflow", selectedWorkflowItems, `${selectedWorkflowItems.length}/4`, openWorkflowSettings);
 }
@@ -1865,6 +1864,7 @@ function renderMessage(role, text, images = [], workspace = defaultWorkspace) {
   article.append(body);
   messages.append(article);
   scrollToEnd(messages);
+  return article;
 }
 
 function startStreamingAnswer(sessionId) {
@@ -1905,27 +1905,20 @@ function renderMessages() {
     return;
   }
   const activities = sessionActivityRuns(session.events || []);
-  const isAgentMessage = (message) => ["agent", "assistant"].includes(message.role);
-  const agentMessageCount = session.messages.filter(isAgentMessage).length;
-  const unmatchedAgentCount = Math.max(0, agentMessageCount - activities.length);
-  let agentIndex = 0;
-  let activityIndex = 0;
-  for (const message of session.messages) {
-    if (isAgentMessage(message)) {
-      if (agentIndex >= unmatchedAgentCount && activityIndex < activities.length) {
-        const isLatest = activityIndex === activities.length - 1;
-        messages.append(createSessionActivityCard(activities[activityIndex], { active: isLatest && runActive, sessionId: session.id }));
-        activityIndex += 1;
-      }
-      agentIndex += 1;
-    }
-    renderMessage(message.role, message.text, message.images || [], session.workspace || defaultWorkspace);
-  }
-  while (activityIndex < activities.length) {
-    const isLatest = activityIndex === activities.length - 1;
-    messages.append(createSessionActivityCard(activities[activityIndex], { active: isLatest && runActive, sessionId: session.id }));
-    activityIndex += 1;
-  }
+  const anchors = activityMessageIndices(session.messages, activities);
+  const appendActivity = (activity, index) => messages.append(createSessionActivityCard(activity, {
+    active: index === activities.length - 1 && runActive, sessionId: session.id,
+  }));
+  session.messages.forEach((message, messageIndex) => {
+    const article = renderMessage(message.role, message.text, message.images || [], session.workspace || defaultWorkspace);
+    article.dataset.messageIndex = String(messageIndex);
+    activities.forEach((activity, index) => {
+      if (anchors[index] === messageIndex) appendActivity(activity, index);
+    });
+  });
+  activities.forEach((activity, index) => {
+    if (anchors[index] < 0) appendActivity(activity, index);
+  });
 }
 
 function createSessionActivityCard(activity, { active = false, sessionId = activeSessionId } = {}) {
@@ -2226,29 +2219,24 @@ function refreshRunningStepDurations() {
 }
 
 function renderSessionActivity() {
-  const activities = sessionActivityRuns(activeSession()?.events || []);
+  const session = activeSession();
+  const activities = sessionActivityRuns(session?.events || []);
+  const anchors = activityMessageIndices(session?.messages || [], activities);
   const cards = [...messages.querySelectorAll(".sessionActivity")];
-  if (activities.length === 0) {
-    cards.forEach((card) => card.remove());
-    return;
-  }
-  let card = cards.at(-1);
-  if (cards.length < activities.length) {
-    card = createSessionActivityCard(activities.at(-1), { active: runActive, sessionId: activeSessionId });
-    const streamingMessage = messages.querySelector(".message-streaming");
-    if (streamingMessage) messages.insertBefore(card, streamingMessage);
+  const retained = new Set();
+  const tails = new Map();
+  activities.forEach((activity, index) => {
+    let card = cards.find((candidate) => candidate.activity?.runId === activity.runId);
+    const active = index === activities.length - 1 && runActive;
+    if (!card) card = createSessionActivityCard(activity, { active, sessionId: activeSessionId });
+    else if (index === activities.length - 1) updateSessionActivityCard(card, activity, { active });
+    retained.add(card);
+    const anchor = tails.get(anchors[index]) || messages.querySelector(`[data-message-index="${anchors[index]}"]`);
+    if (anchor) anchor.insertAdjacentElement('afterend', card);
     else messages.append(card);
-  } else {
-    updateSessionActivityCard(card, activities.at(-1), { active: runActive });
-  }
-  const streamingResponse = messages.querySelector(".message-streaming");
-  if (streamingResponse) {
-    messages.insertBefore(card, streamingResponse);
-  } else if (activities.at(-1).complete) {
-    const responses = [...messages.querySelectorAll(".message-agent, .message-assistant")];
-    const finalResponse = responses.at(-1);
-    if (finalResponse) messages.insertBefore(card, finalResponse);
-  }
+    tails.set(anchors[index], card);
+  });
+  cards.filter((card) => !retained.has(card)).forEach((card) => card.remove());
   if (runActive) scrollToEnd(messages);
 }
 
@@ -3632,6 +3620,7 @@ chatComponent.addEventListener("submit-prompt", () => {
   };
   addEvent("Prompt sent", {
     runId: randomUuid(),
+    messageIndex: session.messages.length - 1,
     prompt: images.length > 0 ? `${displayPrompt} (${images.length} image)` : displayPrompt,
     providerId: matchedProviderId,
     providerName: matchedProvider?.name || titleCaseIdentifier(providerSettings.provider),

@@ -95,6 +95,16 @@ try {
   await until(() => evaluate(`document.body.textContent.includes('Parity edit completed.')`));
   assert.equal(providerRequests.length, 2);
   assert.ok(providerRequests[1].messages.some((message) => message.role === 'tool' && message.content.includes('change_id')));
+  const liveOrder = await evaluate(`Array.from(document.querySelector('#messages').children).filter(node => node.matches('.message, .sessionActivity')).map(node => node.matches('.sessionActivity') ? 'run' : node.matches('.message-user') ? 'user' : 'assistant')`);
+  assert.deepEqual(liveOrder, ['user', 'run', 'assistant']);
+  const saved = await fetch('http://127.0.0.1:8236/api/ui-state', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ state: { sessions: [{ id: 'ordering-regression', title: 'Ordering regression', workspace, messages: [{ role: 'user', text: 'Create a Node.js website' }, { role: 'user', text: 'Style it as a locksmith business' }], events: [{ title: 'Prompt sent', detail: { prompt: 'Create a Node.js website', runId: 'first' }, timestamp: 1 }, { title: 'Error', detail: 'Example failed run', timestamp: 2 }, { title: 'Prompt sent', detail: { prompt: 'Style it as a locksmith business', runId: 'second' }, timestamp: 3 }, { title: 'Response completed', detail: { type: 'response_complete' }, timestamp: 4 }], tokenHistory: [], updatedAt: Date.now() }] } }) });
+  assert.equal(saved.status, 200);
+  await call('Page.reload');
+  await until(() => evaluate(`document.querySelector('#messages')?.textContent.includes('Style it as a locksmith business')`));
+  const savedOrder = await evaluate(`Array.from(document.querySelector('#messages').children).filter(node => node.matches('.message, .sessionActivity')).map(node => node.matches('.sessionActivity') ? 'run' : node.matches('.message-user') ? 'user' : 'assistant')`);
+  assert.deepEqual(savedOrder, ['user', 'run', 'user', 'run']);
+  const orderingScreenshot = await call('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+  await fs.writeFile(path.join(artifacts, 'prompt-run-order.png'), Buffer.from(orderingScreenshot.data, 'base64'));
   assert.deepEqual(errors, []);
-  console.log(JSON.stringify({ result: 'PASS', checks: ['rendered settings', 'saved rules and context budget', 'history list and preview', 'HTTP undo and redo', 'JavaScript symbol UI', 'browser approval before edit', 'structured tool replay', 'no browser exceptions'], screenshot: path.join(artifacts, 'tools-settings.png') }));
+  console.log(JSON.stringify({ result: 'PASS', checks: ['rendered settings', 'saved rules and context budget', 'history list and preview', 'HTTP undo and redo', 'JavaScript symbol UI', 'browser approval before edit', 'structured tool replay', 'live prompt/run/answer order', 'saved prompt-only run order after reload', 'no browser exceptions'], screenshot: path.join(artifacts, 'tools-settings.png') }));
 } finally { socket?.close(); server.kill('SIGTERM'); chrome.kill('SIGTERM'); modelServer.closeAllConnections(); modelServer.close(); }

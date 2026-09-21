@@ -599,26 +599,26 @@ code {
   padding: 0 0 8px;
 }
 .presetStatusBar[hidden] { display: none; }
-.presetStatusItems { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.presetStatusItems { display: flex; flex-wrap: wrap; gap: 6.4px; min-width: 0; }
 .presetStatusItem {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6.4px;
   min-width: 0;
   max-width: 100%;
-  min-height: 38px;
-  padding: 8px 12px;
+  min-height: 30.4px;
+  padding: 6.4px 9.6px;
   border: 1px solid var(--line);
-  border-radius: 22px;
+  border-radius: 17.6px;
   background: transparent;
   color: var(--muted);
-  font-size: .75rem;
+  font-size: .6rem;
   white-space: nowrap;
   cursor: pointer;
 }
 .presetStatusItem:hover { background: var(--surface-hover); color: var(--text); border-color: var(--strong-line); }
 .presetStatusItem:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.presetStatusItem .bsIcon { width: 17px; height: 17px; }
+.presetStatusItem .bsIcon { width: 13.6px; height: 13.6px; }
 .presetStatusLabel { font-weight: 500; }
 .presetStatusValue { color: var(--text); font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
 
