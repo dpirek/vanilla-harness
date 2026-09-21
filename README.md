@@ -8,7 +8,10 @@ The application supports:
 - Local Ollama models
 - Custom OpenAI-compatible endpoints
 - Workspace-scoped file listing, reading, searching, and writing
-- Approval-gated shell commands and file changes
+- Configurable allow/ask/deny rules for tool calls, paths, and commands
+- Exact file edits, durable change review, and guarded undo/redo
+- Persistent structured context with automatic long-session compaction
+- Dependency-free JavaScript/Node syntax checks and lexical navigation
 - MCP servers and configurable skills
 - Asynchronous task delegation to one or more A2A Agent Workers
 - Persistent conversations, skills, and settings in SQLite
@@ -34,7 +37,7 @@ npm start
 
 Open [http://localhost:3000](http://localhost:3000) in a browser.
 
-On the first launch, the Providers dialog opens automatically. Add an OpenAI, Ollama, or custom provider, choose a model, and save it. For Ollama, start Ollama separately before loading its models. Custom providers must expose the OpenAI-compatible endpoints used by the harness, including `/models` and `/responses`.
+On the first launch, the Providers dialog opens automatically. Add an OpenAI, Ollama, or custom provider, choose a model, and save it. For Ollama, start Ollama separately before loading its models. Custom providers must expose the OpenAI-compatible endpoints used by the harness, including `/models` and `/chat/completions`.
 
 ## Configuration
 
@@ -185,9 +188,30 @@ Open [http://localhost:3000/web-component-demo.html](http://localhost:3000/web-c
 
 The current component is same-origin: its modules, stylesheet, `/api` requests, and WebSocket connection are resolved against the page serving Vanilla Harness. Embedding it on an unrelated origin requires serving the frontend from that origin or adding configurable server URLs and corresponding CORS support.
 
+## Coding workflow controls
+
+Open **Tools** to configure global permission rules, context budgeting, automatic JavaScript checks,
+manual JavaScript inspection, and workspace change recovery. Tool enablement remains per-preset.
+
+The agent can use `edit_files` for unique exact replacements, `change_history` to review/undo/redo
+tracked edits, and `javascript` for Node syntax diagnostics and lexical symbol/reference lookup.
+`read_file` returns a full-file hash for optional stale-write checks.
+
+Conversation context persists structured tool calls/results and images across restarts. Older rounds
+can be summarized to fit a configurable budget (32,000 estimated tokens by default). Summarization
+uses additional model requests; set the budget to match your model's capacity.
+
+CLI users can edit shared runtime settings with `/runtime` and review changes with `/changes`,
+`/changes inspect <id>`, `/changes undo <id>`, or `/changes redo <id>`.
+
+Recovery covers built-in writes/exact edits, not shell/MCP/manual-editor changes. JavaScript tooling
+supports `.js`, `.mjs`, and `.cjs`; navigation is lexical, not a full language server.
+See the [implementation report](IMPLEMENTATION_REPORT.md) for configuration examples, limits, and
+validation, and the [parity comparison](FEATURE_PARITY.md) for remaining OpenCode differences.
+
 ## Security notes
 
-The agent can read files, write files, make HTTP requests, run commands, and call MCP servers within the selected workspace. Enabled tools and MCP servers are automatically approved, so only enable capabilities and connect servers you trust.
+The agent can read files, write files, make HTTP requests, run commands, and call MCP servers within the selected workspace. Enabled tools and MCP servers use the configured runtime permission policy. The default is `allow` for compatibility; configure `ask` or `deny` rules in Tools for more control. Non-interactive CLI requests subject to `ask` are denied. Tool permissions do not sandbox shell commands or MCP processes; only enable capabilities and connect servers you trust.
 
 ## License
 

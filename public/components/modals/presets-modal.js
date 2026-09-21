@@ -48,6 +48,9 @@ class PresetsModal extends BaseComponent {
               this.createElement("div", { class: "presetToggleGrid", "aria-label": "Tool permissions", children: [
                 this.toggle("presetToolListFiles", "List files", "Browse workspace entries"),
                 this.toggle("presetToolReadFile", "Read files", "Read workspace content"),
+                this.toggle("presetToolEditFiles", "Exact edits", "Precise replacements with recovery"),
+                this.toggle("presetToolChangeHistory", "Change history", "Review, undo, and redo tracked edits"),
+                this.toggle("presetToolJavaScript", "JavaScript tools", "Syntax checks and lexical navigation"),
                 this.toggle("presetToolWriteFile", "Write files", "Create and edit files"),
                 this.toggle("presetToolSearchFiles", "Search files", "Search workspace content"),
                 this.toggle("presetToolCurl", "HTTP requests", "Request HTTP and HTTPS URLs"),

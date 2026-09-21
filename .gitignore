@@ -2,3 +2,6 @@
 .env
 .env.disabled
 .DS_Store
+
+# Isolated browser verification profiles and temporary runtime databases.
+/.ui-verification/parity-artifacts/run-*/

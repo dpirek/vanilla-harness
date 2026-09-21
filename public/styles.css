@@ -3082,3 +3082,14 @@ models-page .providerTableWrap { max-height: none; }
 .collapsedModelsLink .bsIcon { width: 20px; height: 20px; }
 
 .modelRatingIcon { width: 12px; height: 12px; }
+
+.runtimeSettings { padding: 1rem; display: grid; gap: .75rem; border-top: 1px solid var(--border, #555); }
+.runtimeSettings label { display: flex; gap: .75rem; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.runtimeSettings textarea { width: 100%; min-height: 9rem; font-family: monospace; }
+.runtimeSettings input[type=number] { width: 9rem; }
+.runtimeSettings p { max-width: 75ch; font-size: .85rem; }
+#changeHistoryList > div { padding: .5rem 0; border-bottom: 1px solid var(--border, #555); }
+#changeHistoryList button { margin: .25rem; }
+#javascriptResults, #changeHistoryPreview, .permissionDialog pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 40vh; overflow: auto; }
+.permissionDialog { max-width: min(700px, 90vw); padding: 1.5rem; border-radius: 12px; }
+.permissionDialog button { margin-right: .75rem; }

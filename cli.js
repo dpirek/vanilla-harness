@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+import { runtimeSettings, normalizeRuntimeSettings } from "./lib/runtime-settings.js";
+import { createAuthorizer, protectTools } from "./lib/permissions.js";
+import { ConversationContext } from "./lib/conversation-context.js";
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -28,6 +31,8 @@ const HELP = `Commands:
   /upload <source> [path]       Copy a file into the workspace
   /sessions | /new [title]      List or create conversations
   /use <number|id>              Switch conversation
+  /runtime                      Edit global permissions/context/JavaScript settings
+  /changes [inspect|undo|redo] [id]  Review or recover tracked file changes
   /rename <title>               Rename the current conversation
   /delete                       Delete the current conversation
   /clear | /reset               Clear chat or reset model continuity
@@ -132,18 +137,27 @@ class HarnessCli {
     const disabledSteps = resolveDisabledSteps([], preset.componentState.effects);
     const disabled = new Set(disabledSteps);
     const permissions = normalizeStoredToolPermissions(preset.toolPermissions);
-    const localTools = disabled.has("tools") ? [] : createTools({ root: this.workspace, approve: async () => true })
+    const settingsNow = () => runtimeSettings(this.store);
+    const authorize = createAuthorizer({ settings: settingsNow, ask: async ({ tool, target, preview }) => {
+      if (!this.ui.input?.isTTY) return false;
+      if (preview) this.ui.line(preview);
+      return this.ui.confirm(`Allow ${tool} ${target}?`, false);
+    } });
+    const localTools = disabled.has("tools") ? [] : createTools({ root: this.workspace, approve: async () => true, authorize, store: this.store, settings: settingsNow })
       .filter((tool) => permissions[tool.name] === true && tool.name !== "delegate_to_sub_agent");
     const mcpTools = disabled.has("mcp") ? [] : await loadMcpTools({
       root: this.workspace, configContent: preset.mcpConfig, approve: async () => true,
-      autoApprove: true, onInfo: (message) => this.ui.info(message),
+      autoApprove: true, forceLocal: true, onInfo: (message) => this.ui.info(message),
     });
     const client = createModelClient({
       provider, apiKey,
       baseUrl: settings.baseUrl || defaultBaseUrlForProvider(provider),
     });
+    const context = new ConversationContext({ store: this.store, root: this.workspace, sessionId: this.session.id, settings: settingsNow, onEvent: (event) => this.ui.info(`${event.type}: ${event.estimatedTokens ?? ''}`) });
+    context.seed(this.session.messages);
     return new CodingAgent({
-      client, tools: [...localTools, ...mcpTools], model: settings.model || defaultModelForProvider(provider),
+      context,
+      client, tools: [...localTools, ...protectTools(mcpTools, authorize)], model: settings.model || defaultModelForProvider(provider),
       root: this.workspace, disabledSteps, systemPrompts: preset.systemPrompts,
       skills: this.store.getSelectedSkills(), approve: async () => true,
       onInfo: (message) => this.ui.info(message),
@@ -163,7 +177,7 @@ class HarnessCli {
     this.ui.line(this.ui.style(`\n${preset.providerSettings.model}`, "cyan"));
     try {
       const composed = disabled.includes("composer") ? prompt : await this.agent.refinePrompt(prompt);
-      const input = this.agent.previousResponseId ? composed : transcriptPrompt(composed, prior);
+      const input = this.agent.context || this.agent.previousResponseId ? composed : transcriptPrompt(composed, prior);
       const answer = await this.agent.run(input, { disabledSteps: disabled });
       this.ui.line("\n");
       this.session.messages.push({ role: "agent", text: answer });
@@ -205,6 +219,15 @@ class HarnessCli {
     if (["/quit", "/exit"].includes(command)) return false;
     if (command === "/help") this.ui.line(HELP);
     else if (command === "/status") this.status();
+    else if (command === '/runtime') {
+      const edited = await this.ui.edit(JSON.stringify(runtimeSettings(this.store), null, 2), { suffix: '.json' });
+      this.store.setRuntimeValue('settings', normalizeRuntimeSettings(JSON.parse(edited)));
+      this.invalidateAgent(); this.ui.success('Global runtime settings saved.');
+    } else if (command === '/changes') {
+      const authorize = createAuthorizer({ settings: () => runtimeSettings(this.store), ask: async () => true });
+      const tool = createTools({ root: this.workspace, store: this.store, authorize }).find((item) => item.name === 'change_history');
+      this.ui.line(JSON.stringify(await tool.execute({ action: args[0] || 'list', change_id: args[1] || null }), null, 2));
+    }
     else if (command === "/workspace") {
       if (!args[0]) this.ui.line(this.workspace);
       else {
@@ -255,7 +278,7 @@ class HarnessCli {
         const remaining = this.sessions().filter((item) => item.id !== this.session.id); this.store.set({ sessions: remaining });
         this.session = remaining[0] || this.newSession("New chat", false); this.invalidateAgent();
       }
-    } else if (command === "/clear") { this.session.messages = []; this.session.events = []; this.session.tokenHistory = []; this.agent?.reset(); this.saveSession();
+    } else if (command === "/clear") { this.session.messages = []; this.session.events = []; this.session.tokenHistory = []; this.agent?.reset(); new ConversationContext({ store: this.store, root: this.workspace, sessionId: this.session.id, settings: () => runtimeSettings(this.store) }).reset(); this.saveSession();
     } else if (command === "/reset") { this.agent?.reset(); this.ui.success("Model continuity reset.");
     } else if (command === "/events") this.session.events.forEach((event) => this.ui.line(`${new Date(event.timestamp).toLocaleTimeString()}  ${event.title}`));
     else if (command === "/presets") {

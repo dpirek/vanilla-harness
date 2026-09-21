@@ -15,6 +15,9 @@ test("local tool modules compose into the existing tool registry", () => {
     "run_command",
     "chrome_devtools",
     "delegate_to_sub_agent",
+    "edit_files",
+    "change_history",
+    "javascript",
   ]);
   assert.equal(tools.find((tool) => tool.name === "read_file").validatesWorkspace, true);
   assert.equal(tools.find((tool) => tool.name === "write_file").mutatesWorkspace, true);

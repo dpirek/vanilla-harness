@@ -1,3 +1,6 @@
+import { runtimeSettings } from "./lib/runtime-settings.js";
+import { createAuthorizer, protectTools } from "./lib/permissions.js";
+import { ConversationContext } from "./lib/conversation-context.js";
 import fs from "node:fs/promises";
 import http from "node:http";
 import path from "node:path";
@@ -84,6 +87,9 @@ async function resolveWorkspace(requested) {
 
 async function createAgentSession({
   disabledSteps = [],
+  ask,
+  sessionId,
+  history,
   emit,
   onTextDelta,
   providerSettings = {},
@@ -96,6 +102,8 @@ async function createAgentSession({
   const model = settings.model ||
     process.env.AI_MODEL ||
     defaultModelForProvider(provider);
+  const settingsNow = () => runtimeSettings(uiStateStore);
+  const authorize = createAuthorizer({ settings: settingsNow, ask });
   const approveMcp = async () => true;
   const onInfo = (message) => emit({ type: "info", message });
   const onTool = ({ name, args }) => emit({ type: "tool", name, args });
@@ -123,6 +131,9 @@ async function createAgentSession({
     root,
     approve: async () => true,
     subAgentManager,
+    authorize,
+    store: uiStateStore,
+    settings: settingsNow,
   }).filter((tool) => (
     toolPermissions[tool.name] === true &&
     (tool.name !== "delegate_to_sub_agent" || subAgentManager.listWorkers().length > 0)
@@ -133,10 +144,14 @@ async function createAgentSession({
       approve: approveMcp,
       onInfo,
       autoApprove: true,
+      forceLocal: true,
     });
+  const context = new ConversationContext({ store: uiStateStore, root, sessionId, settings: settingsNow, onEvent });
+  context.seed(history);
   return new CodingAgent({
+    context,
     client,
-    tools: [...localTools, ...mcpTools],
+    tools: [...localTools, ...protectTools(mcpTools, authorize)],
     model,
     root,
     approve: approveMcp,
@@ -174,6 +189,10 @@ function startServer({ port = defaultPort, host } = {}) {
 
 const handleWebSocket = createWebSocketHandler({
   createAgentSession,
+  resetContext: (sessionId) => {
+    const session = uiStateStore.getAll().sessions.find((item) => item.id === sessionId);
+    if (session) new ConversationContext({ store: uiStateStore, root: session.workspace, sessionId, settings: () => runtimeSettings(uiStateStore) }).reset();
+  },
   getRigConfigurations: () => uiStateStore.getRigConfigurations(),
   normalizeToolPermissions,
   resolveWorkspace,

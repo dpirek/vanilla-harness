@@ -72,7 +72,7 @@ export function createSettingsApiHandlers({
       customModel: process.env.CUSTOM_AI_MODEL || "custom-model",
       customBaseUrl: process.env.CUSTOM_AI_BASE_URL || "http://localhost:8000/v1",
       hasApiKey: Boolean(storedSettings.apiKey),
-      approveAll: true,
+      approveAll: false,
       workspace: defaultWorkspace,
       workspaceConfiguredByEnvironment: Boolean(process.env.AI_HARNESS_WORKSPACE?.trim()),
       environmentFileDetected,

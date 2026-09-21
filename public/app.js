@@ -767,6 +767,9 @@ function selectPresetProvider() {
 const PRESET_TOOL_INPUTS = {
   list_files: "presetToolListFiles",
   read_file: "presetToolReadFile",
+  edit_files: "presetToolEditFiles",
+  change_history: "presetToolChangeHistory",
+  javascript: "presetToolJavaScript",
   write_file: "presetToolWriteFile",
   search_files: "presetToolSearchFiles",
   curl: "presetToolCurl",
@@ -2722,13 +2725,15 @@ function renderToolPermissions(settings = storedToolPermissions) {
   }
 }
 
-function saveToolPermissions() {
+async function saveToolPermissions() {
+  try { await toolsModal.saveRuntimeSettings(); }
+  catch (error) { toolPermissionsStatus.textContent = error.message; toolPermissionsStatus.dataset.state = 'error'; return; }
   const permissions = currentToolPermissions();
   storedToolPermissions = permissions;
   updateActivePresetSnapshot({ toolPermissions: permissions });
   persistUiState({ toolPermissions: permissions });
   send({ type: "tool_permissions", permissions });
-  toolPermissionsStatus.textContent = "Tool permissions saved to the active preset";
+  toolPermissionsStatus.textContent = "Tools and global runtime settings saved";
   toolPermissionsStatus.dataset.state = "success";
 }
 
@@ -3443,7 +3448,37 @@ async function loadHealth(initialHealth = null) {
   }
 }
 
+const permissionDialogs = new Map();
+
 async function handleSocketMessage(payload) {
+    if (payload.type === 'permission_closed') {
+      addEvent(`Permission ${payload.approved ? 'granted' : 'denied'}: ${payload.tool}`, { target: payload.target, approved: payload.approved });
+      permissionDialogs.get(payload.id)?.remove();
+      permissionDialogs.delete(payload.id);
+      return;
+    }
+    if (payload.type === 'permission_request') {
+      const dialog = document.createElement('dialog');
+      dialog.className = 'permissionDialog';
+      const title = document.createElement('h2');
+      title.textContent = 'Allow this tool call?';
+      const details = document.createElement('pre');
+      details.textContent = `${payload.tool}\n${payload.target}${payload.preview ? `\n\n${payload.preview}` : ''}`;
+      const reply = (approved) => {
+        send({ type: 'permission_response', id: payload.id, sessionId: payload.sessionId, approved });
+        dialog.remove(); permissionDialogs.delete(payload.id);
+      };
+      const deny = document.createElement('button');
+      deny.textContent = 'Deny'; deny.autofocus = true;
+      deny.addEventListener('click', () => reply(false));
+      const allow = document.createElement('button');
+      allow.textContent = 'Allow once';
+      allow.addEventListener('click', () => reply(true));
+      dialog.addEventListener('cancel', (event) => { event.preventDefault(); reply(false); });
+      dialog.append(title, details, deny, allow);
+      (appRoot === document ? document.body : appRoot).append(dialog); permissionDialogs.set(payload.id, dialog); dialog.showModal();
+      return;
+    }
     if (payload.type === "ready") {
       addEvent("Server defaults", {
         provider: payload.provider,
@@ -3543,6 +3578,8 @@ function connect() {
       addEvent("Socket connected");
     },
     onClose() {
+      for (const dialog of permissionDialogs.values()) dialog.remove();
+      permissionDialogs.clear();
       setBusy(false);
       addEvent("Socket closed");
       window.setTimeout(connect, 1500);
@@ -3568,7 +3605,7 @@ chatComponent.addEventListener("submit-prompt", () => {
   if ((!prompt && attachedImages.length === 0) || runActive || !socketService?.isOpen) return;
   const sessionId = activeSessionId;
   const session = activeSession();
-  const history = session ? session.messages.slice(-20) : [];
+  const history = session ? [...session.messages] : [];
   const images = attachedImages;
   const displayPrompt = prompt || "Analyze attached image";
   addMessageToSession(
@@ -3730,6 +3767,7 @@ async function openSystemPromptsModal() {
 function openToolsModal() {
   if (!toolsDialog.open) toolsDialog.showModal();
   renderToolPermissions();
+  toolsModal.loadRuntimeSettings().catch((error) => { toolPermissionsStatus.textContent = error.message; toolPermissionsStatus.dataset.state = 'error'; });
   toolPermissionsStatus.textContent = "Tool permissions are stored in the active preset.";
   toolPermissionsStatus.dataset.state = "";
 }
@@ -3998,6 +4036,56 @@ mcpModal.addEventListener("show-mcp-editor", () => openMcpEditor());
 mcpModal.addEventListener("cancel-mcp-editor", closeMcpEditor);
 providersModal.addEventListener("save-provider-settings", saveProviderSettings);
 toolsModal.addEventListener("save-tool-permissions", saveToolPermissions);
+toolsModal.addEventListener('load-change-history', loadChangeHistory);
+toolsModal.addEventListener('inspect-javascript', async () => {
+  const result = toolsModal.querySelector('#javascriptResults');
+  const button = toolsModal.querySelector('#inspectJavaScript');
+  button.disabled = true; result.textContent = 'Inspecting…';
+  try {
+    const response = await fetch('/api/javascript', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ workspace: activeSession()?.workspace || defaultWorkspace, path: toolsModal.querySelector('#javascriptPath').value, action: toolsModal.querySelector('#javascriptAction').value, query: toolsModal.querySelector('#javascriptQuery').value }) });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error);
+    result.textContent = JSON.stringify(payload, null, 2);
+  } catch (error) { result.textContent = error.message; }
+  finally { button.disabled = false; }
+});
+async function loadChangeHistory() {
+  const list = toolsModal.querySelector('#changeHistoryList');
+  const preview = toolsModal.querySelector('#changeHistoryPreview');
+  const workspace = activeSession()?.workspace || defaultWorkspace;
+  try {
+    const response = await fetch(`/api/changes?${new URLSearchParams({ workspace })}`);
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error);
+    list.replaceChildren();
+    if (!data.changes.length) list.textContent = 'No tracked changes in this workspace.';
+    for (const change of data.changes) {
+      const row = document.createElement('div');
+      const text = document.createElement('span');
+      text.textContent = `${new Date(change.at).toLocaleString()} · ${change.state} · ${change.paths.join(', ')} `;
+      row.append(text);
+      for (const action of ['inspect', ...(change.state === 'undone' ? ['redo'] : ['undo'])]) {
+        const button = document.createElement('button');
+        button.type = 'button'; button.textContent = action === 'inspect' ? 'Review' : action === 'undo' ? 'Undo' : 'Redo';
+        button.addEventListener('click', async () => {
+          button.disabled = true;
+          try {
+            const result = action === 'inspect'
+              ? await fetch(`/api/changes?${new URLSearchParams({ workspace, id: change.id, action: 'inspect' })}`)
+              : await fetch('/api/changes', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ workspace, id: change.id, action }) });
+            const payload = await result.json();
+            if (!result.ok) throw new Error(payload.error);
+            preview.textContent = action === 'inspect' ? payload.change.files.map((file) => `${file.diff || file.path}${file.truncated ? '\n[preview truncated]' : ''}`).join('\n\n') : `${action} completed: ${change.paths.join(', ')}`;
+            if (action !== 'inspect') { await loadChangeHistory(); loadWorkspaceTree(); }
+          } catch (error) { preview.textContent = error.message; }
+          finally { button.disabled = false; }
+        });
+        row.append(button);
+      }
+      list.append(row);
+    }
+  } catch (error) { preview.textContent = error.message; }
+}
 subAgentsModal.addEventListener("show-sub-agent-editor", openSubAgentEditor);
 subAgentsModal.addEventListener("cancel-sub-agent-editor", closeSubAgentEditor);
 subAgentsModal.addEventListener("add-sub-agent", addSubAgentDraft);

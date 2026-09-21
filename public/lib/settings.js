@@ -7,6 +7,9 @@ const DEFAULT_TOOL_PERMISSIONS = {
   run_command: true,
   chrome_devtools: true,
   delegate_to_sub_agent: true,
+  edit_files: true,
+  change_history: true,
+  javascript: true,
 };
 
 function defaultProviderSettings() {

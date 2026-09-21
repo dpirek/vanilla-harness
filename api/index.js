@@ -1,3 +1,4 @@
+import { createRuntimeApiHandlers } from "./runtime.js";
 import { createSettingsApiHandlers } from "./settings.js";
 import { createSubAgentApiHandlers } from "./sub-agents.js";
 import { createWorkspaceApiHandlers } from "./workspace.js";
@@ -5,6 +6,7 @@ import { createWorkspaceApiHandlers } from "./workspace.js";
 export function createApiRouter(options) {
   const routes = new Map(Object.entries({
     ...createSettingsApiHandlers(options),
+    ...createRuntimeApiHandlers(options),
     ...createSubAgentApiHandlers(options),
     ...createWorkspaceApiHandlers(options),
   }));

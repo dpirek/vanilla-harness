@@ -152,3 +152,38 @@ test("stop coalesced with a prompt cancels initialization", async () => {
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(created, false);
 });
+
+test('websocket approvals require a matching request/session and stop cancels pending approval', async () => {
+  const { EventEmitter } = await import('node:events');
+  const { createWebSocketHandler } = await import('../lib/ws.js');
+  const socket = new EventEmitter();
+  const events = [];
+  socket.destroyed = false; socket.end = () => {};
+  socket.write = (data) => {
+    if (typeof data === 'string') return;
+    events.push(JSON.parse(data.subarray(data[1] === 126 ? 4 : data[1] === 127 ? 10 : 2).toString()));
+  };
+  let executions = 0;
+  createWebSocketHandler({
+    normalizeToolPermissions: () => ({}), resolveWorkspace: async () => '/tmp', getRigConfigurations: () => ({ configurations: [] }),
+    createAgentSession: async ({ ask }) => ({ refinePrompt: async (prompt) => prompt, run: async (_prompt, { executionControl }) => {
+      const allowed = await ask({ tool: 'write_file', target: 'a.js' }, { signal: executionControl.signal });
+      if (allowed) executions++;
+      executionControl.signal.throwIfAborted();
+      return 'done';
+    } }),
+  })(socket, { headers: { 'sec-websocket-key': 'test' } });
+  const send = (payload) => socket.emit('data', maskedTextFrame(JSON.stringify(payload)));
+  const tick = () => new Promise((resolve) => setImmediate(resolve));
+  send({ type: 'prompt', prompt: 'edit', sessionId: 'one' }); await tick();
+  const request = events.find((event) => event.type === 'permission_request');
+  assert.ok(request);
+  send({ type: 'permission_response', sessionId: 'bad', id: request.id, approved: true }); await tick();
+  assert.equal(executions, 0);
+  send({ type: 'permission_response', sessionId: 'one', id: request.id, approved: true }); await tick();
+  assert.equal(executions, 1);
+  send({ type: 'prompt', prompt: 'edit again', sessionId: 'one' }); await tick();
+  send({ type: 'stop', sessionId: 'one' }); await tick();
+  assert.equal(executions, 1);
+  assert.ok(events.some((event) => event.type === 'stopped'));
+});
