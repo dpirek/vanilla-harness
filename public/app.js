@@ -84,6 +84,13 @@ import SocketService from "./services/socket-service.js";
 
 const appRoot = document.querySelector("ai-harness-app")?.shadowRoot || document;
 const appShell = mountAppShell(appRoot);
+
+function setActionIcon(button, icon, label) {
+  button.classList.add("tableActionIcon");
+  button.title = label;
+  button.setAttribute("aria-label", label);
+  button.replaceChildren(bootstrapIcon(icon));
+}
 const sidebarComponent = appRoot.querySelector("harness-sidebar");
 const chatComponent = appRoot.querySelector("harness-chat");
 const workspaceComponent = appRoot.querySelector("workspace-panel");
@@ -371,7 +378,7 @@ function renderSystemPrompts() {
     if (!baseKeys.has(field) || (role !== "global" && !prompt.key.startsWith(`${role}_`))) continue;
     const row = document.createElement("article"); row.className = "systemPromptRow";
     const title = document.createElement("strong"); title.textContent = prompt.title;
-    const edit = document.createElement("button"); edit.type = "button"; edit.textContent = "Edit";
+    const edit = document.createElement("button"); edit.type = "button"; setActionIcon(edit, "pencil-square", `Edit ${prompt.title}`);
     edit.addEventListener("click", () => {
       editingSystemPromptKey = prompt.key;
       systemPromptEditorTitle.textContent = prompt.title;
@@ -467,8 +474,7 @@ function renderSkills() {
     const editButton = document.createElement("button");
     editButton.type = "button";
     editButton.className = "skillEditButton";
-    editButton.textContent = "Edit";
-    editButton.setAttribute("aria-label", `Edit ${skill.name}`);
+    setActionIcon(editButton, "pencil-square", `Edit ${skill.name}`);
     editButton.addEventListener("click", () => openSkillEditor(skill.id));
     actionCell.append(editButton);
 
@@ -1078,7 +1084,7 @@ function renderPresets() {
     actions.className = "presetActions";
     const editButton = document.createElement("button");
     editButton.type = "button";
-    editButton.textContent = "Edit";
+    setActionIcon(editButton, "pencil-square", `Edit ${configuration.name}`);
     editButton.disabled = presetMutationPending || runActive;
     editButton.addEventListener("click", () => openPresetEditor(configuration.id));
 
@@ -1090,7 +1096,7 @@ function renderPresets() {
     } else {
       const useButton = document.createElement("button");
       useButton.type = "button";
-      useButton.textContent = "Use";
+      setActionIcon(useButton, "check-lg", `Use ${configuration.name}`);
       useButton.disabled = presetMutationPending || runActive;
       useButton.addEventListener("click", () => activatePreset(configuration.id));
       actions.append(useButton);
@@ -1099,7 +1105,7 @@ function renderPresets() {
     const deleteButton = document.createElement("button");
     deleteButton.type = "button";
     deleteButton.className = "presetDeleteButton";
-    deleteButton.textContent = "Delete";
+    setActionIcon(deleteButton, "x-lg", `Delete ${configuration.name}`);
     deleteButton.disabled = presetMutationPending || runActive || presetConfigurations.length <= 1;
     deleteButton.addEventListener("click", () => deletePreset(configuration.id));
     actions.prepend(editButton);
@@ -2633,7 +2639,7 @@ function renderProvidersTable() {
     const actionCell = document.createElement("td");
     const editButton = document.createElement("button");
     editButton.type = "button";
-    editButton.textContent = "Edit";
+    setActionIcon(editButton, "pencil-square", `Edit ${item.name}`);
     editButton.addEventListener("click", async () => {
       editingProviderId = item.id;
       renderProviderSettings(
@@ -2650,7 +2656,7 @@ function renderProvidersTable() {
     const deleteButton = document.createElement("button");
     deleteButton.type = "button";
     deleteButton.className = "providerDeleteButton";
-    deleteButton.textContent = "Delete";
+    setActionIcon(deleteButton, "x-lg", `Delete ${item.name}`);
     deleteButton.addEventListener("click", () => {
       if (!window.confirm(`Delete provider “${item.name}”?`)) return;
       const deletedSelectedProvider = item.selected === true;
@@ -2919,7 +2925,7 @@ function renderProviderModelsTable() {
       const useButton = document.createElement("button");
       useButton.type = "button";
       useButton.className = "providerModelUseButton";
-      useButton.textContent = "Use";
+      useButton.append(bootstrapIcon("check-lg"));
       const isActive = providers.some((provider) => (
         String(provider.id) === String(detail.providerId)
         && provider.selected === true
@@ -3331,18 +3337,24 @@ function renderTools() {
     const detail = document.createElement("span");
     detail.textContent = block.detail;
 
-    const toggle = document.createElement("button");
-    toggle.type = "button";
-    toggle.className = `toggleButton ${block.enabled ? "enabled" : ""}`;
-    toggle.textContent = block.enabled ? "On" : "Off";
-    toggle.addEventListener("click", async () => {
-      setToolsStatus(`${block.enabled ? "Disabling" : "Enabling"} ${block.label}...`);
+    const toggle = document.createElement("input");
+    toggle.type = "checkbox";
+    toggle.className = "mcpEnabledCheckbox";
+    toggle.checked = block.enabled;
+    toggle.setAttribute("aria-label", `Enable ${block.label}`);
+    toggle.addEventListener("change", async () => {
+      const enabled = toggle.checked;
+      toggle.disabled = true;
+      setToolsStatus(`${enabled ? "Enabling" : "Disabling"} ${block.label}...`);
       try {
-        toolsConfigContent = setToolBlockEnabled(toolsConfigContent, block, !block.enabled);
-        await saveConfigContent(toolsConfigContent);
+        const nextContent = setToolBlockEnabled(toolsConfigContent, block, enabled);
+        await saveConfigContent(nextContent);
+        toolsConfigContent = nextContent;
         renderTools();
-        setToolsStatus(`${block.label} ${block.enabled ? "disabled" : "enabled"}`, "success");
+        setToolsStatus(`${block.label} ${enabled ? "enabled" : "disabled"}`, "success");
       } catch (error) {
+        toggle.checked = block.enabled;
+        toggle.disabled = false;
         setToolsStatus(error.message, "error");
       }
     });
@@ -3352,14 +3364,12 @@ function renderTools() {
     const editButton = document.createElement("button");
     editButton.type = "button";
     editButton.className = "mcpEditButton";
-    editButton.textContent = "Edit";
-    editButton.setAttribute("aria-label", `Edit ${block.label}`);
+    setActionIcon(editButton, "pencil-square", `Edit ${block.label}`);
     editButton.addEventListener("click", () => openMcpEditor(block));
     const deleteButton = document.createElement("button");
     deleteButton.type = "button";
     deleteButton.className = "mcpDeleteButton";
-    deleteButton.textContent = "Delete";
-    deleteButton.setAttribute("aria-label", `Delete ${block.label}`);
+    setActionIcon(deleteButton, "x-lg", `Delete ${block.label}`);
     deleteButton.addEventListener("click", async () => {
       if (!window.confirm(`Delete MCP server “${block.label}”?`)) return;
       deleteButton.disabled = true;
@@ -3377,7 +3387,7 @@ function renderTools() {
     });
     actions.append(editButton, deleteButton);
 
-    row.append(title, type, detail, toggle, actions);
+    row.append(toggle, title, type, detail, actions);
     toolsList.append(row);
   }
 }
@@ -3859,8 +3869,7 @@ function renderSubAgents() {
     const remove = document.createElement("button");
     remove.type = "button";
     remove.className = "subAgentDeleteButton";
-    remove.textContent = "Remove";
-    remove.setAttribute("aria-label", `Remove ${worker.name || `worker ${index + 1}`}`);
+    setActionIcon(remove, "x-lg", `Remove ${worker.name || `worker ${index + 1}`}`);
     remove.addEventListener("click", () => {
       subAgentDrafts.splice(index, 1);
       renderSubAgents();

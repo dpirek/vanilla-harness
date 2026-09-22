@@ -60,7 +60,7 @@ class McpModal extends BaseComponent {
             ] }),
           ] }),
           element("section", { class: "toolsListPanel", "aria-label": "Configured MCP servers", children: [
-            element("div", { class: "mcpListHeader", children: ["Name", "Type", "Target", "Status", "Actions"].map((label) => element("span", { children: [text(label)] })) }),
+            element("div", { class: "mcpListHeader", children: ["Enabled", "Name", "Type", "Target", "Actions"].map((label) => element("span", { children: [text(label)] })) }),
             element("div", { id: "toolsList", class: "toolsList" }),
           ] }),
           element("div", { class: "settingsTemplates", "aria-label": "Config templates", hidden: "", children: [
