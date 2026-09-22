@@ -6,6 +6,7 @@ import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
 
 import { createUiStateStore } from "../lib/ui-state.js";
+import { skillDraft } from "../public/lib/skill-content.js";
 
 test("SQLite preserves discovered models for each provider", async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "ai-harness-provider-models-"));
@@ -129,9 +130,13 @@ test("SQLite preserves conversation messages and step events across reopen", asy
   }
 });
 
-test("SQLite is the sole skill store and removes the legacy source column", async () => {
+test("SQLite skills migrate to /skills folders and presets keep their selections", async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "ai-harness-skills-"));
   const databasePath = path.join(directory, "skills.sqlite");
+  const oldSkillFolder = path.join(directory, "old-skill");
+  await fs.mkdir(path.join(oldSkillFolder, "scripts"), { recursive: true });
+  await fs.writeFile(path.join(oldSkillFolder, "SKILL.md"), "legacy content");
+  await fs.writeFile(path.join(oldSkillFolder, "scripts/check.js"), "const migrated = true;\n");
   const legacy = new DatabaseSync(databasePath);
   legacy.exec(`
     CREATE TABLE skills (
@@ -169,7 +174,7 @@ test("SQLite is the sole skill store and removes the legacy source column", asyn
   legacy.prepare(`
     INSERT INTO skills (id, name, source_path, content, selected, updated_at)
     VALUES (?, ?, ?, ?, ?, ?)
-  `).run("legacy-skill", "legacy-skill", "/previous/location/SKILL.md", "legacy content", 1, 10);
+  `).run("legacy-skill", "legacy-skill", path.join(oldSkillFolder, "SKILL.md"), "legacy content", 1, 10);
   legacy.prepare(`
     INSERT INTO rig_configurations
       (id, name, component_state, system_prompts, tool_permissions, mcp_config, updated_at, sort_order, selected)
@@ -187,25 +192,23 @@ test("SQLite is the sole skill store and removes the legacy source column", asyn
         .toolPermissions.run_command,
       false,
     );
-    assert.deepEqual(store.getSkills(), [{
-      id: "legacy-skill",
-      name: "legacy-skill",
-      content: "legacy content",
-      selected: true,
-      updatedAt: 10,
-    }]);
+    assert.equal(store.getSkills()[0].id, "legacy-skill");
+    assert.equal(store.getSkills()[0].selected, true);
+    assert.match(store.getSkills()[0].content, /legacy content/);
+    assert.equal(await fs.readFile(path.join(directory, "skills/legacy-skill/SKILL.md"), "utf8"), store.getSkills()[0].content);
+    assert.equal(await fs.readFile(path.join(directory, "skills/legacy-skill/scripts/check.js"), "utf8"), "const migrated = true;\n");
 
-    const created = store.createSkill({ name: "new-skill", content: "new content" });
+    const created = store.createSkill({ name: "new-skill", content: skillDraft("new-skill") });
     assert.equal(created.skill.name, "new-skill");
     const updated = store.updateSkill(created.skill.id, {
       name: "renamed-skill",
-      content: "updated content",
+      content: skillDraft("renamed-skill").replace("Describe the exact workflow the agent should follow.", "Updated content."),
     });
     assert.equal(updated.skill.name, "renamed-skill");
-    assert.equal(updated.skill.content, "updated content");
-    store.setSelectedSkills([created.skill.id]);
+    assert.match(updated.skill.content, /Updated content/);
+    store.setSelectedSkills([updated.skill.id]);
     const activePreset = store.getRigConfigurations().configurations.find((configuration) => configuration.selected);
-    assert.deepEqual(activePreset.skillIds, [created.skill.id]);
+    assert.deepEqual(activePreset.skillIds, [updated.skill.id]);
 
     const alternatePreset = {
       ...structuredClone(activePreset),
@@ -237,7 +240,7 @@ test("SQLite is the sole skill store and removes the legacy source column", asyn
     store = null;
 
     const database = new DatabaseSync(databasePath);
-    const columns = database.prepare("SELECT name FROM pragma_table_info('skills')").all()
+    const columns = database.prepare("SELECT name FROM pragma_table_info('skills_legacy_archive')").all()
       .map(({ name }) => name);
     const presetColumns = database.prepare("SELECT name FROM pragma_table_info('presets')").all()
       .map(({ name }) => name);
@@ -250,8 +253,10 @@ test("SQLite is the sole skill store and removes the legacy source column", asyn
     const legacyToolPermissionsTable = database.prepare(
       "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'tool_permissions'",
     ).get();
+    const activeSkillsTable = database.prepare("SELECT name FROM sqlite_master WHERE name = 'skills'").get();
     database.close();
     assert.deepEqual(columns, ["id", "name", "content", "selected", "updated_at"]);
+    assert.equal(activeSkillsTable, undefined);
     assert.ok(presetColumns.includes("skill_ids"));
     assert.ok(presetColumns.includes("sub_agents"));
     assert.equal(legacyPresetTable, undefined);

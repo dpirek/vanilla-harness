@@ -26,6 +26,24 @@ function createSkill(name, content) {
   return requestJson("/api/skills", jsonOptions("POST", { name, content }), "Unable to create skill.");
 }
 
+function importSkill(files) {
+  return requestJson("/api/skills", jsonOptions("POST", { action: "import", files }), "Unable to import skill.");
+}
+
+function testSkill(skillId) {
+  return requestJson("/api/skills", jsonOptions("POST", { action: "test", skillId }), "Unable to test skill.");
+}
+
+async function loadSkillResource(skillId, resource) {
+  const query = new URLSearchParams({ skillId, resource });
+  const payload = await requestJson(`/api/skills?${query}`, {}, "Unable to load skill resource.");
+  return payload.content;
+}
+
+function saveSkillResource(skillId, resource, content) {
+  return requestJson("/api/skills", jsonOptions("PUT", { skillId, resource, content }), "Unable to save skill resource.");
+}
+
 function loadProviderModels({ provider, baseUrl, apiKey }) {
   return requestJson(
     "/api/models",
@@ -83,17 +101,21 @@ function saveRigConfigurations(configurations, activeConfigurationId) {
 export {
   loadConfig,
   createSkill,
+  importSkill,
   loadHealth,
   loadProviderModels,
   loadRigConfigurations,
   loadSkills,
+  loadSkillResource,
   loadSystemPrompts,
   loadTaskRatings,
   saveConfig,
   saveRigConfigurations,
   saveSkill,
+  saveSkillResource,
   saveSelectedSkills,
   saveSystemPrompt,
   saveTaskRating,
   testProviderModel,
+  testSkill,
 };

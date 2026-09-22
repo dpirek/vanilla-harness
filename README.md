@@ -14,7 +14,7 @@ The application supports:
 - Dependency-free JavaScript/Node syntax checks and lexical navigation
 - MCP servers and configurable skills
 - Asynchronous task delegation to one or more A2A Agent Workers
-- Persistent conversations, skills, and settings in SQLite
+- Persistent conversations and settings in SQLite; skills in `/skills` folders
 - Image attachments and optional microphone transcription
 
 ## Requirements
@@ -92,7 +92,9 @@ db/ui-state.sqlite
 
 The `db/` directory is ignored by Git. Provider API keys saved through the UI are stored in this local database, so treat it as sensitive data and do not publish or share it.
 
-If `AI_HARNESS_DATA_DIR` is set, the database is created under that directory instead. Microphone recordings are written to a `recordings/` directory inside the selected workspace.
+Skills live under `skills/<name>/SKILL.md` beside `db/`. Supporting files can live in `scripts/`, `references/`, `templates/`, and `examples/` inside each skill folder. The Skills modal can create and edit a guide, import a whole folder (including binary resources), edit supporting text files, and test metadata, referenced files, and JavaScript syntax without running scripts. Selected skills remain a per-preset setting in SQLite. The agent can read selected supporting files with `read_skill_resource`. Existing SQLite skills are exported to folders on startup; their old table is kept as `skills_legacy_archive` for recovery.
+
+If `AI_HARNESS_DATA_DIR` is set, both `db/` and `skills/` are created under that directory instead. Microphone recordings are written to a `recordings/` directory inside the selected workspace.
 
 ## Project structure
 
@@ -101,6 +103,7 @@ server.js          HTTP, WebSocket, workspace, and provider server
 lib/               Agent loop, model clients, tools, MCP, skills, and SQLite state
 public/            Vanilla JavaScript UI, components, styles, and browser services
 db/                Local runtime state (ignored by Git)
+skills/            SKILL.md guides and supporting scripts, references, templates, examples
 ```
 
 ## Terminal interface

@@ -1,6 +1,7 @@
 const DEFAULT_TOOL_PERMISSIONS = {
   list_files: true,
   read_file: true,
+  read_skill_resource: true,
   write_file: true,
   search_files: true,
   curl: true,

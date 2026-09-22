@@ -2284,9 +2284,18 @@ textarea:disabled {
 }
 
 .skillTable .skillActionColumn {
-  width: 92px;
+  width: 100px;
   text-align: right;
 }
+.skillTable .skillActionColumn button + button { margin-left: 5px; }
+.skillResourcesSection { display: grid; gap: 10px; border-top: 1px solid var(--line); padding-top: 14px; }
+.skillResourcesSection[hidden] { display: none; }
+.skillResourcesSection h3, .skillResourcesSection p { margin: 0; }
+.skillResourcesSection p { color: var(--muted); font-size: .8rem; }
+.skillResourceList { display: flex; flex-wrap: wrap; gap: 6px; }
+.skillResourceList button, .skillResourceActions button { border: 1px solid var(--line); border-radius: 7px; background: var(--raised); color: var(--text); padding: 7px 10px; }
+.skillResourceActions { display: flex; gap: 8px; }
+.skillTestResults { margin: 0; white-space: pre-wrap; font-size: .78rem; }
 
 .skillEditButton {
   min-height: 30px;

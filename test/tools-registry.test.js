@@ -9,6 +9,7 @@ test("local tool modules compose into the existing tool registry", () => {
   assert.deepEqual(tools.map((tool) => tool.name), [
     "list_files",
     "read_file",
+    "read_skill_resource",
     "write_file",
     "search_files",
     "curl",

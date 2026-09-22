@@ -5,6 +5,7 @@ const TOOL_ROWS = [
   ["List files", "List files and folders inside the workspace.", "list_files"],
   ["Search files", "Search workspace text files with a regular expression.", "search_files"],
   ["Read files", "Read selected UTF-8 file contents from the workspace.", "read_file"],
+  ["Read skill resource", "Read scripts, references, templates, and examples from selected skill folders.", "read_skill_resource"],
   ["Exact edits", "Unique replacements across files with durable recovery.", "edit_files"],
   ["Change history", "Review, undo, and redo tracked file changes.", "change_history"],
   ["JavaScript tools", "Node syntax checks, import hints, and lexical symbol/reference lookup.", "javascript"],
@@ -17,7 +18,7 @@ const TOOL_ROWS = [
 
 const TOOL_GROUPS = [
   ["file-access", "File access", ["list_files", "search_files", "read_file", "write_file", "edit_files", "change_history"]],
-  ["code-inspection", "Code inspection", ["javascript"]],
+  ["code-inspection", "Code and skills", ["javascript", "read_skill_resource"]],
   ["web-access", "Web access", ["curl", "chrome_devtools"]],
   ["execution", "Execution and delegation", ["run_command", "delegate_to_sub_agent"]],
 ];

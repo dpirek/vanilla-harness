@@ -314,14 +314,28 @@ export function createSettingsApiHandlers({
     methodNotAllowed(res, "GET, PUT");
   }
 
-  async function handleSkillsApi(req, res) {
+  async function handleSkillsApi(req, res, url) {
     if (req.method === "GET") {
+      if (url?.searchParams.has("skillId") && url.searchParams.has("resource")) {
+        try {
+          json(res, 200, { ok: true, content: uiStateStore.getSkillResource(url.searchParams.get("skillId"), url.searchParams.get("resource")) });
+        } catch (error) { json(res, 400, { ok: false, error: error.message }); }
+        return;
+      }
       json(res, 200, { ok: true, skills: uiStateStore.getSkills() });
       return;
     }
     if (req.method === "POST") {
       try {
-        const body = JSON.parse(await readRequestBody(req, 2_100_000) || "{}");
+        const body = JSON.parse(await readRequestBody(req, 20_000_000) || "{}");
+        if (body.action === "import") {
+          json(res, 200, { ok: true, ...uiStateStore.importSkill(body.files) });
+          return;
+        }
+        if (body.action === "test") {
+          json(res, 200, { ok: true, report: uiStateStore.testSkill(body.skillId) });
+          return;
+        }
         if (typeof body.name !== "string") throw new Error("Expected skill name.");
         const name = normalizeSkillName(body.name);
         if (!name) throw new Error("Enter a skill name using letters, numbers, and hyphens.");
@@ -340,6 +354,10 @@ export function createSettingsApiHandlers({
         const body = JSON.parse(await readRequestBody(req, 2_100_000) || "{}");
         if (Array.isArray(body.selectedSkillIds)) {
           json(res, 200, { ok: true, skills: uiStateStore.setSelectedSkills(body.selectedSkillIds) });
+          return;
+        }
+        if (typeof body.skillId === "string" && typeof body.resource === "string" && typeof body.content === "string") {
+          json(res, 200, { ok: true, ...uiStateStore.setSkillResource(body.skillId, body.resource, body.content) });
           return;
         }
         if (typeof body.skillId === "string" && typeof body.content === "string") {

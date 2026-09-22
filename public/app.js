@@ -65,20 +65,24 @@ import {
 } from "./services/workspace-api.js";
 import {
   createSkill as persistNewSkill,
+  importSkill as persistImportedSkill,
   loadConfig as fetchConfig,
   loadHealth as fetchHealth,
   loadProviderModels as fetchProviderModels,
   loadRigConfigurations as fetchRigConfigurations,
   loadSkills as fetchSkills,
+  loadSkillResource as fetchSkillResource,
   loadSystemPrompts as fetchSystemPrompts,
   loadTaskRatings as fetchTaskRatings,
   saveConfig as persistConfig,
   saveRigConfigurations as persistRigConfigurations,
   saveSelectedSkills as persistSelectedSkills,
   saveSkill as persistSkill,
+  saveSkillResource as persistSkillResource,
   saveSystemPrompt as persistSystemPrompt,
   saveTaskRating as persistTaskRating,
   testProviderModel as runProviderModelTest,
+  testSkill as runStoredSkillTest,
 } from "./services/settings-api.js";
 import SocketService from "./services/socket-service.js";
 
@@ -168,6 +172,12 @@ const skillLibrary = appRoot.querySelector(".skillLibrary");
 const skillEditor = appRoot.querySelector("#skillEditor");
 const skillEditorName = appRoot.querySelector("#skillEditorName");
 const skillEditorContent = appRoot.querySelector("#skillEditorContent");
+const skillResourcesSection = appRoot.querySelector("#skillResourcesSection");
+const skillResourceList = appRoot.querySelector("#skillResourceList");
+const skillResourcePath = appRoot.querySelector("#skillResourcePath");
+const skillResourceContent = appRoot.querySelector("#skillResourceContent");
+const skillTestResults = appRoot.querySelector("#skillTestResults");
+const importSkillInput = appRoot.querySelector("#importSkillInput");
 const skillsDialogTitle = appRoot.querySelector("#skillsDialogTitle");
 const skillsDialogDescription = appRoot.querySelector("#skillsDialogDescription");
 const backToSkillsButton = appRoot.querySelector("#backToSkillsButton");
@@ -456,7 +466,7 @@ function renderSkills() {
     name.textContent = skill.name;
     const summary = document.createElement("div");
     summary.className = "skillSummary";
-    summary.textContent = summarizeSkillContent(skill.content);
+    summary.textContent = skill.description || summarizeSkillContent(skill.content);
     nameCell.append(name, summary);
 
     const toggleCell = document.createElement("td");
@@ -476,7 +486,11 @@ function renderSkills() {
     editButton.className = "skillEditButton";
     setActionIcon(editButton, "pencil-square", `Edit ${skill.name}`);
     editButton.addEventListener("click", () => openSkillEditor(skill.id));
-    actionCell.append(editButton);
+    const testButton = document.createElement("button");
+    testButton.type = "button";
+    setActionIcon(testButton, "check-lg", `Test ${skill.name}`);
+    testButton.addEventListener("click", () => testStoredSkill(skill.id));
+    actionCell.append(editButton, testButton);
 
     row.append(nameCell, toggleCell, actionCell);
     skillsTableBody.append(row);
@@ -500,12 +514,79 @@ function setSkillEditorPending(pending) {
     : editingSkillId === null ? "Create skill" : "Save skill";
 }
 
+function renderSkillResources(skill) {
+  skillResourceList.replaceChildren();
+  for (const resource of skill?.resources || []) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = resource;
+    button.addEventListener("click", async () => {
+      try {
+        skillResourcePath.value = resource;
+        skillResourceContent.value = await fetchSkillResource(skill.id, resource);
+        skillsStatus.textContent = `Editing ${resource}`;
+        skillsStatus.dataset.state = "";
+      } catch (error) { skillsStatus.textContent = error.message; skillsStatus.dataset.state = "error"; }
+    });
+    skillResourceList.append(button);
+  }
+}
+
+async function saveCurrentSkillResource() {
+  if (!editingSkillId) return;
+  try {
+    const resource = skillResourcePath.value.trim();
+    const result = await persistSkillResource(editingSkillId, resource, skillResourceContent.value);
+    skills = result.skills || await fetchSkills();
+    renderSkillResources(skills.find((skill) => skill.id === editingSkillId));
+    skillsStatus.textContent = `${resource} saved`;
+    skillsStatus.dataset.state = "success";
+  } catch (error) { skillsStatus.textContent = error.message; skillsStatus.dataset.state = "error"; }
+}
+
+async function testStoredSkill(skillId = editingSkillId) {
+  if (!skillId) return;
+  try {
+    const result = await runStoredSkillTest(skillId);
+    const report = result.report;
+    const lines = report.checks.map((check) => `${check.ok ? "PASS" : "FAIL"} ${check.path}: ${check.message}`);
+    skillTestResults.textContent = lines.join("\n");
+    skillsStatus.textContent = `${skillId}: ${report.ok ? "validation passed" : "validation failed"}`;
+    skillsStatus.dataset.state = report.ok ? "success" : "error";
+  } catch (error) { skillsStatus.textContent = error.message; skillsStatus.dataset.state = "error"; }
+}
+
+async function importSkillFolder() {
+  const files = [...importSkillInput.files].filter((file) => !file.name.startsWith("."));
+  importSkillInput.value = "";
+  if (!files.length) return;
+  try {
+    const payload = await Promise.all(files.map((file) => new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve({ path: file.webkitRelativePath || file.name, content: String(reader.result).split(",", 2)[1], encoding: "base64" });
+      reader.onerror = () => reject(reader.error || new Error(`Unable to read ${file.name}`));
+      reader.readAsDataURL(file);
+    })));
+    const result = await persistImportedSkill(payload);
+    skills = result.skills || await fetchSkills();
+    renderSkills();
+    renderPresetSkills();
+    skillsStatus.textContent = `${result.skill.name} imported to /skills`;
+    skillsStatus.dataset.state = "success";
+  } catch (error) { skillsStatus.textContent = error.message; skillsStatus.dataset.state = "error"; }
+}
+
 function openSkillEditor(skillId = null) {
   const skill = skillId ? skills.find((entry) => entry.id === skillId) : null;
   if (skillId && !skill) return;
   editingSkillId = skill?.id || null;
   skillEditorName.value = skill?.name || "";
   skillEditorContent.value = skill?.content || skillDraft();
+  skillResourcesSection.hidden = !skill;
+  skillResourcePath.value = "";
+  skillResourceContent.value = "";
+  skillTestResults.textContent = "";
+  renderSkillResources(skill);
   skillLibrary.hidden = true;
   skillEditor.hidden = false;
   backToSkillsButton.hidden = false;
@@ -519,7 +600,7 @@ function openSkillEditor(skillId = null) {
     : "Create a skill with valid metadata and instructions";
   skillsStatus.textContent = skill
     ? `Editing ${skill.name}`
-    : "New skills are stored in SQLite.";
+    : "New skills are stored in /skills.";
   skillsStatus.dataset.state = "";
   setSkillEditorPending(false);
   if (skill) {
@@ -544,7 +625,7 @@ function closeSkillEditor({ preserveStatus = false } = {}) {
   skillsDialogDescription.textContent = "Choose which SKILL.md guides are injected into new agent sessions";
   setSkillEditorPending(false);
   if (skillsDialog.open && !preserveStatus) {
-    skillsStatus.textContent = "Skill selections are stored in SQLite.";
+    skillsStatus.textContent = "Skill folders are stored in /skills.";
     skillsStatus.dataset.state = "";
   }
 }
@@ -642,6 +723,7 @@ function normalizeProviderRecords(value) {
 const PRESET_STATUS_TOOL_LABELS = {
   list_files: "List files",
   read_file: "Read files",
+  read_skill_resource: "Skill resources",
   write_file: "Write files",
   search_files: "Search files",
   curl: "Curl",
@@ -782,6 +864,7 @@ function selectPresetProvider() {
 const PRESET_TOOL_INPUTS = {
   list_files: "presetToolListFiles",
   read_file: "presetToolReadFile",
+  read_skill_resource: "presetToolReadSkillResource",
   edit_files: "presetToolEditFiles",
   change_history: "presetToolChangeHistory",
   javascript: "presetToolJavaScript",
@@ -3773,11 +3856,11 @@ async function openSkillsModal() {
   closeSkillEditor();
   skillsSearchInput.value = "";
   if (!skillsDialog.open) skillsDialog.showModal();
-  skillsStatus.textContent = "Loading skills from SQLite...";
+  skillsStatus.textContent = "Loading skill folders...";
   skillsStatus.dataset.state = "";
   try {
     await loadSkills();
-    skillsStatus.textContent = "Skill selections are stored in SQLite.";
+    skillsStatus.textContent = "Skill folders are stored in /skills.";
     skillsStatus.dataset.state = "";
   } catch (error) {
     skillsStatus.textContent = error.message;
@@ -4065,6 +4148,9 @@ skillsModal.addEventListener("search-skills", renderSkills);
 skillsModal.addEventListener("create-skill", () => openSkillEditor());
 skillsModal.addEventListener("cancel-skill-edit", closeSkillEditor);
 skillsModal.addEventListener("save-skill-edit", saveSkillEdit);
+skillsModal.addEventListener("import-skill", importSkillFolder);
+skillsModal.addEventListener("save-skill-resource", saveCurrentSkillResource);
+skillsModal.addEventListener("test-skill", () => testStoredSkill());
 providersModal.addEventListener("refresh-provider-models", loadProviderModels);
 modelsPage.addEventListener("refresh-all-provider-models", () => loadAllProviderModels());
 modelsPage.addEventListener("provider-model-search", (event) => {
