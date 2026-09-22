@@ -3001,8 +3001,22 @@ function renderProviderModelsTable() {
   }
   for (const item of models) {
     const row = document.createElement("tr");
+    const isSelectedModel = item.details.some((detail) => providers.some((provider) => (
+      String(provider.id) === String(detail.providerId)
+      && provider.selected === true
+      && provider.model === item.model
+    )));
+    row.classList.toggle("selected", isSelectedModel);
     const modelCell = document.createElement("td");
-    modelCell.textContent = item.model;
+    const modelName = document.createElement("span");
+    modelName.textContent = item.model;
+    modelCell.append(modelName);
+    if (isSelectedModel) {
+      const selectedLabel = document.createElement("span");
+      selectedLabel.className = "providerModelSelectedLabel";
+      selectedLabel.textContent = "Selected";
+      modelCell.append(selectedLabel);
+    }
     modelCell.title = item.model;
     const providersCell = document.createElement("td");
     providersCell.className = "providerModelNames";

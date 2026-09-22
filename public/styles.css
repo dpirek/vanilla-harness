@@ -1882,6 +1882,19 @@ textarea:disabled {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   text-overflow: ellipsis;
 }
+.providerModelsTable tbody tr.selected td:first-child { box-shadow: inset 3px 0 var(--accent); }
+.providerModelSelectedLabel {
+  display: inline-block;
+  margin-left: 8px;
+  border: 1px solid var(--strong-line);
+  border-radius: 999px;
+  padding: 2px 6px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: .68rem;
+  font-weight: 700;
+  vertical-align: middle;
+}
 .providerModelsTable th:last-child,
 .providerTable.providerModelsTable td.providerModelActionsCell {
   position: sticky;
@@ -1894,6 +1907,7 @@ textarea:disabled {
 .providerModelsTable th:last-child { z-index: 2; text-align: right; }
 .providerTable.providerModelsTable tbody tr:hover td.providerModelActionsCell,
 .providerTable.providerModelsTable tbody tr.selected td.providerModelActionsCell { background: var(--raised); }
+.providerTable.providerModelsTable tbody tr.selected td.providerModelActionsCell { background: var(--selected); }
 .providerTable.providerModelsTable td.providerModelActionsCell { display: table-cell; }
 .providerModelUseActions { display: flex; align-items: center; justify-content: flex-end; gap: 6px; color: var(--muted); }
 .providerTable button.providerModelUseButton {
