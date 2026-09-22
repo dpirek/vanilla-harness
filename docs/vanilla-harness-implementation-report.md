@@ -137,4 +137,4 @@ Screenshots: [tools](.ui-verification/parity-artifacts/tools-settings.png), [run
 
 The browser pass found and drove fixes for settings JSON parsing, document-versus-Shadow-DOM dialog mounting, and duplicate current-prompt history. These checks used a deterministic local model fixture; they do not certify live model/provider quality or broad browser/platform compatibility. `git diff --check` also passed.
 
-See [FEATURE_PARITY.md](FEATURE_PARITY.md) for the current scoped comparison and the original baseline review.
+See [OpenCode feature parity](opencode-feature-parity.md) for the current scoped comparison and the original baseline review.

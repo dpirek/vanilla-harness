@@ -12,7 +12,7 @@ Updated September 20, 2026 after implementing the four requested feature areas i
 
 The requested areas now have concrete implementations, but full OpenCode equivalence is not asserted. Broader baseline gaps such as desktop distribution, worktrees, editor integrations, native provider breadth, and MCP OAuth remain outside this implementation.
 
-Validation: **171 passing tests** plus an isolated Chrome/local mock-model workflow covering settings, JavaScript inspection, undo/redo, approval before mutation, and structured tool-result replay. See [IMPLEMENTATION_REPORT.md](IMPLEMENTATION_REPORT.md) for details, usage, and limits.
+Validation: **171 passing tests** plus an isolated Chrome/local mock-model workflow covering settings, JavaScript inspection, undo/redo, approval before mutation, and structured tool-result replay. See [implementation report](vanilla-harness-implementation-report.md) for details, usage, and limits.
 
 ## Historical baseline
 

@@ -49,4 +49,4 @@ Codex's strongest transferable ideas are deeper execution boundaries, project-aw
 
 ## Review limits
 
-The two local checkouts were inspected without running either application or its tests. Absence claims mean no first-class path was found in the inspected source, not that the behavior is impossible through shell commands or third-party MCP tools. Codex is a much larger product; feature presence does not establish reliability or suitability for Vanilla Harness. The existing [OpenCode parity report](FEATURE_PARITY.md) describes a different comparison and should not be read as Codex evidence.
+The two local checkouts were inspected without running either application or its tests. Absence claims mean no first-class path was found in the inspected source, not that the behavior is impossible through shell commands or third-party MCP tools. Codex is a much larger product; feature presence does not establish reliability or suitability for Vanilla Harness. The existing [OpenCode parity report](opencode-feature-parity.md) describes a different comparison and should not be read as Codex evidence.
