@@ -2,6 +2,39 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { CodingAgent } from "../lib/agent.js";
+import { resolveSystemPrompts } from "../lib/system-prompts.js";
+
+test("each role has editable prompt defaults and keeps its own changes", () => {
+  const prompts = {
+    role_preset: "researcher",
+    researcher_agent_instructions: "Check primary sources first.",
+    travel_agent_agent_instructions: "Compare flight options.",
+  };
+  assert.equal(resolveSystemPrompts(prompts).agent_instructions, "Check primary sources first.");
+  assert.equal(resolveSystemPrompts({ ...prompts, role_preset: "travel_agent" }).agent_instructions, "Compare flight options.");
+  assert.match(resolveSystemPrompts(prompts).prompt_refinement, /researcher assistant/);
+  assert.equal(resolveSystemPrompts({ ...prompts, role_preset: "global" }).agent_instructions, resolveSystemPrompts({ role_preset: "global" }).agent_instructions);
+});
+
+test("selected role guidance yields to global agent instructions", async () => {
+  let request;
+  const agent = new CodingAgent({
+    client: { async createResponse(body) {
+      request = body;
+      return { id: "response-1", output_text: "done", output: [] };
+    } },
+    model: "test-model",
+    root: "/workspace",
+    tools: [],
+    systemPrompts: { role_preset: "researcher", agent_instructions: "Global policy: answer in Spanish." },
+  });
+
+  await agent.run("Investigate this.");
+
+  assert.match(request.instructions, /Act as a researcher/);
+  assert.match(request.instructions, /Global policy: answer in Spanish/);
+  assert.ok(request.instructions.indexOf("Act as a researcher") < request.instructions.indexOf("Global policy: answer in Spanish"));
+});
 
 test("agent prompt describes provider-managed remote MCP servers", async () => {
   const requests = [];

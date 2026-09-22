@@ -151,6 +151,7 @@ const systemPromptsList = appRoot.querySelector("#systemPromptsList");
 const systemPromptEditor = appRoot.querySelector("#systemPromptEditor");
 const systemPromptEditorTitle = appRoot.querySelector("#systemPromptEditorTitle");
 const systemPromptContent = appRoot.querySelector("#systemPromptContent");
+const systemPromptRolePreset = appRoot.querySelector("#systemPromptRolePreset");
 const systemPromptsStatus = appRoot.querySelector("#systemPromptsStatus");
 const saveSystemPromptButton = appRoot.querySelector("#saveSystemPromptButton");
 const skillsTableBody = appRoot.querySelector("#skillsTableBody");
@@ -363,7 +364,11 @@ let editingSkillId = null;
 
 function renderSystemPrompts() {
   systemPromptsList.replaceChildren();
+  const role = systemPromptRolePreset.value;
+  const baseKeys = new Set(["prompt_refinement", "agent_instructions", "workspace_context", "tool_contract", "validation_reminder"]);
   for (const prompt of systemPrompts) {
+    const field = role === "global" ? prompt.key : prompt.key.slice(role.length + 1);
+    if (!baseKeys.has(field) || (role !== "global" && !prompt.key.startsWith(`${role}_`))) continue;
     const row = document.createElement("article"); row.className = "systemPromptRow";
     const title = document.createElement("strong"); title.textContent = prompt.title;
     const edit = document.createElement("button"); edit.type = "button"; edit.textContent = "Edit";
@@ -379,6 +384,7 @@ function renderSystemPrompts() {
 
 async function loadSystemPrompts() {
   systemPrompts = await fetchSystemPrompts();
+  systemPromptRolePreset.value = systemPrompts.find((prompt) => prompt.key === "role_preset")?.content || "global";
   renderSystemPrompts();
 }
 
@@ -690,7 +696,7 @@ function renderPresetStatusBar() {
 
   const activeSkillIds = new Set((active.skillIds || []).map((id) => String(id)));
   const configuredPrompts = Object.entries(active.systemPrompts || {})
-    .filter(([, content]) => String(content || "").trim())
+    .filter(([name, content]) => Object.hasOwn(PRESET_PROMPT_TITLES, name) && String(content || "").trim())
     .map(([name]) => PRESET_PROMPT_TITLES[name] || titleCaseIdentifier(name));
   const selectedSkills = skills
     .filter((skill) => skill.selected === true || activeSkillIds.has(String(skill.id)))
@@ -800,6 +806,7 @@ function setPresetEditorPending(pending) {
 function renderPresetPromptEditors(prompts = {}) {
   presetSystemPrompts.replaceChildren();
   for (const [key, content] of Object.entries(prompts)) {
+    if (!Object.hasOwn(PRESET_PROMPT_TITLES, key)) continue;
     const label = document.createElement("label");
     label.className = "presetPromptField";
     const title = document.createElement("span");
@@ -1007,6 +1014,9 @@ async function savePresetEdit() {
     [...presetSystemPrompts.querySelectorAll("textarea[data-prompt-key]")]
       .map((textarea) => [textarea.dataset.promptKey, textarea.value]),
   );
+  for (const [key, value] of Object.entries(current.systemPrompts || {})) {
+    if (!Object.hasOwn(PRESET_PROMPT_TITLES, key)) systemPrompts[key] = value;
+  }
   const componentState = normalizeRigComponentState(current.componentState);
   const toolPermissions = normalizeToolPermissions(
     Object.fromEntries(Object.entries(PRESET_TOOL_INPUTS).map(([key, id]) => [key, appRoot.querySelector(`#${id}`).checked])),
@@ -2715,6 +2725,7 @@ function renderToolPermissions(settings = storedToolPermissions) {
   for (const input of toolPermissionInputs) {
     input.checked = permissions[input.dataset.toolPermission] === true;
   }
+  toolsModal.syncToolGroupChecks();
 }
 
 async function saveToolPermissions() {
@@ -4023,6 +4034,20 @@ sidebarComponent.addEventListener("open-modal", async (event) => {
 
 systemPromptsModal.addEventListener("save-system-prompt", async () => {
   try { await saveSystemPrompt(); } catch (error) { systemPromptsStatus.textContent = error.message; systemPromptsStatus.dataset.state = "error"; }
+});
+systemPromptsModal.addEventListener("save-system-prompt-role", async () => {
+  try {
+    const role = systemPromptRolePreset.value;
+    await persistSystemPrompt("role_preset", role);
+    const active = presetConfigurations.find((configuration) => configuration.id === activePresetId);
+    updateActivePresetSnapshot({ systemPrompts: { ...(active?.systemPrompts || {}), role_preset: role } });
+    systemPromptsStatus.textContent = `${systemPromptRolePreset.selectedOptions[0].textContent} role saved`;
+    systemPromptsStatus.dataset.state = "success";
+    await loadSystemPrompts();
+  } catch (error) {
+    systemPromptsStatus.textContent = error.message;
+    systemPromptsStatus.dataset.state = "error";
+  }
 });
 skillsModal.addEventListener("save-skills", async () => {
   try { await saveSkills(); } catch (error) { skillsStatus.textContent = error.message; skillsStatus.dataset.state = "error"; }

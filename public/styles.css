@@ -1652,6 +1652,10 @@ textarea:disabled {
 #saveSystemPromptButton[hidden], .systemPromptEditor[hidden], .systemPromptsList[hidden] { display: none; }
 
 .systemPromptsList { display: grid; border: 1px solid #292929; border-radius: 9px; overflow: hidden; }
+.systemPromptRole { display: grid; gap: 6px; padding: 14px; border: 1px solid var(--line); border-radius: 9px; background: var(--panel); }
+.systemPromptRole label { display: flex; align-items: center; justify-content: space-between; gap: 14px; font-weight: 700; }
+.systemPromptRole select { min-width: 175px; padding: 9px 40px 9px 12px; appearance: none; border: 1px solid var(--line); border-radius: 8px; background: var(--field) url("/vendor/bootstrap-icons/chevron-down-muted.svg") no-repeat right 14px center; color: var(--text); }
+.systemPromptRole p { margin: 0; color: var(--muted); font-size: .8rem; }
 .systemPromptRow { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border-bottom: 1px solid #292929; }
 .systemPromptRow:last-child { border-bottom: 0; }
 .systemPromptRow button { min-height: 32px; border: 1px solid #333; border-radius: 999px; background: #1f1f1f; padding: 0 12px; }
@@ -3083,11 +3087,39 @@ models-page .providerTableWrap { max-height: none; }
 
 .modelRatingIcon { width: 12px; height: 12px; }
 
-.runtimeSettings { padding: 1rem; display: grid; gap: .75rem; border-top: 1px solid var(--border, #555); }
-.runtimeSettings label { display: flex; gap: .75rem; align-items: center; justify-content: space-between; flex-wrap: wrap; }
-.runtimeSettings textarea { width: 100%; min-height: 9rem; font-family: monospace; }
-.runtimeSettings input[type=number] { width: 9rem; }
-.runtimeSettings p { max-width: 75ch; font-size: .85rem; }
+.toolTree { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--panel); }
+.toolTreeGroup + .toolTreeGroup { border-top: 1px solid var(--line); }
+.toolTreeGroupHeader { display: flex; align-items: center; gap: 4px; padding: 11px 14px; background: var(--raised); }
+.toolTreeDisclosure { width: 28px; height: 28px; border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 1.1rem; }
+.toolTreeGroupLabel, .toolTreeItem { display: flex; align-items: center; gap: 11px; cursor: pointer; }
+.toolTreeGroupLabel { font-weight: 750; }
+.toolTree input[type="checkbox"] { width: 17px; height: 17px; margin: 0; accent-color: var(--accent); flex: none; }
+.toolTreeChildren[hidden] { display: none; }
+.toolTreeChildren { padding: 3px 14px 8px 76px; }
+.toolTreeItem { padding: 9px 0; border-top: 1px solid var(--line); }
+.toolTreeItem:first-child { border-top: 0; }
+.toolTreeItemText { display: grid; gap: 2px; min-width: 0; }
+.toolTreeItemText strong { font-size: .9rem; }
+.toolTreeItemText small { color: var(--muted); font-size: .8rem; line-height: 1.35; }
+.runtimeSettings { display: grid; gap: 14px; padding-top: 18px; border-top: 1px solid var(--line); }
+.runtimeHeading h3, .runtimeCard h4 { margin: 0; }
+.runtimeHeading p { margin: 4px 0 0; color: var(--muted); font-size: .85rem; }
+.runtimeGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.runtimeCard { min-width: 0; display: grid; align-content: start; gap: 12px; padding: 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+.runtimeCardWide { grid-column: 1 / -1; }
+.runtimeCard h4 { font-size: .96rem; }
+.runtimeCard p { margin: 0; color: var(--muted); font-size: .82rem; line-height: 1.45; }
+.runtimeCard .runtimeHelp { padding-top: 4px; font-size: .78rem; }
+.runtimeCard label { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: .84rem; }
+.runtimeCard .runtimeStackedField { display: block; width: 100%; }
+.runtimeCard input:not([type="checkbox"]), .runtimeCard select, .runtimeCard textarea { min-width: 0; max-width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--field); color: var(--text); }
+.runtimeCard select { appearance: none; padding-right: 40px; background-image: url("/vendor/bootstrap-icons/chevron-down-muted.svg"); background-repeat: no-repeat; background-position: right 14px center; }
+.runtimeCard input[type="number"] { width: 105px; }
+.runtimeCard input[type="checkbox"] { width: 17px; height: 17px; accent-color: var(--accent); }
+.runtimeCard textarea { display: block; width: 100%; max-width: none; box-sizing: border-box; min-height: 120px; margin-top: 7px; font: .82rem/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; resize: vertical; }
+.runtimeCard button { justify-self: start; padding: 8px 12px; border: 1px solid var(--line); border-radius: 7px; background: var(--raised); color: var(--text); cursor: pointer; }
+.runtimeCard pre:empty, .runtimeCard #changeHistoryList:empty { display: none; }
+@media (max-width: 650px) { .runtimeGrid { grid-template-columns: 1fr; } .toolTreeChildren { padding-left: 58px; } }
 #changeHistoryList > div { padding: .5rem 0; border-bottom: 1px solid var(--border, #555); }
 #changeHistoryList button { margin: .25rem; }
 #javascriptResults, #changeHistoryPreview, .permissionDialog pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 40vh; overflow: auto; }
