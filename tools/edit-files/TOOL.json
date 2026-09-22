@@ -1,0 +1,9 @@
+{
+  "name": "edit_files",
+  "kind": "builtin",
+  "title": "Exact edits",
+  "description": "Unique replacements across files with durable recovery.",
+  "group": "file-access",
+  "entry": "index.js",
+  "order": 10
+}

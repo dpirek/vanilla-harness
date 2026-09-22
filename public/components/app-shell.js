@@ -27,7 +27,7 @@ class AppShellContent extends BaseComponent {
       element("harness-chat", { class: "chat" }),
       element("column-resize-handle", { id: "filesResizeHandle", class: "columnResizeHandle filesResizeHandle", label: "Resize workspace files column" }),
       element("workspace-panel", { class: "filesColumn" }),
-      element("models-page", { hidden: "", role: "main" }),
+      element("models-page"),
       element("workspace-picker-modal"),
       element("create-workspace-modal"),
       element("file-editor-modal"),

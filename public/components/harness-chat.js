@@ -99,8 +99,8 @@ class HarnessChat extends BaseComponent {
         id: "workspaceMeta", class: "composerProviderSummary",
         "aria-label": "Active provider, model, and pricing",
         children: [
-          this.createElement("button", {
-            id: "providerShortcutButton", type: "button", title: "Manage providers",
+          this.createElement("a", {
+            id: "providerShortcutButton", href: "/providers", "data-app-route": "", title: "Manage providers",
             children: [this.createElement("span", { id: "providerShortcutName", textContent: "Connecting…" })],
           }),
           this.createElement("a", {

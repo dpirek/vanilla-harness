@@ -1,0 +1,9 @@
+{
+  "name": "read_skill_resource",
+  "kind": "builtin",
+  "title": "Read skill resource",
+  "description": "Load a SKILL.md guide or its supporting files.",
+  "group": "code-inspection",
+  "entry": "index.js",
+  "order": 2
+}

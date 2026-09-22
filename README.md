@@ -211,8 +211,8 @@ CLI users can edit shared runtime settings with `/runtime` and review changes wi
 
 Recovery covers built-in writes/exact edits, not shell/MCP/manual-editor changes. JavaScript tooling
 supports `.js`, `.mjs`, and `.cjs`; navigation is lexical, not a full language server.
-See the [implementation report](IMPLEMENTATION_REPORT.md) for configuration examples, limits, and
-validation, and the [parity comparison](FEATURE_PARITY.md) for remaining OpenCode differences.
+See the [implementation report](docs/vanilla-harness-implementation-report.md) for configuration examples, limits, and
+validation, and the [parity comparison](docs/opencode-feature-parity.md) for remaining OpenCode differences.
 
 ## Security notes
 

@@ -1,0 +1,9 @@
+{
+  "name": "curl",
+  "kind": "builtin",
+  "title": "Curl",
+  "description": "Fetch HTTP or HTTPS URLs for API and web inspection.",
+  "group": "web-access",
+  "entry": "index.js",
+  "order": 6
+}

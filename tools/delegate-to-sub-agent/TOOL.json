@@ -1,0 +1,9 @@
+{
+  "name": "delegate_to_sub_agent",
+  "kind": "builtin",
+  "title": "Sub-agent delegation",
+  "description": "Delegate tasks to configured Agent Workers.",
+  "group": "execution",
+  "entry": "index.js",
+  "order": 9
+}

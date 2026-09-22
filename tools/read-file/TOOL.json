@@ -1,0 +1,9 @@
+{
+  "name": "read_file",
+  "kind": "builtin",
+  "title": "Read files",
+  "description": "Read selected UTF-8 file contents from the workspace.",
+  "group": "file-access",
+  "entry": "index.js",
+  "order": 1
+}

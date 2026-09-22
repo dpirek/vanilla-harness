@@ -1,0 +1,9 @@
+{
+  "name": "change_history",
+  "kind": "builtin",
+  "title": "Change history",
+  "description": "Review, undo, and redo tracked file changes.",
+  "group": "file-access",
+  "entry": "index.js",
+  "order": 11
+}

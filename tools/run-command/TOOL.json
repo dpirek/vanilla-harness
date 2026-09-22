@@ -1,0 +1,9 @@
+{
+  "name": "run_command",
+  "kind": "builtin",
+  "title": "Run commands",
+  "description": "Run shell commands in the workspace.",
+  "group": "execution",
+  "entry": "index.js",
+  "order": 7
+}

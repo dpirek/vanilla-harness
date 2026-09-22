@@ -14,7 +14,7 @@ class ProvidersModal extends BaseComponent {
     const button = (id, label, attributes = {}) => element("button", {
       id, type: "button", ...attributes, children: [typeof label === "string" ? text(label) : label],
     });
-    const providersTable = element("table", { class: "providerTable", children: [
+    const providersTable = element("table", { class: "providerTable providersTable", children: [
       element("thead", { children: [element("tr", { children: ["Use", "Name", "Type", "Model", "API key", ""].map((label) =>
         element("th", { children: label ? [text(label)] : [] })) })] }),
       element("tbody", { id: "providersTableBody" }),
@@ -37,7 +37,7 @@ class ProvidersModal extends BaseComponent {
       providerEditor,
     ] });
 
-    this.appendChildren(this, [element("dialog", { id: "settingsDialog", class: "settingsDialog", children: [
+    this.appendChildren(this, [element("dialog", { id: "settingsDialog", class: "settingsDialog providersDialog", children: [
       element("form", { id: "settingsForm", class: "settingsPanel", method: "dialog", children: [
         element("header", { class: "settingsHeader", children: [
           element("div", { children: [element("h2", { children: [text("Providers")] }), element("p", { children: [text("Manage AI providers and credentials")] })] }),

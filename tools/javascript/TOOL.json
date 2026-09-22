@@ -1,0 +1,9 @@
+{
+  "name": "javascript",
+  "kind": "builtin",
+  "title": "JavaScript tools",
+  "description": "Node syntax checks, import hints, and lexical symbol/reference lookup.",
+  "group": "code-inspection",
+  "entry": "index.js",
+  "order": 12
+}

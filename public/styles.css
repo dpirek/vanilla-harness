@@ -2016,6 +2016,9 @@ textarea:disabled {
 .providerTable tbody tr { cursor: pointer; }
 .providerTable tbody tr:hover,
 .providerTable tbody tr.selected { background: #1b1b1b; }
+.providersTable tbody tr.selected td:first-child { box-shadow: inset 3px 0 var(--accent); }
+.providersTable th:first-child,
+.providersTable td:first-child { width: 62px; }
 .providerTable tr:last-child td { border-bottom: 0; }
 .providerSettings .providerTable input[type="checkbox"] {
   width: 18px;
@@ -3173,25 +3176,33 @@ textarea,
 }
 
 
-/* The models catalog occupies the main area while preserving navigation. */
-.app.models-route { grid-template-columns: var(--sidebar-width) 8px minmax(0, 1fr); }
-.app.models-route.sidebar-collapsed { grid-template-columns: var(--sidebar-collapsed-width) 8px minmax(0, 1fr); }
-.app.models-route .chat,
-.app.models-route .filesColumn,
-.app.models-route .filesResizeHandle { display: none; }
-models-page { display: flex; flex-direction: column; min-width: 0; min-height: 0; padding: 24px; gap: 20px; overflow: auto; }
-models-page[hidden] { display: none; }
-models-page .providerModelsSection { min-height: 0; }
-models-page .providerTableWrap { max-height: none; }
-@media (max-width: 900px) {
-  .app.models-route, .app.models-route.sidebar-collapsed { grid-template-columns: minmax(0, 1fr); }
-  .app.models-route .sidebarResizeHandle { display: none; }
+.modelsDialog {
+  width: calc(100vw - 40px);
+  max-width: none;
+  height: min(760px, calc(100vh - 48px));
 }
+.modelsDialog .settingsPanel {
+  height: 100%;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 0;
+  overflow: hidden;
+  padding: 0;
+}
+.modelsDialog .settingsHeader,
+.modelsDialog .settingsFooter { padding: 18px; }
+.modelsDialog .providerModelsSection {
+  min-width: 0;
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr);
+  padding: 18px;
+  overflow: hidden;
+}
+.modelsDialog .providerTableWrap { min-height: 0; max-height: none; overflow: auto; }
 @media (max-width: 700px) {
-  models-page { padding: 12px; }
-  models-page .providerTableToolbar { align-items: stretch; flex-direction: column; }
-  models-page .providerModelsControls { flex-wrap: wrap; }
-  models-page .providerModelsControls input { width: 100%; min-width: 0; }
+  .modelsDialog { width: calc(100vw - 24px); max-height: calc(100vh - 24px); }
+  .modelsDialog .providerTableToolbar { align-items: stretch; flex-direction: column; }
+  .modelsDialog .providerModelsControls { flex-wrap: wrap; }
+  .modelsDialog .providerModelsControls input { width: 100%; min-width: 0; }
 }
 
 .iconButton .bsIcon, .sendButton .bsIcon, .composerIcon .bsIcon { width: 18px; height: 18px; }
@@ -3217,6 +3228,10 @@ models-page .providerTableWrap { max-height: none; }
 .toolTreeItemText { display: grid; gap: 2px; min-width: 0; }
 .toolTreeItemText strong { font-size: .9rem; }
 .toolTreeItemText small { color: var(--muted); font-size: .8rem; line-height: 1.35; }
+.toolTreeItem > .iconButton { margin-left: auto; flex: none; }
+.toolFileActions { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
+#toolEditor { margin-top: 14px; }
+#toolManifest { width: 100%; min-height: 220px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .runtimeSettings { display: grid; gap: 14px; padding-top: 18px; border-top: 1px solid var(--line); }
 .runtimeHeading h3, .runtimeCard h4 { margin: 0; }
 .runtimeHeading p { margin: 4px 0 0; color: var(--muted); font-size: .85rem; }

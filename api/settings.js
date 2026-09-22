@@ -387,7 +387,42 @@ export function createSettingsApiHandlers({
     methodNotAllowed(res, "GET, POST, PUT");
   }
 
+  async function handleToolsApi(req, res, url) {
+    try {
+      if (req.method === "GET") {
+        if (url?.searchParams.has("name") && url.searchParams.has("resource")) {
+          json(res, 200, { ok: true, content: uiStateStore.getToolResource(url.searchParams.get("name"), url.searchParams.get("resource")) });
+          return;
+        }
+        json(res, 200, { ok: true, tools: uiStateStore.getTools() });
+        return;
+      }
+      if (req.method === "POST" || req.method === "PUT") {
+        const body = JSON.parse(await readRequestBody(req, 20_000_000) || "{}");
+        if (body.action === "import") {
+          const tool = uiStateStore.importToolFiles(body.files);
+          json(res, 200, { ok: true, tool, tools: uiStateStore.getTools() });
+          return;
+        }
+        if (body.action === "test") {
+          json(res, 200, { ok: true, report: uiStateStore.testTool(body.content, body.source) });
+          return;
+        }
+        if (req.method === "PUT" && typeof body.name === "string" && typeof body.resource === "string") {
+          uiStateStore.setToolResource(body.name, body.resource, body.content);
+          json(res, 200, { ok: true });
+          return;
+        }
+        const tool = req.method === "POST" ? uiStateStore.createTool(body.content) : uiStateStore.updateTool(body.content);
+        json(res, 200, { ok: true, tool, tools: uiStateStore.getTools() });
+        return;
+      }
+      methodNotAllowed(res, "GET, POST, PUT");
+    } catch (error) { json(res, 400, { ok: false, error: error.message }); }
+  }
+
   return {
+    "/api/tools": handleToolsApi,
     "/api/health": handleHealthApi,
     "/api/config": handleConfigApi,
     "/api/models": handleModelsApi,

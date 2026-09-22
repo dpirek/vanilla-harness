@@ -1,0 +1,9 @@
+{
+  "name": "search_skills",
+  "kind": "builtin",
+  "title": "Search skills",
+  "description": "Find skill guides by name and description without loading them.",
+  "group": "code-inspection",
+  "entry": "index.js",
+  "order": 3
+}

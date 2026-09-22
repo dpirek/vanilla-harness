@@ -228,6 +228,7 @@ const providerNameInput = appRoot.querySelector("#providerNameInput");
 const providersTableBody = appRoot.querySelector("#providersTableBody");
 const providerModelsTableBody = appRoot.querySelector("#providerModelsTableBody");
 const modelsPage = appRoot.querySelector("models-page");
+const modelsDialog = appRoot.querySelector("#modelsDialog");
 const providerModelsFilter = appRoot.querySelector("#providerModelsFilter");
 let routeReady = false;
 const refreshAllProviderModelsButton = appRoot.querySelector("#refreshAllProviderModelsButton");
@@ -241,7 +242,7 @@ const providerApiKeyInput = appRoot.querySelector("#providerApiKeyInput");
 const providerApiKeyField = appRoot.querySelector("#providerApiKeyField");
 const refreshModelsButton = appRoot.querySelector("#refreshModelsButton");
 const providerModelsStatus = appRoot.querySelector("#providerModelsStatus");
-const toolPermissionInputs = [...appRoot.querySelectorAll("[data-tool-permission]")];
+const toolPermissionInputs = () => [...appRoot.querySelectorAll("[data-tool-permission]")];
 const sidebarToggleButton = appRoot.querySelector("#sidebarToggleButton");
 const sidebarResizeHandle = appRoot.querySelector("#sidebarResizeHandle");
 const toggleFilesColumnButton = appRoot.querySelector("#toggleFilesColumnButton");
@@ -2731,11 +2732,15 @@ function renderProvidersTable() {
     const row = document.createElement("tr");
     row.classList.toggle("selected", item.selected === true);
     const selectCell = document.createElement("td");
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.checked = item.selected === true;
-    checkbox.setAttribute("aria-label", `Use ${item.name}`);
-    checkbox.addEventListener("change", () => {
+    const selectButton = document.createElement("button");
+    selectButton.type = "button";
+    selectButton.className = "providerModelUseButton";
+    selectButton.append(bootstrapIcon("check-lg"));
+    selectButton.disabled = item.selected === true;
+    selectButton.setAttribute("aria-pressed", String(item.selected === true));
+    selectButton.title = item.selected ? `Currently using ${item.name}` : `Use ${item.name}`;
+    selectButton.setAttribute("aria-label", selectButton.title);
+    selectButton.addEventListener("click", () => {
       providers = providers.map((provider) => ({ ...provider, selected: provider.id === item.id }));
       applyActiveProviderSettings({
         provider: item.type,
@@ -2746,11 +2751,21 @@ function renderProvidersTable() {
       editingProviderId = item.id;
       persistUiState({ providers });
       renderProvidersTable();
+      renderProviderModelsTable();
       renderProviderSettings(providerSettings, item.name);
     });
-    selectCell.append(checkbox);
+    selectCell.append(selectButton);
     row.append(selectCell);
-    for (const value of [item.name, item.type, item.model || "Default"]) {
+    const nameCell = document.createElement("td");
+    nameCell.append(document.createTextNode(item.name));
+    if (item.selected) {
+      const selectedLabel = document.createElement("span");
+      selectedLabel.className = "providerModelSelectedLabel";
+      selectedLabel.textContent = "Selected";
+      nameCell.append(selectedLabel);
+    }
+    row.append(nameCell);
+    for (const value of [item.type, item.model || "Default"]) {
       const cell = document.createElement("td"); cell.textContent = value; row.append(cell);
     }
     const apiKeyCell = document.createElement("td");
@@ -2841,7 +2856,7 @@ function saveProviderSettings() {
 
 function currentToolPermissions() {
   const permissions = normalizeToolPermissions();
-  for (const input of toolPermissionInputs) {
+  for (const input of toolPermissionInputs()) {
     permissions[input.dataset.toolPermission] = input.checked;
   }
   return permissions;
@@ -2849,7 +2864,7 @@ function currentToolPermissions() {
 
 function renderToolPermissions(settings = storedToolPermissions) {
   const permissions = normalizeToolPermissions(settings);
-  for (const input of toolPermissionInputs) {
+  for (const input of toolPermissionInputs()) {
     input.checked = permissions[input.dataset.toolPermission] === true;
   }
   toolsModal.syncToolGroupChecks();
@@ -3226,12 +3241,21 @@ function formatTokenCost(value) {
 function renderRoute() {
   const routeProviderId = modelsRouteProviderId(window.location.pathname);
   const showModels = routeProviderId !== null;
+  const showProviders = /^\/providers\/?$/.test(window.location.pathname);
   if (showModels) providerModelsProviderId = routeProviderId;
-  appShell.classList.toggle("models-route", showModels);
-  modelsPage.hidden = !showModels;
+  if (routeReady) {
+    if (!showModels && modelsDialog.open) modelsDialog.close();
+    if (!showProviders && settingsDialog.open) settingsDialog.close();
+    if (showModels && !modelsDialog.open) modelsDialog.showModal();
+    if (showProviders && !settingsDialog.open) {
+      prepareProvidersModal();
+      settingsDialog.showModal();
+    }
+  }
   providerShortcutModel.setAttribute("aria-current", showModels ? "page" : "false");
+  appRoot.querySelector("#providerShortcutButton").setAttribute("aria-current", showProviders ? "page" : "false");
   appRoot.querySelector("#collapsedModelsLink").setAttribute("aria-current", showModels ? "page" : "false");
-  document.title = showModels ? "Models · AI Harness" : "AI Harness";
+  document.title = showModels ? "Models · AI Harness" : showProviders ? "Providers · AI Harness" : "AI Harness";
   if (showModels && routeReady) loadAllProviderModels({ missingOnly: true });
 }
 
@@ -3247,6 +3271,16 @@ appRoot.addEventListener("click", (event) => {
   navigateRoute(link.getAttribute("href"));
 });
 window.addEventListener("popstate", renderRoute);
+modelsDialog.addEventListener("close", () => {
+  if (modelsRouteProviderId(window.location.pathname) === null) return;
+  window.history.replaceState({}, "", "/");
+  renderRoute();
+});
+settingsDialog.addEventListener("close", () => {
+  if (!/^\/providers\/?$/.test(window.location.pathname)) return;
+  window.history.replaceState({}, "", "/");
+  renderRoute();
+});
 renderRoute();
 
 async function loadAllProviderModels({ missingOnly = false } = {}) {
@@ -3893,7 +3927,7 @@ window.addEventListener("resize", () => {
   setFilesWidth(filesWidth);
 });
 
-function openProvidersModal() {
+function prepareProvidersModal() {
   renderProvidersTable();
   renderProviderModelsTable();
   providerSettingsSection.classList.remove("editor-open");
@@ -3901,7 +3935,10 @@ function openProvidersModal() {
   saveSettingsButton.hidden = true;
   settingsStatus.textContent = "Provider settings are stored in SQLite.";
   settingsStatus.dataset.state = "";
-  if (!settingsDialog.open) settingsDialog.showModal();
+}
+
+function openProvidersModal() {
+  navigateRoute("/providers");
 }
 
 async function openSkillsModal() {
@@ -3935,7 +3972,7 @@ async function openSystemPromptsModal() {
 
 function openToolsModal() {
   if (!toolsDialog.open) toolsDialog.showModal();
-  renderToolPermissions();
+  toolsModal.loadToolDefinitions().then(() => renderToolPermissions()).catch((error) => { toolPermissionsStatus.textContent = error.message; toolPermissionsStatus.dataset.state = 'error'; });
   toolsModal.loadRuntimeSettings().catch((error) => { toolPermissionsStatus.textContent = error.message; toolPermissionsStatus.dataset.state = 'error'; });
   toolPermissionsStatus.textContent = "Tool permissions are stored in the active preset.";
   toolPermissionsStatus.dataset.state = "";
@@ -4158,8 +4195,6 @@ async function saveWorkflowSettings() {
   }
 }
 
-appRoot.querySelector("#providerShortcutButton").addEventListener("click", openProvidersModal);
-
 sidebarComponent.addEventListener("open-modal", async (event) => {
   if (event.detail.modal === "providers") openProvidersModal();
   if (event.detail.modal === "system-prompts") {
@@ -4217,7 +4252,8 @@ modelsPage.addEventListener("provider-model-search", (event) => {
   renderProviderModelsTable();
 });
 modelsPage.addEventListener("provider-model-filter", (event) => {
-  navigateRoute(modelsRoutePath(event.detail.providerId));
+  window.history.replaceState({}, "", modelsRoutePath(event.detail.providerId));
+  renderRoute();
 });
 modelsPage.addEventListener("provider-model-sort", (event) => sortProviderModels(event.detail.key));
 providersModal.addEventListener("add-provider", addProvider);
@@ -4237,6 +4273,7 @@ mcpModal.addEventListener("show-mcp-config-import", () => {
 mcpModal.addEventListener("import-mcp-config", addMcpServersFromConfig);
 providersModal.addEventListener("save-provider-settings", saveProviderSettings);
 toolsModal.addEventListener("save-tool-permissions", saveToolPermissions);
+toolsModal.addEventListener("tool-definitions-changed", () => renderToolPermissions());
 toolsModal.addEventListener('load-change-history', loadChangeHistory);
 toolsModal.addEventListener('inspect-javascript', async () => {
   const result = toolsModal.querySelector('#javascriptResults');
@@ -4407,11 +4444,11 @@ async function initialize() {
   await loadWorkspaceTree();
   routeReady = true;
   renderRoute();
-  const viewingModels = appShell.classList.contains("models-route");
-  if (!viewingModels && needsDefaultWorkspace) {
+  const viewingModalRoute = modelsRouteProviderId(window.location.pathname) !== null || /^\/providers\/?$/.test(window.location.pathname);
+  if (!viewingModalRoute && needsDefaultWorkspace) {
     openProvidersAfterWorkspaceSelection = shouldOpenProvidersModal;
     await openDefaultWorkspacePicker();
-  } else if (!viewingModels && shouldOpenProvidersModal) {
+  } else if (!viewingModalRoute && shouldOpenProvidersModal) {
     openProvidersModal();
   }
   connect();

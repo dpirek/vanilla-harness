@@ -26,6 +26,106 @@ const TOOL_GROUPS = [
 const TOOL_TREE_STORAGE_KEY = "ai-harness.toolsCollapsedGroups";
 
 class ToolsModal extends BaseComponent {
+  async loadToolDefinitions() {
+    const response = await fetch('/api/tools');
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || 'Unable to load tools.');
+    this.tools = payload.tools;
+    const tree = this.querySelector('.toolTree');
+    tree.replaceChildren();
+    const labels = new Map(TOOL_GROUPS.map(([id, label]) => [id, label]));
+    let collapsed = [];
+    try { collapsed = JSON.parse(localStorage.getItem(TOOL_TREE_STORAGE_KEY) || '[]'); } catch { /* Use defaults. */ }
+    const groups = new Map();
+    for (const tool of payload.tools) {
+      const group = tool.group || 'custom';
+      if (!groups.has(group)) groups.set(group, []);
+      groups.get(group).push(tool);
+    }
+    for (const [id, tools] of groups) {
+      const name = labels.get(id) || id.replaceAll('-', ' ').replace(/^./, (letter) => letter.toUpperCase());
+      const children = tools.map((tool) => this.createElement('div', { class: 'toolTreeItem', children: [
+        this.createElement('input', { type: 'checkbox', 'data-tool-permission': tool.name, 'aria-label': `Enable ${tool.title}` }),
+        this.createElement('span', { class: 'toolTreeItemText', children: [this.createElement('strong', { textContent: tool.title }), this.createElement('small', { textContent: tool.description })] }),
+        this.createElement('button', { type: 'button', class: 'iconButton', 'data-edit-tool': tool.name, 'aria-label': `Edit ${tool.title}`, title: `Edit ${tool.title}`, children: [bootstrapIcon('pencil')] }),
+      ] }));
+      const closed = Array.isArray(collapsed) && collapsed.includes(id);
+      tree.append(this.createElement('div', { class: 'toolTreeGroup', 'data-tool-group': id, children: [
+        this.createElement('div', { class: 'toolTreeGroupHeader', children: [
+          this.createElement('button', { type: 'button', class: 'toolTreeDisclosure', 'aria-label': `${closed ? 'Expand' : 'Collapse'} ${name}`, 'aria-expanded': String(!closed), 'aria-controls': `tool-group-${id}`, textContent: closed ? '▸' : '▾' }),
+          this.createElement('label', { class: 'toolTreeGroupLabel', children: [this.createElement('input', { type: 'checkbox', 'data-tool-group-toggle': id }), this.createElement('span', { textContent: name })] }),
+        ] }),
+        this.createElement('div', { id: `tool-group-${id}`, class: 'toolTreeChildren', ...(closed ? { hidden: '' } : {}), children }),
+      ] }));
+    }
+    this.bindToolTree();
+  }
+
+  bindToolTree() {
+    this.querySelectorAll('[data-tool-group]').forEach((group) => {
+      const parent = group.querySelector('[data-tool-group-toggle]');
+      const children = [...group.querySelectorAll('[data-tool-permission]')];
+      parent.addEventListener('change', () => { children.forEach((input) => { input.checked = parent.checked; }); parent.indeterminate = false; });
+      children.forEach((input) => input.addEventListener('change', () => this.syncToolGroupChecks()));
+      const disclosure = group.querySelector('.toolTreeDisclosure');
+      const childList = group.querySelector('.toolTreeChildren');
+      disclosure.addEventListener('click', () => {
+        childList.hidden = !childList.hidden;
+        disclosure.setAttribute('aria-expanded', String(!childList.hidden));
+        disclosure.textContent = childList.hidden ? '▸' : '▾';
+        const collapsed = [...this.querySelectorAll('[data-tool-group]')].filter((item) => item.querySelector('.toolTreeChildren').hidden).map((item) => item.dataset.toolGroup);
+        try { localStorage.setItem(TOOL_TREE_STORAGE_KEY, JSON.stringify(collapsed)); } catch { /* Storage may be unavailable. */ }
+      });
+    });
+    this.querySelectorAll('[data-edit-tool]').forEach((button) => button.addEventListener('click', () => this.showToolEditor(this.tools.find((tool) => tool.name === button.dataset.editTool)).catch((error) => { this.querySelector('#toolEditorStatus').textContent = error.message; })));
+    this.syncToolGroupChecks();
+  }
+
+  async showToolEditor(tool = null, kind = 'command') {
+    this.querySelector('#toolEditor').hidden = false;
+    this.querySelector('#toolManifest').value = JSON.stringify(tool || (kind === 'module'
+      ? { name: 'my_tool', kind: 'module', title: 'My tool', description: 'Describe what this tool does.', group: 'custom', entry: 'index.js' }
+      : { name: 'my_tool', kind: 'command', title: 'My tool', description: 'Describe what this command does.', group: 'custom', command: 'node', args: ['script.js', '{{input}}'], timeoutMs: 10000 }), null, 2);
+    this.querySelector('#toolEditor').dataset.mode = tool ? 'edit' : 'create';
+    this.querySelector('#toolEditor').dataset.name = tool?.name || '';
+    const source = this.querySelector('#toolSource');
+    this.querySelector('#toolSourceLabel').textContent = `Module source (${tool?.entry || 'index.js'})`;
+    source.value = '';
+    source.hidden = !tool || tool.kind === 'command';
+    this.querySelector('#toolSourceLabel').hidden = source.hidden;
+    if (kind === 'module' && !tool) {
+      source.hidden = false;
+      this.querySelector('#toolSourceLabel').hidden = false;
+      source.value = 'export function createTool(context) {\n  return {\n    name: "my_tool",\n    description: "Describe what this tool does.",\n    parameters: { type: "object", properties: {}, required: [] },\n    async execute(args) { return { ok: true }; },\n  };\n}\n';
+    }
+    if (tool && tool.kind !== 'command') {
+      const response = await fetch(`/api/tools?${new URLSearchParams({ name: tool.name, resource: tool.entry })}`);
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'Unable to load tool source.');
+      source.value = payload.content;
+    }
+    this.querySelector('#toolManifest').focus();
+  }
+
+  async submitTool(action) {
+    const editor = this.querySelector('#toolEditor');
+    const content = this.querySelector('#toolManifest').value;
+    const manifest = JSON.parse(content);
+    if (editor.dataset.mode === 'edit' && manifest.name !== editor.dataset.name) throw new Error('Tool names cannot be changed while editing. Import a new manifest instead.');
+    const source = manifest.kind === 'command' ? undefined : this.querySelector('#toolSource').value;
+    const method = action === 'test' ? 'POST' : editor.dataset.mode === 'create' ? 'POST' : 'PUT';
+    const response = await fetch('/api/tools', { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(action === 'test' ? { action, content, source } : { content }) });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || 'Unable to save tool.');
+    if (action !== 'test' && source !== undefined) {
+      const sourceResponse = await fetch('/api/tools', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: manifest.name, resource: manifest.entry, content: source }) });
+      const sourceResult = await sourceResponse.json();
+      if (!sourceResponse.ok) throw new Error(sourceResult.error || 'Unable to save tool source.');
+    }
+    this.querySelector('#toolEditorStatus').textContent = action === 'test' ? payload.report.message : `Saved ${payload.tool.name} to /tools/${payload.tool.name.replaceAll('_', '-')}/`;
+    if (action !== 'test') { editor.hidden = true; await this.loadToolDefinitions(); this.emit('tool-definitions-changed'); }
+  }
+
   connectedCallback() {
     if (this.childElementCount) return;
     this.style.display = "contents";
@@ -153,7 +253,28 @@ class ToolsModal extends BaseComponent {
             class: "toolPermissions",
             "aria-label": "Local tool permissions",
             children: [
+              this.createElement('div', { class: 'toolFileActions', children: [
+                this.createElement('button', { id: 'createModuleTool', type: 'button', textContent: 'New module tool' }),
+                this.createElement('button', { id: 'createTool', type: 'button', textContent: 'New command tool' }),
+                this.createElement('button', { id: 'importTool', type: 'button', textContent: 'Import TOOL.json' }),
+                this.createElement('input', { id: 'toolImportFile', type: 'file', accept: '.json,application/json', hidden: '' }),
+                this.createElement('button', { id: 'importToolFolder', type: 'button', textContent: 'Import tool folder' }),
+                this.createElement('input', { id: 'toolImportFolderFiles', type: 'file', webkitdirectory: '', multiple: '', hidden: '' }),
+              ] }),
               this.createElement("div", { class: "toolTree", children: toolGroups }),
+              this.createElement('section', { id: 'toolEditor', class: 'runtimeCard', hidden: '', children: [
+                this.createElement('h3', { textContent: 'Tool manifest' }),
+                this.createElement('p', { textContent: 'Edit TOOL.json. Command tools receive an input string through {{input}} in their arguments.' }),
+                this.createElement('textarea', { id: 'toolManifest', rows: '12', spellcheck: 'false', 'aria-label': 'TOOL.json content' }),
+                this.createElement('label', { id: 'toolSourceLabel', textContent: 'Module source (index.js)', hidden: '' }),
+                this.createElement('textarea', { id: 'toolSource', rows: '16', spellcheck: 'false', 'aria-label': 'Tool module source', hidden: '' }),
+                this.createElement('div', { class: 'toolFileActions', children: [
+                  this.createElement('button', { id: 'testTool', type: 'button', textContent: 'Test manifest' }),
+                  this.createElement('button', { id: 'saveTool', type: 'button', textContent: 'Save manifest' }),
+                  this.createElement('button', { id: 'cancelTool', type: 'button', textContent: 'Cancel' }),
+                ] }),
+                this.createElement('p', { id: 'toolEditorStatus', role: 'status' }),
+              ] }),
             ],
           }),
           this.runtimeSection(),
@@ -181,6 +302,31 @@ class ToolsModal extends BaseComponent {
     this.querySelector("#inspectJavaScript").addEventListener("click", () => this.emit("inspect-javascript"));
     this.querySelector("#loadChangeHistory").addEventListener("click", () => this.emit("load-change-history"));
     this.querySelector("#closeToolsButton").addEventListener("click", () => dialog.close());
+    this.querySelector('#createTool').addEventListener('click', () => this.showToolEditor());
+    this.querySelector('#createModuleTool').addEventListener('click', () => this.showToolEditor(null, 'module'));
+    this.querySelector('#importTool').addEventListener('click', () => this.querySelector('#toolImportFile').click());
+    this.querySelector('#importToolFolder').addEventListener('click', () => this.querySelector('#toolImportFolderFiles').click());
+    this.querySelector('#toolImportFolderFiles').addEventListener('change', async (event) => {
+      try {
+        const files = await Promise.all([...event.target.files].map(async (file) => ({ path: file.webkitRelativePath.split('/').slice(1).join('/'), content: await file.text() })));
+        const response = await fetch('/api/tools', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'import', files }) });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || 'Unable to import tool folder.');
+        await this.loadToolDefinitions();
+        this.emit('tool-definitions-changed');
+        this.querySelector('#toolPermissionsStatus').textContent = `Imported ${payload.tool.title}.`;
+      } catch (error) { this.querySelector('#toolPermissionsStatus').textContent = error.message; }
+      event.target.value = '';
+    });
+    this.querySelector('#toolImportFile').addEventListener('change', async (event) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      this.showToolEditor();
+      this.querySelector('#toolManifest').value = await file.text();
+      event.target.value = '';
+    });
+    for (const [id, action] of [['testTool', 'test'], ['saveTool', 'save']]) this.querySelector(`#${id}`).addEventListener('click', () => this.submitTool(action).catch((error) => { this.querySelector('#toolEditorStatus').textContent = error.message; }));
+    this.querySelector('#cancelTool').addEventListener('click', () => { this.querySelector('#toolEditor').hidden = true; });
     this.querySelectorAll("[data-tool-group]").forEach((group) => {
       const parent = group.querySelector("[data-tool-group-toggle]");
       const children = [...group.querySelectorAll("[data-tool-permission]")];

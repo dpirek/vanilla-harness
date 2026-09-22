@@ -1,0 +1,9 @@
+{
+  "name": "list_files",
+  "kind": "builtin",
+  "title": "List files",
+  "description": "List files and folders inside the workspace.",
+  "group": "file-access",
+  "entry": "index.js",
+  "order": 0
+}

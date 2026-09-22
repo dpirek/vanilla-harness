@@ -41,10 +41,14 @@ function matchingProviderId(providerRecords = [], settings = {}) {
 }
 
 function normalizeToolPermissions(value = {}) {
-  return Object.fromEntries(Object.entries(DEFAULT_TOOL_PERMISSIONS).map(([name, defaultValue]) => [
+  const permissions = Object.fromEntries(Object.entries(DEFAULT_TOOL_PERMISSIONS).map(([name, defaultValue]) => [
     name,
     typeof value[name] === "boolean" ? value[name] : defaultValue,
   ]));
+  for (const [name, enabled] of Object.entries(value || {})) {
+    if (/^[a-z][a-z0-9_]{0,63}$/.test(name) && typeof enabled === "boolean") permissions[name] = enabled;
+  }
+  return permissions;
 }
 
 export {

@@ -1,0 +1,9 @@
+{
+  "name": "search_files",
+  "kind": "builtin",
+  "title": "Search files",
+  "description": "Search workspace text files with a regular expression.",
+  "group": "file-access",
+  "entry": "index.js",
+  "order": 5
+}

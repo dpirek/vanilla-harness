@@ -1,8 +1,10 @@
+import { bootstrapIcon } from "../lib/icons.js";
 import BaseComponent from "./base-component.js";
 
 class ModelsPage extends BaseComponent {
   connectedCallback() {
     if (this.childElementCount) return;
+    this.style.display = "contents";
     const element = (tag, attributes = {}) => this.createElement(tag, attributes);
     const text = (value) => document.createTextNode(value);
     const button = (id, label, attributes = {}) => element("button", {
@@ -34,7 +36,7 @@ class ModelsPage extends BaseComponent {
     ] });
     const modelsSection = element("section", { id: "providerModelsSection", class: "providerModelsSection", "aria-label": "Models", children: [
       element("div", { class: "providerTableToolbar", children: [
-        element("div", { class: "providerModelsHeading", children: [element("span", { id: "allProviderModelsStatus", children: [text("Models are cached in SQLite.")] })] }),
+        element("strong", { children: [text("Model catalog")] }),
         element("div", { class: "providerModelsControls", children: [
           element("select", { id: "providerModelsFilter", "aria-label": "Filter models by provider", children: [
             element("option", { value: "", textContent: "All providers" }),
@@ -46,7 +48,17 @@ class ModelsPage extends BaseComponent {
       element("div", { class: "providerTableWrap", children: [modelsTable] }),
     ] });
 
-    this.appendChildren(this, [modelsSection]);
+    this.appendChildren(this, [element("dialog", { id: "modelsDialog", class: "settingsDialog modelsDialog", children: [
+      element("div", { class: "settingsPanel", children: [
+        element("header", { class: "settingsHeader", children: [
+          element("div", { children: [element("h2", { children: [text("Models")] }), element("p", { children: [text("Browse and select a model from your providers")] })] }),
+          element("button", { id: "closeModelsButton", class: "iconButton", type: "button", "aria-label": "Close models", children: [bootstrapIcon("x-lg")] }),
+        ] }),
+        modelsSection,
+        element("footer", { class: "settingsFooter", children: [element("span", { id: "allProviderModelsStatus", class: "configStatus", children: [text("Models are cached in SQLite.")] })] }),
+      ] }),
+    ] })]);
+    this.querySelector("#closeModelsButton").addEventListener("click", () => this.querySelector("#modelsDialog").close());
     this.querySelector("#refreshAllProviderModelsButton").addEventListener("click", () => this.emit("refresh-all-provider-models"));
     this.querySelector("#providerModelsSearch").addEventListener("input", (event) => this.emit("provider-model-search", { query: event.target.value }));
     this.querySelector("#providerModelsFilter").addEventListener("change", (event) => this.emit("provider-model-filter", { providerId: event.target.value }));

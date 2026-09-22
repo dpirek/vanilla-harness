@@ -1,0 +1,9 @@
+{
+  "name": "chrome_devtools",
+  "kind": "builtin",
+  "title": "Chrome DevTools",
+  "description": "Browse pages, inspect source, run JavaScript, and save screenshots.",
+  "group": "web-access",
+  "entry": "index.js",
+  "order": 8
+}
