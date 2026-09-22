@@ -12,7 +12,8 @@
   "scripts": {
     "cli": "node cli.js",
     "test": "node --test",
-    "start": "node server.js"
+    "start": "node server.js",
+    "dev": "node server.js --watch"
   },
   "repository": {
     "type": "git",
