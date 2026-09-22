@@ -26,11 +26,63 @@ const TOOL_GROUPS = [
 const TOOL_TREE_STORAGE_KEY = "ai-harness.toolsCollapsedGroups";
 
 class ToolsModal extends BaseComponent {
+  selectTab(name, { focus = false, updateRoute = false } = {}) {
+    for (const button of this.querySelectorAll('[data-tools-tab]')) {
+      const active = button.dataset.toolsTab === name;
+      button.setAttribute('aria-selected', String(active));
+      button.tabIndex = active ? 0 : -1;
+      if (active && focus) button.focus();
+    }
+    for (const panel of this.querySelectorAll('[data-tools-panel]')) panel.hidden = panel.dataset.toolsPanel !== name;
+    const save = this.querySelector('#saveToolPermissionsButton');
+    save.hidden = !['permissions', 'runtime'].includes(name);
+    save.textContent = name === 'runtime' ? 'Save runtime settings' : 'Save permissions';
+    if (updateRoute) this.emit('tools-tab-change', { tab: name });
+  }
+
+  renderToolFiles(tools) {
+    const list = this.querySelector('#toolFilesList');
+    list.replaceChildren(...tools.map((tool) => this.createElement('li', { class: 'toolFileItem', children: [
+      this.createElement('div', { children: [
+        this.createElement('strong', { textContent: tool.title }),
+        this.createElement('small', { textContent: `${tool.name} · ${tool.kind}` }),
+      ] }),
+      this.createElement('button', { type: 'button', class: 'iconButton', title: `Edit ${tool.title}`, 'aria-label': `Edit ${tool.title}`, children: [bootstrapIcon('pencil-square')] }),
+    ] })));
+    [...list.children].forEach((item, index) => item.querySelector('button').addEventListener('click', () => this.showToolEditor(tools[index]).catch((error) => { this.querySelector('#toolEditorStatus').textContent = error.message; })));
+  }
+
+  async runSystemTest() {
+    this.selectTab('test', { updateRoute: true });
+    const button = this.querySelector('#testAllTools');
+    const panel = this.querySelector('#toolSystemTestResults');
+    const summary = this.querySelector('#toolSystemTestSummary');
+    const list = this.querySelector('#toolSystemTestList');
+    panel.hidden = false;
+    button.disabled = true;
+    summary.textContent = 'Testing tools in a temporary workspace…';
+    list.replaceChildren();
+    try {
+      const response = await fetch('/api/tools', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'system-test' }) });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'Unable to test tools.');
+      const report = payload.report;
+      summary.textContent = `${report.passed} passed · ${report.failed} failed · ${report.limited} limited`;
+      list.replaceChildren(...report.results.map((item) => this.createElement('li', { class: `toolSystemTestResult ${item.status}`, children: [
+        this.createElement('strong', { textContent: item.title || item.name }),
+        this.createElement('span', { class: 'toolSystemTestBadge', textContent: item.status }),
+        this.createElement('small', { textContent: item.detail }),
+      ] })));
+    } catch (error) { summary.textContent = error.message; }
+    finally { button.disabled = false; }
+  }
+
   async loadToolDefinitions() {
     const response = await fetch('/api/tools');
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.error || 'Unable to load tools.');
     this.tools = payload.tools;
+    this.renderToolFiles(payload.tools);
     const tree = this.querySelector('.toolTree');
     tree.replaceChildren();
     const labels = new Map(TOOL_GROUPS.map(([id, label]) => [id, label]));
@@ -47,7 +99,6 @@ class ToolsModal extends BaseComponent {
       const children = tools.map((tool) => this.createElement('div', { class: 'toolTreeItem', children: [
         this.createElement('input', { type: 'checkbox', 'data-tool-permission': tool.name, 'aria-label': `Enable ${tool.title}` }),
         this.createElement('span', { class: 'toolTreeItemText', children: [this.createElement('strong', { textContent: tool.title }), this.createElement('small', { textContent: tool.description })] }),
-        this.createElement('button', { type: 'button', class: 'iconButton', 'data-edit-tool': tool.name, 'aria-label': `Edit ${tool.title}`, title: `Edit ${tool.title}`, children: [bootstrapIcon('pencil')] }),
       ] }));
       const closed = Array.isArray(collapsed) && collapsed.includes(id);
       tree.append(this.createElement('div', { class: 'toolTreeGroup', 'data-tool-group': id, children: [
@@ -77,11 +128,11 @@ class ToolsModal extends BaseComponent {
         try { localStorage.setItem(TOOL_TREE_STORAGE_KEY, JSON.stringify(collapsed)); } catch { /* Storage may be unavailable. */ }
       });
     });
-    this.querySelectorAll('[data-edit-tool]').forEach((button) => button.addEventListener('click', () => this.showToolEditor(this.tools.find((tool) => tool.name === button.dataset.editTool)).catch((error) => { this.querySelector('#toolEditorStatus').textContent = error.message; })));
     this.syncToolGroupChecks();
   }
 
   async showToolEditor(tool = null, kind = 'command') {
+    this.selectTab('files', { updateRoute: true });
     this.querySelector('#toolEditor').hidden = false;
     this.querySelector('#toolManifest').value = JSON.stringify(tool || (kind === 'module'
       ? { name: 'my_tool', kind: 'module', title: 'My tool', description: 'Describe what this tool does.', group: 'custom', entry: 'index.js' }
@@ -249,10 +300,25 @@ class ToolsModal extends BaseComponent {
               }),
             ],
           }),
+          this.createElement('nav', { class: 'toolsTabs', role: 'tablist', 'aria-label': 'Tools settings sections', children: [
+            ...[['permissions', 'Permissions'], ['files', 'Tool files'], ['runtime', 'Runtime'], ['test', 'System test']].map(([name, label]) => this.createElement('button', {
+              id: 'toolsTab' + name, type: 'button', role: 'tab', 'data-tools-tab': name,
+              'aria-controls': 'toolsPanel' + name, 'aria-selected': String(name === 'permissions'),
+              tabindex: name === 'permissions' ? '0' : '-1', textContent: label,
+            })),
+          ] }),
           this.createElement("section", {
-            class: "toolPermissions",
+            id: 'toolsPanelpermissions',
+            class: "toolPermissions toolsTabPanel",
+            role: 'tabpanel', 'data-tools-panel': 'permissions', 'aria-labelledby': 'toolsTabpermissions',
             "aria-label": "Local tool permissions",
             children: [
+              this.createElement('p', { class: 'toolsPanelIntro', textContent: 'Choose which tools the active preset can use. Parent checkboxes select every child.' }),
+              this.createElement("div", { class: "toolTree", children: toolGroups }),
+            ],
+          }),
+          this.createElement('section', { id: 'toolsPanelfiles', class: 'toolsTabPanel', role: 'tabpanel', 'data-tools-panel': 'files', 'aria-labelledby': 'toolsTabfiles', hidden: '', children: [
+              this.createElement('p', { class: 'toolsPanelIntro', textContent: 'Create, import, and edit tool folders under /tools.' }),
               this.createElement('div', { class: 'toolFileActions', children: [
                 this.createElement('button', { id: 'createModuleTool', class: 'iconButton', type: 'button', title: 'New module tool', 'aria-label': 'New module tool', children: [bootstrapIcon('filetype-js')] }),
                 this.createElement('button', { id: 'createTool', class: 'iconButton', type: 'button', title: 'New command tool', 'aria-label': 'New command tool', children: [bootstrapIcon('wrench')] }),
@@ -261,7 +327,7 @@ class ToolsModal extends BaseComponent {
                 this.createElement('button', { id: 'importToolFolder', class: 'iconButton', type: 'button', title: 'Import tool folder', 'aria-label': 'Import tool folder', children: [bootstrapIcon('folder-plus')] }),
                 this.createElement('input', { id: 'toolImportFolderFiles', type: 'file', webkitdirectory: '', multiple: '', hidden: '' }),
               ] }),
-              this.createElement("div", { class: "toolTree", children: toolGroups }),
+              this.createElement('ul', { id: 'toolFilesList', class: 'toolFilesList' }),
               this.createElement('section', { id: 'toolEditor', class: 'runtimeCard', hidden: '', children: [
                 this.createElement('h3', { textContent: 'Tool manifest' }),
                 this.createElement('p', { textContent: 'Edit TOOL.json. Command tools receive an input string through {{input}} in their arguments.' }),
@@ -275,9 +341,17 @@ class ToolsModal extends BaseComponent {
                 ] }),
                 this.createElement('p', { id: 'toolEditorStatus', role: 'status' }),
               ] }),
-            ],
-          }),
-          this.runtimeSection(),
+          ] }),
+          this.createElement('section', { id: 'toolsPanelruntime', class: 'toolsTabPanel', role: 'tabpanel', 'data-tools-panel': 'runtime', 'aria-labelledby': 'toolsTabruntime', hidden: '', children: [this.runtimeSection()] }),
+          this.createElement('section', { id: 'toolsPaneltest', class: 'toolsTabPanel', role: 'tabpanel', 'data-tools-panel': 'test', 'aria-labelledby': 'toolsTabtest', hidden: '', children: [
+            this.createElement('p', { class: 'toolsPanelIntro', textContent: 'Run safe checks in a temporary workspace. Browser and worker integrations report their limits.' }),
+            this.createElement('button', { id: 'testAllTools', type: 'button', class: 'toolSystemTestButton', children: [bootstrapIcon('check-lg'), this.createElement('span', { textContent: 'Test tools' })] }),
+            this.createElement('section', { id: 'toolSystemTestResults', class: 'toolSystemTestResults', 'aria-label': 'Tool system test results', hidden: '', children: [
+              this.createElement('h3', { textContent: 'System test' }),
+              this.createElement('p', { id: 'toolSystemTestSummary', role: 'status' }),
+              this.createElement('ul', { id: 'toolSystemTestList' }),
+            ] }),
+          ] }),
           this.createElement("footer", {
             class: "settingsFooter",
             children: [
@@ -299,6 +373,19 @@ class ToolsModal extends BaseComponent {
     });
 
     this.appendChildren(this, [dialog]);
+    const tabs = [...this.querySelectorAll('[data-tools-tab]')];
+    tabs.forEach((button, index) => {
+      button.addEventListener('click', () => this.selectTab(button.dataset.toolsTab, { updateRoute: true }));
+      button.addEventListener('keydown', (event) => {
+        const next = event.key === 'ArrowRight' ? (index + 1) % tabs.length
+          : event.key === 'ArrowLeft' ? (index + tabs.length - 1) % tabs.length
+            : event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : -1;
+        if (next < 0) return;
+        event.preventDefault();
+        this.selectTab(tabs[next].dataset.toolsTab, { focus: true, updateRoute: true });
+      });
+    });
+    this.selectTab('permissions');
     this.querySelector("#inspectJavaScript").addEventListener("click", () => this.emit("inspect-javascript"));
     this.querySelector("#loadChangeHistory").addEventListener("click", () => this.emit("load-change-history"));
     this.querySelector("#closeToolsButton").addEventListener("click", () => dialog.close());
@@ -306,6 +393,7 @@ class ToolsModal extends BaseComponent {
     this.querySelector('#createModuleTool').addEventListener('click', () => this.showToolEditor(null, 'module'));
     this.querySelector('#importTool').addEventListener('click', () => this.querySelector('#toolImportFile').click());
     this.querySelector('#importToolFolder').addEventListener('click', () => this.querySelector('#toolImportFolderFiles').click());
+    this.querySelector('#testAllTools').addEventListener('click', () => this.runSystemTest());
     this.querySelector('#toolImportFolderFiles').addEventListener('change', async (event) => {
       try {
         const files = await Promise.all([...event.target.files].map(async (file) => ({ path: file.webkitRelativePath.split('/').slice(1).join('/'), content: await file.text() })));

@@ -11,6 +11,7 @@ import {
 } from "../lib/provider-config.js";
 import { benchmarkModel } from "../lib/model-benchmark.js";
 import { createModelClient } from "../lib/openai.js";
+import { runToolSystemTest } from "../lib/tool-diagnostics.js";
 import {
   normalizeSkillName,
   skillDraft,
@@ -399,6 +400,10 @@ export function createSettingsApiHandlers({
       }
       if (req.method === "POST" || req.method === "PUT") {
         const body = JSON.parse(await readRequestBody(req, 20_000_000) || "{}");
+        if (body.action === "system-test") {
+          json(res, 200, { ok: true, report: await runToolSystemTest(uiStateStore) });
+          return;
+        }
         if (body.action === "import") {
           const tool = uiStateStore.importToolFiles(body.files);
           json(res, 200, { ok: true, tool, tools: uiStateStore.getTools() });

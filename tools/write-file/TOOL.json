@@ -2,7 +2,7 @@
   "name": "write_file",
   "kind": "builtin",
   "title": "Write files",
-  "description": "Create or replace UTF-8 files inside the workspace.",
+  "description": "Create or replace UTF-8 files inside the workspace. A full HTML document without a path creates index.html; CSS without a path uses its filename or the stylesheet linked from index.html. Inferred paths never overwrite existing files.",
   "group": "file-access",
   "entry": "index.js",
   "order": 4

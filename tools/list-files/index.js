@@ -7,11 +7,11 @@ function createListFilesTool({ resolvePath }) {
     name: "list_files",
     description: "List files and directories in a workspace directory.",
     parameters: objectSchema({
-      path: { type: "string", description: "Workspace-relative directory path." },
+      path: { type: "string", description: "Workspace-relative directory path. Use an empty string or . for the workspace root." },
     }),
     async execute({ path: requested }) {
       // withFileTypes avoids extra stat calls when building dir/file labels.
-      const target = resolvePath(requested);
+      const target = resolvePath(requested || ".");
       const entries = await fs.readdir(target, { withFileTypes: true });
       return {
         ok: true,

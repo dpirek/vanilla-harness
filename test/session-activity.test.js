@@ -338,12 +338,13 @@ test("failed runs expose the last command and its response as expandable details
     stderr: "Tests failed\n",
   });
   assert.deepEqual(failure.details.map((section) => section.title), [
+    "Failure reason",
     "Command",
     "Response",
     "Run error",
   ]);
-  assert.match(failure.details[1].text, /Tests failed/);
-  assert.equal(failure.details[2].text, "The agent stopped after the command failed.");
+  assert.match(failure.details[2].text, /Tests failed/);
+  assert.equal(failure.details[3].text, "The agent stopped after the command failed.");
 });
 
 test("failed runs without a completed command still expose useful details", () => {
@@ -353,9 +354,37 @@ test("failed runs without a completed command still expose useful details", () =
 
   const failure = activity.items.find((item) => item.key === "error");
   assert.deepEqual(failure.details.map(({ title, text }) => ({ title, text })), [
+    { title: "Failure reason", text: "Provider request timed out." },
     { title: "Command", text: "No command was recorded for this run." },
     { title: "Response", text: "Provider request timed out." },
   ]);
+});
+
+test("failed response and pending model steps show the provider error", () => {
+  const activity = sessionActivities([
+    { detail: { type: "turn_start", turn: 2, model: "example" }, timestamp: 1 },
+    { detail: { type: "response_stream" }, timestamp: 2 },
+    { title: "Error", detail: "Provider connection terminated.", timestamp: 3 },
+  ]);
+  for (const key of ["turn:2", "response", "error"]) {
+    const step = activity.items.find((item) => item.key === key);
+    assert.equal(step.status, "failed");
+    assert.equal(step.failureReason, "Provider connection terminated.");
+    assert.equal(step.details.find((section) => section.title === "Failure reason").text, "Provider connection terminated.");
+  }
+});
+
+test("failed commands and validation retain command, output, and failure reason", () => {
+  const activity = sessionActivities([
+    { detail: { type: "tool_start", name: "run_command", args: { command: "npm test" } }, timestamp: 1 },
+    { detail: { type: "tool_result", name: "run_command", output: { ok: false, exit_code: 1, stdout: "FAIL example test", stderr: "Assertion failed" } }, timestamp: 2 },
+    { detail: { type: "validation", status: "failed", tool: "run_command", paths: ["app.js"] }, timestamp: 3 },
+  ]);
+  const command = activity.items.find((item) => item.key === "tool:run_command");
+  assert.equal(command.details.find((section) => section.title === "Command").text, "npm test");
+  assert.match(command.details.find((section) => section.title === "Response").text, /FAIL example test/);
+  assert.equal(command.failureReason, "Assertion failed");
+  assert.equal(activity.items.find((item) => item.key === "validation").failureReason, "Assertion failed");
 });
 
 test("stopped runs finish pending steps without reporting success or failure", () => {

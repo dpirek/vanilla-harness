@@ -53,6 +53,16 @@ function printableValue(value) {
   }
 }
 
+function failureReason(output) {
+  if (!output || typeof output !== "object") return printableValue(output);
+  if (output.error) return printableValue(output.error);
+  const stderr = printableValue(output.stderr);
+  if (stderr) return stderr;
+  if (output.exit_code !== undefined && output.exit_code !== null) return `Command exited with code ${output.exit_code}.`;
+  if (output.signal) return `Command stopped by signal ${output.signal}.`;
+  return "The step reported a failure without an error message.";
+}
+
 function formatModelTurnInput(inputPrompt) {
   if (!inputPrompt || typeof inputPrompt !== "object") return "Input prompt unavailable.";
   const sections = [];
@@ -275,8 +285,12 @@ function sessionActivities(events = [], now = Date.now()) {
         label,
       ) || add(label, failed ? "failed" : "completed", event, `tool:${detail.name}`);
       const priorArguments = item.details?.find((section) => section.title === "Arguments")?.text;
+      item.output = detail.output;
+      if (failed) item.failureReason = failureReason(detail.output);
       setDetails(item, [
+        { title: "Command", text: detail.name === "run_command" ? item.command || detail.args?.command : "" },
         { title: "Arguments", text: priorArguments || detail.args },
+        { title: "Failure reason", text: failed ? item.failureReason : "" },
         { title: "Response", text: detail.output },
       ]);
       if (detail.name === "run_command") {
@@ -284,8 +298,11 @@ function sessionActivities(events = [], now = Date.now()) {
         item.response = detail.output;
       }
     } else if (type === "tool_blocked") {
-      setDetails(add(`${humanizeToolName(detail.name)} blocked`, "failed", event, `tool:${detail.name}`), [
+      const item = add(`${humanizeToolName(detail.name)} blocked`, "failed", event, `tool:${detail.name}`);
+      item.failureReason = `Tool ${detail.name} is unavailable.`;
+      setDetails(item, [
         { title: "Arguments", text: detail.args },
+        { title: "Failure reason", text: item.failureReason },
       ]);
     } else if (type === "mcp_call") {
       setDetails(add(`Call ${detail.server}.${detail.name}`, "completed", event, `mcp:${detail.server}:${detail.name}`), [
@@ -304,10 +321,12 @@ function sessionActivities(events = [], now = Date.now()) {
       const status = detail.status === "passed" ? "completed" : "failed";
       const item = finish((candidate) => candidate.key === "validation", event, status, `Validation ${detail.status}`)
         || add(`Validation ${detail.status}`, status, event, "validation");
+      if (status === "failed") item.failureReason = failureReason(detail.error || [...items].reverse().find((candidate) => candidate.key === `tool:${detail.tool}`)?.output);
       setDetails(item, [
         { title: "Changed paths", text: detail.paths },
         { title: "Validation tool", text: detail.tool },
         { title: "Status", text: detail.status },
+        { title: "Failure reason", text: item.failureReason },
       ]);
     } else if (type === "response_stream") {
       if (!findRunning((item) => item.key === "response")) add("Write response", "running", event, "response");
@@ -325,14 +344,20 @@ function sessionActivities(events = [], now = Date.now()) {
       complete = true;
     } else if (event.title === "Error") {
       finishAll(event, "failed");
+      const errorText = printableValue(event.detail) || "The run failed without an error message.";
+      for (const pending of items.filter((item) => item.status === "failed" && !item.failureReason)) {
+        pending.failureReason = errorText;
+        setDetails(pending, [...(pending.details || []), { title: "Failure reason", text: errorText }]);
+      }
       const commandItem = [...items].reverse().find((item) => item.key === "tool:run_command");
       const response = commandItem?.response ?? event.detail;
-      const errorText = printableValue(event.detail);
       const responseText = printableValue(response);
       const item = add("Run failed", "failed", event, "error");
+      item.failureReason = errorText;
       item.command = commandItem?.command || "";
       item.response = response;
       setDetails(item, [
+        { title: "Failure reason", text: item.failureReason },
         { title: "Command", text: item.command || "No command was recorded for this run." },
         { title: "Response", text: responseText || "No response was recorded for this run." },
         {

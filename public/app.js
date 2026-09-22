@@ -14,6 +14,7 @@ import {
   providerSettingsFromRecord,
 } from "./lib/settings.js";
 import { normalizeRigComponentState } from "./lib/rig-presets.js";
+import { toolsTabFromPath, toolsTabPath } from "./lib/tool-routes.js";
 import {
   CONFIG_TEMPLATES,
   formatHttpHeaders,
@@ -2243,7 +2244,7 @@ function updateSessionActivityCard(card, activity, { active = false } = {}) {
     item.append(marker, content, duration);
     if (task.details?.length) {
       const details = createStepDetails(task);
-      const expanded = expandedTaskDetails.has(task.id) || task.response?.ok === false;
+      const expanded = expandedTaskDetails.has(task.id) || task.status === "failed";
       item.append(createStepDetailsButton(task, details, expanded), details);
       item.toggleAttribute("data-details-open", expanded);
     }
@@ -2252,7 +2253,7 @@ function updateSessionActivityCard(card, activity, { active = false } = {}) {
   card.dataset.running = String(isRunning);
   card.dataset.complete = String(activity.complete);
   if (isRunning) card.open = true;
-  else if (activity.complete && !wasComplete) card.open = false;
+  else if (activity.complete && !wasComplete) card.open = failed;
 }
 
 function taskRatingRunId(activity, sessionId) {
@@ -3243,7 +3244,8 @@ function renderRoute() {
   const routeProviderId = modelsRouteProviderId(window.location.pathname);
   const showModels = routeProviderId !== null;
   const showProviders = /^\/providers\/?$/.test(window.location.pathname);
-  const showTools = /^\/tools\/?$/.test(window.location.pathname);
+  const toolsTab = toolsTabFromPath(window.location.pathname);
+  const showTools = toolsTab !== null;
   const showSkills = /^\/skills\/?$/.test(window.location.pathname);
   const showPresets = /^\/presets\/?$/.test(window.location.pathname);
   const showSystemPrompts = /^\/system-prompts\/?$/.test(window.location.pathname);
@@ -3265,6 +3267,7 @@ function renderRoute() {
       settingsDialog.showModal();
     }
     if (showTools && !toolsDialog.open) showToolsModal();
+    if (showTools) toolsModal.selectTab(toolsTab);
     if (showSkills && !skillsDialog.open) showSkillsModal();
     if (showPresets && !presetsDialog.open) showPresetsModal();
     if (showSystemPrompts && !systemPromptsDialog.open) systemPromptsLoadPromise = showSystemPromptsModal();
@@ -3301,7 +3304,7 @@ settingsDialog.addEventListener("close", () => {
   renderRoute();
 });
 toolsDialog.addEventListener("close", () => {
-  if (!/^\/tools\/?$/.test(window.location.pathname)) return;
+  if (toolsTabFromPath(window.location.pathname) === null) return;
   window.history.replaceState({}, "", "/");
   renderRoute();
 });
@@ -4336,6 +4339,7 @@ mcpModal.addEventListener("show-mcp-config-import", () => {
 mcpModal.addEventListener("import-mcp-config", addMcpServersFromConfig);
 providersModal.addEventListener("save-provider-settings", saveProviderSettings);
 toolsModal.addEventListener("save-tool-permissions", saveToolPermissions);
+toolsModal.addEventListener("tools-tab-change", (event) => navigateRoute(toolsTabPath(event.detail.tab)));
 toolsModal.addEventListener("tool-definitions-changed", () => renderToolPermissions());
 toolsModal.addEventListener('load-change-history', loadChangeHistory);
 toolsModal.addEventListener('inspect-javascript', async () => {
@@ -4507,7 +4511,7 @@ async function initialize() {
   await loadWorkspaceTree();
   routeReady = true;
   renderRoute();
-  const viewingModalRoute = modelsRouteProviderId(window.location.pathname) !== null || /^\/(?:providers|tools|skills|presets|system-prompts|mcp|workflow)\/?$/.test(window.location.pathname);
+  const viewingModalRoute = modelsRouteProviderId(window.location.pathname) !== null || toolsTabFromPath(window.location.pathname) !== null || /^\/(?:providers|skills|presets|system-prompts|mcp|workflow)\/?$/.test(window.location.pathname);
   if (!viewingModalRoute && needsDefaultWorkspace) {
     openProvidersAfterWorkspaceSelection = shouldOpenProvidersModal;
     await openDefaultWorkspacePicker();

@@ -35,3 +35,47 @@ test('canonical paths and recursive search cannot bypass read deny rules', async
   const result = await tools.search_files.execute({ path: '.', query: 'SECRET|PUBLIC' });
   assert.equal(result.matches.length, 1); assert.match(result.matches[0], /PUBLIC/);
 });
+
+test('list_files treats an empty path as the workspace root and authorizes that path', async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'harness-list-root-'));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  await fs.writeFile(path.join(root, 'sample.txt'), 'sample');
+  const targets = [];
+  const tools = Object.fromEntries(createTools({ root, authorize: async (name, target) => { targets.push([name, target]); } }).map((tool) => [tool.name, tool]));
+  const result = await tools.list_files.execute({ path: '' });
+  assert.equal(result.ok, true);
+  assert.ok(result.entries.includes('file\tsample.txt'));
+  assert.deepEqual(targets, [['list_files', '.']]);
+  await assert.rejects(tools.read_file.execute({ path: '' }), /workspace-relative path is required/);
+});
+
+test('write_file creates index.html for a full HTML document without a path', async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'harness-html-entry-'));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const targets = [];
+  const tools = Object.fromEntries(createTools({ root, approve: async () => true, authorize: async (name, target) => { targets.push([name, target]); } }).map((tool) => [tool.name, tool]));
+  const html = '<!DOCTYPE html>\n<html lang="en"><title>Example</title></html>';
+  const result = await tools.write_file.execute({ content: html });
+  assert.equal(result.path, 'index.html');
+  assert.equal(await fs.readFile(path.join(root, 'index.html'), 'utf8'), html);
+  assert.deepEqual(targets[0], ['write_file', 'index.html']);
+  await assert.rejects(tools.write_file.execute({ content: '<!DOCTYPE html><html>replacement</html>' }), /index.html already exists/);
+  assert.equal(await fs.readFile(path.join(root, 'index.html'), 'utf8'), html);
+  await assert.rejects(tools.write_file.execute({ content: 'plain text' }), /file path is required/i);
+});
+
+test('write_file uses the stylesheet linked from public/index.html when CSS omits its path', async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'harness-css-entry-'));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  await fs.mkdir(path.join(root, 'public'));
+  await fs.writeFile(path.join(root, 'public/index.html'), '<!DOCTYPE html><link rel="stylesheet" href="/styles.css">');
+  const targets = [];
+  const tools = Object.fromEntries(createTools({ root, approve: async () => true, authorize: async (name, target) => { targets.push([name, target]); } }).map((tool) => [tool.name, tool]));
+  const css = '/* Guardian Lock & Key — styles.css */\n:root { --color: red; }';
+  const result = await tools.write_file.execute({ content: css });
+  assert.equal(result.path, 'public/styles.css');
+  assert.equal(await fs.readFile(path.join(root, 'public/styles.css'), 'utf8'), css);
+  assert.deepEqual(targets[0], ['write_file', 'public/styles.css']);
+  await assert.rejects(tools.write_file.execute({ content: css }), /public\/styles.css already exists/);
+  assert.equal(await fs.readFile(path.join(root, 'public/styles.css'), 'utf8'), css);
+});

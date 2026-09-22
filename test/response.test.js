@@ -54,7 +54,7 @@ test("static responses serve files, redirects, and missing-file errors", async (
   assert.equal(page.headers["cache-control"], "no-store");
   assert.equal(page.body.toString(), "<h1>Harness</h1>");
 
-  for (const url of ["/models", "/models/", "/models?search=test", "/models/provider-123", "/models/provider-123/", "/models/My%20provider", "/providers", "/providers/", "/providers?source=direct", "/tools", "/tools/", "/tools?source=direct", "/skills", "/skills/", "/skills?source=direct", "/presets", "/system-prompts", "/mcp", "/workflow"]) {
+  for (const url of ["/models", "/models/", "/models?search=test", "/models/provider-123", "/models/provider-123/", "/models/My%20provider", "/providers", "/providers/", "/providers?source=direct", "/tools", "/tools/", "/tools?source=direct", "/tools/permissions", "/tools/files", "/tools/runtime/", "/tools/test?source=direct", "/skills", "/skills/", "/skills?source=direct", "/presets", "/system-prompts", "/mcp", "/workflow"]) {
     const modelsPage = responseRecorder();
     await serveStatic({ url, headers: {} }, modelsPage, root);
     assert.equal(modelsPage.statusCode, 200);
