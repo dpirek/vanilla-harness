@@ -322,7 +322,12 @@ export function createSettingsApiHandlers({
         } catch (error) { json(res, 400, { ok: false, error: error.message }); }
         return;
       }
-      json(res, 200, { ok: true, skills: uiStateStore.getSkills() });
+      if (url?.searchParams.has("skillId")) {
+        try { json(res, 200, { ok: true, skill: uiStateStore.getSkill(url.searchParams.get("skillId")) }); }
+        catch (error) { json(res, 400, { ok: false, error: error.message }); }
+        return;
+      }
+      json(res, 200, { ok: true, skills: uiStateStore.getSkillCatalog(), skillAutoDiscovery: uiStateStore.getSkillAutoDiscovery() });
       return;
     }
     if (req.method === "POST") {
@@ -353,7 +358,8 @@ export function createSettingsApiHandlers({
       try {
         const body = JSON.parse(await readRequestBody(req, 2_100_000) || "{}");
         if (Array.isArray(body.selectedSkillIds)) {
-          json(res, 200, { ok: true, skills: uiStateStore.setSelectedSkills(body.selectedSkillIds) });
+          if (body.skillAutoDiscovery !== undefined && typeof body.skillAutoDiscovery !== "boolean") throw new Error("Expected skillAutoDiscovery to be a boolean.");
+          json(res, 200, { ok: true, skills: uiStateStore.setSelectedSkills(body.selectedSkillIds, body.skillAutoDiscovery), skillAutoDiscovery: uiStateStore.getSkillAutoDiscovery() });
           return;
         }
         if (typeof body.skillId === "string" && typeof body.resource === "string" && typeof body.content === "string") {

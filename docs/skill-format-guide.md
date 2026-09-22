@@ -18,6 +18,12 @@ skills/
     └── scripts/
         └── deploy.sh
 
+The harness indexes only each guide's frontmatter during discovery. A preset selection loads the
+full guide for the next turn. Otherwise, the agent can search descriptions with `search_skills`,
+then request `SKILL.md` or a supporting file with `read_skill_resource`. Keep descriptions specific
+to the tasks that should trigger the skill. Optional `assets/` and `agents/` folders can be kept
+beside scripts, references, templates, and examples.
+
 The SKILL.md itself commonly has this shape:
 
 ---

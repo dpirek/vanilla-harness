@@ -120,7 +120,6 @@ button {
   border: 0;
   background: transparent;
   color: inherit;
-  cursor: pointer;
 }
 
 button:disabled {
@@ -1715,8 +1714,12 @@ textarea:disabled {
 .presetsToolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .presetsToolbar .primaryButton { min-width: 146px; }
 .presetsList { display: grid; min-height: 0; gap: 8px; overflow: auto; }
-.presetRow { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--field); padding: 12px; }
+.presetRow { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; align-items: center; gap: 10px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--field); padding: 12px; }
 .presetRow.active { border-color: var(--strong-line); background: var(--raised); }
+.presetSelectButton { display: inline-grid; place-items: center; width: 36px; height: 36px; border: 1px solid var(--line); border-radius: 9px; background: var(--raised); color: var(--muted); cursor: pointer; }
+.presetSelectButton[aria-pressed="true"] { border-color: color-mix(in srgb, var(--accent) 48%, var(--line)); background: color-mix(in srgb, var(--accent) 18%, var(--raised)); color: var(--accent); }
+.presetSelectButton:not([aria-pressed="true"]) .bsIcon { opacity: .68; }
+.presetSelectButton:hover:not(:disabled), .presetSelectButton:focus-visible { border-color: var(--strong-line); outline-offset: 2px; }
 .presetIdentity { display: grid; min-width: 0; gap: 5px; }
 .presetName { overflow: hidden; color: var(--text); font-size: .94rem; text-overflow: ellipsis; white-space: nowrap; }
 .presetMeta { overflow: hidden; color: var(--muted); font-size: .78rem; text-overflow: ellipsis; white-space: nowrap; }
@@ -1724,7 +1727,6 @@ textarea:disabled {
 .presetActions button { min-height: 32px; border: 1px solid var(--line); border-radius: 999px; background: var(--raised); padding: 0 11px; color: var(--text); }
 .presetActions button:hover:not(:disabled) { border-color: var(--strong-line); background: var(--surface-hover); }
 .presetActions .presetDeleteButton { color: #ff9a92; }
-.presetActiveBadge { border-radius: 999px; background: var(--selected); padding: 7px 11px; color: var(--muted); font-size: .76rem; font-weight: 750; }
 .presetEmpty { margin: 0; border: 1px dashed var(--line); border-radius: 10px; padding: 28px; color: var(--muted); text-align: center; }
 .presetEditor { display: grid; min-height: 0; gap: 12px; overflow: auto; padding-right: 5px; }
 .presetEditorSection { display: grid; gap: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--field); padding: 16px; }
@@ -1810,8 +1812,7 @@ textarea:disabled {
 .workflowDialog .settingsFooter .primaryButton { background: var(--accent); color: #1b1a18; }
 
 @media (max-width: 680px) {
-  .presetRow { grid-template-columns: 1fr; }
-  .presetActions { flex-wrap: wrap; }
+  .presetRow { grid-template-columns: 36px minmax(0, 1fr) auto; }
   .presetFieldGrid, .presetToggleGrid, .presetMcpAddForm { grid-template-columns: 1fr; }
   .presetFieldWide { grid-column: auto; }
   .presetsToolbar { align-items: stretch; flex-direction: column; }
@@ -2166,8 +2167,7 @@ textarea:disabled {
 .skillLibrary[hidden],
 .skillEditor[hidden],
 .skillFooterActions button[hidden],
-#backToSkillsButton[hidden],
-#toggleSkillColumnButton[hidden] {
+#backToSkillsButton[hidden] {
   display: none;
 }
 
@@ -2177,6 +2177,34 @@ textarea:disabled {
   align-items: center;
   gap: 10px;
 }
+
+.skillDiscoverySetting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 13px 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--raised);
+}
+
+.skillDiscoveryCopy { display: grid; gap: 3px; }
+.skillDiscoveryCopy small { color: var(--muted); }
+.skillDiscoveryButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 68px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+}
+.skillDiscoveryButton[aria-pressed="true"] { color: var(--text); border-color: var(--accent); }
 
 .skillLibraryHeader {
   display: flex;
@@ -2194,6 +2222,26 @@ textarea:disabled {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.skillToolbarIcon {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 38px;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--raised);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.skillToolbarIcon:hover,
+.skillToolbarIcon:focus-visible {
+  border-color: var(--strong-line);
+  background: var(--surface-hover);
 }
 
 .skillLibrary h3 {
@@ -2242,12 +2290,14 @@ textarea:disabled {
 
 .skillTable {
   width: 100%;
-  min-width: 720px;
+  min-width: 640px;
+  table-layout: fixed;
   border-collapse: collapse;
 }
 
 .skillTable th,
 .skillTable td {
+  box-sizing: border-box;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   padding: 11px 14px;
   text-align: left;
@@ -2279,15 +2329,56 @@ textarea:disabled {
 }
 
 .skillTable .skillToggleColumn {
-  width: 96px;
-  text-align: center;
+  width: 210px;
+  white-space: nowrap;
 }
 
 .skillTable .skillActionColumn {
-  width: 100px;
+  width: 104px;
   text-align: right;
+  white-space: nowrap;
 }
-.skillTable .skillActionColumn button + button { margin-left: 5px; }
+
+.skillRowActions { display: flex; justify-content: flex-end; gap: 6px; }
+
+.skillMode {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.skillSelectionButton {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--raised);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.skillSelectionButton[aria-pressed="true"] {
+  color: #f3d27b;
+  border-color: color-mix(in srgb, #f3d27b 40%, var(--line));
+  background: color-mix(in srgb, #f3d27b 10%, var(--raised));
+}
+
+.skillSelectionButton:hover,
+.skillSelectionButton:focus-visible {
+  border-color: var(--strong-line);
+  outline-offset: 2px;
+}
+
+.skillModeLabel {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 650;
+}
+
+.skillToggleColumn[data-mode="manual"] .skillModeLabel { color: #f3d27b; }
 .skillResourcesSection { display: grid; gap: 10px; border-top: 1px solid var(--line); padding-top: 14px; }
 .skillResourcesSection[hidden] { display: none; }
 .skillResourcesSection h3, .skillResourcesSection p { margin: 0; }
@@ -2297,18 +2388,15 @@ textarea:disabled {
 .skillResourceActions { display: flex; gap: 8px; }
 .skillTestResults { margin: 0; white-space: pre-wrap; font-size: .78rem; }
 
-.skillEditButton {
-  min-height: 30px;
+.skillActionButton {
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: 8px;
   background: var(--raised);
-  padding: 0 11px;
   color: var(--text);
-  font-size: .76rem;
-  font-weight: 650;
+  cursor: pointer;
 }
 
-.skillEditButton:hover {
+.skillActionButton:hover {
   border-color: var(--strong-line);
   background: var(--surface-hover);
 }
@@ -2317,38 +2405,17 @@ textarea:disabled {
   color: #efefef;
   font-size: 0.98rem;
   font-weight: 620;
+  overflow-wrap: anywhere;
 }
 
 .skillSummary {
   color: #9b9b9b;
   font-size: 0.81rem;
   margin-top: 2px;
-  max-width: 320px;
+  max-width: 520px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.skillTable input[type="checkbox"] {
-  appearance: none;
-  width: 18px;
-  height: 18px;
-  border-radius: 5px;
-  border: 1px solid #3e3e3e;
-  background: linear-gradient(180deg, #2a2a2a, #1e1e1e);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  cursor: pointer;
-}
-
-.skillTable input[type="checkbox"]:checked {
-  border-color: transparent;
-  background:
-    radial-gradient(circle at 50% 50%, #f5f8ff 0 32%, transparent 33%),
-    linear-gradient(180deg, #5d89db, #355fb4);
-}
-
-.skill-column-hidden .skillTable .skillToggleColumn {
-  display: none;
 }
 
 .skillEditor {
@@ -2953,11 +3020,6 @@ textarea,
   background: transparent;
 }
 
-.skillTable input[type="checkbox"] {
-  border-color: var(--strong-line);
-  background: var(--raised);
-}
-
 .columnResizeHandle::before {
   background: var(--sidebar-line);
 }
@@ -3015,6 +3077,12 @@ textarea,
     flex-direction: column;
   }
 
+  .skillsDialog .settingsHeader,
+  .presetsDialog .settingsHeader {
+    align-items: flex-start;
+    flex-direction: row;
+  }
+
   .settingsFooter div {
     display: flex;
     width: 100%;
@@ -3048,13 +3116,19 @@ textarea,
   }
 
   .skillLibraryHeader .skillLibraryActions {
-    align-items: stretch;
-    flex-direction: column;
+    align-items: center;
   }
 
   .skillSearch {
-    width: 100%;
+    width: auto;
+    flex: 1;
   }
+
+  .skillTable { min-width: 0; }
+  .skillTable .skillToggleColumn { width: 180px; }
+  .skillTable .skillActionColumn { width: 92px; }
+  .skillRowActions { gap: 4px; }
+  .skillsDialog .skillActionButton.tableActionIcon { width: 30px; min-width: 30px; height: 30px; min-height: 30px; }
 
   .settingsFooter button {
     flex: 1;
@@ -3066,6 +3140,22 @@ textarea,
 
   .composerResetButton { padding: 0; }
   .composerResetButton span { display: none; }
+}
+
+@media (max-width: 520px) {
+  .skillTable,
+  .skillTable tbody { display: block; width: 100%; min-width: 0; }
+  .skillTable thead { display: none; }
+  .skillTable tbody tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; padding: 9px 11px; border-bottom: 1px solid var(--line); }
+  .skillTable tbody tr:last-child { border-bottom: 0; }
+  .skillTable tbody th,
+  .skillTable tbody td { width: auto; padding: 2px 0; border: 0; }
+  .skillTable tbody th { grid-column: 1 / -1; }
+  .skillTable .skillToggleColumn { width: auto; }
+  .skillTable .skillActionColumn { width: auto; }
+  .skillSummary { max-width: none; }
+  .presetRow { grid-template-columns: 36px minmax(0, 1fr); }
+  .presetActions { grid-column: 2; justify-content: flex-end; }
 }
 
 
@@ -3143,7 +3233,7 @@ models-page .providerTableWrap { max-height: none; }
 .presetActions button.tableActionIcon,
 .providerTable button.tableActionIcon,
 .providerTable button.providerModelUseButton,
-.skillEditButton.tableActionIcon,
+.skillActionButton.tableActionIcon,
 .mcpRowActions button.tableActionIcon,
 .subAgentRow button.tableActionIcon {
   display: inline-grid;

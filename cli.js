@@ -159,7 +159,7 @@ class HarnessCli {
       context,
       client, tools: [...localTools, ...protectTools(mcpTools, authorize)], model: settings.model || defaultModelForProvider(provider),
       root: this.workspace, disabledSteps, systemPrompts: preset.systemPrompts,
-      skills: this.store.getSelectedSkills(), approve: async () => true,
+      skills: this.store.getSkillCatalog(), loadSkill: (id) => this.store.getSkill(id), approve: async () => true,
       onInfo: (message) => this.ui.info(message),
       onTool: ({ name, args }) => this.ui.info(`Tool: ${name} ${JSON.stringify(args)}`),
       onEvent: (detail) => this.session.events.push({ title: describeAgentEvent(detail), detail, timestamp: Date.now() }),

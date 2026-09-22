@@ -10,6 +10,7 @@ test("local tool modules compose into the existing tool registry", () => {
     "list_files",
     "read_file",
     "read_skill_resource",
+    "search_skills",
     "write_file",
     "search_files",
     "curl",

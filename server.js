@@ -126,6 +126,7 @@ async function createAgentSession({
   const activeConfiguration = rigConfigurations.configurations.find(
     (configuration) => configuration.id === rigConfigurations.activeConfigurationId,
   );
+  const skillAutoDiscovery = activeConfiguration?.skillAutoDiscovery !== false;
   subAgentManager.setWorkers(activeConfiguration?.subAgents || []);
   const localTools = disabled.has("tools") ? [] : createTools({
     root,
@@ -136,6 +137,7 @@ async function createAgentSession({
     settings: settingsNow,
   }).filter((tool) => (
     toolPermissions[tool.name] === true &&
+    (tool.name !== "search_skills" || skillAutoDiscovery) &&
     (tool.name !== "delegate_to_sub_agent" || subAgentManager.listWorkers().length > 0)
   ));
   const mcpTools = disabled.has("mcp") ? [] : await loadMcpTools({
@@ -160,7 +162,9 @@ async function createAgentSession({
     onEvent,
     onTextDelta,
     systemPrompts: uiStateStore.getSystemPrompts(),
-    skills: uiStateStore.getSelectedSkills(),
+    skills: uiStateStore.getSkillCatalog(),
+    skillAutoDiscovery,
+    loadSkill: (id) => uiStateStore.getSkill(id),
     disabledSteps,
   });
 }

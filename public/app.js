@@ -70,7 +70,9 @@ import {
   loadHealth as fetchHealth,
   loadProviderModels as fetchProviderModels,
   loadRigConfigurations as fetchRigConfigurations,
+  loadSkill as fetchSkill,
   loadSkills as fetchSkills,
+  loadSkillSettings as fetchSkillSettings,
   loadSkillResource as fetchSkillResource,
   loadSystemPrompts as fetchSystemPrompts,
   loadTaskRatings as fetchTaskRatings,
@@ -180,8 +182,8 @@ const skillTestResults = appRoot.querySelector("#skillTestResults");
 const importSkillInput = appRoot.querySelector("#importSkillInput");
 const skillsDialogTitle = appRoot.querySelector("#skillsDialogTitle");
 const skillsDialogDescription = appRoot.querySelector("#skillsDialogDescription");
+const skillAutoDiscoveryToggle = appRoot.querySelector("#skillAutoDiscoveryToggle");
 const backToSkillsButton = appRoot.querySelector("#backToSkillsButton");
-const toggleSkillColumnButton = appRoot.querySelector("#toggleSkillColumnButton");
 const cancelSkillEditButton = appRoot.querySelector("#cancelSkillEditButton");
 const saveSkillEditButton = appRoot.querySelector("#saveSkillEditButton");
 const saveSkillsButton = appRoot.querySelector("#saveSkillsButton");
@@ -376,6 +378,13 @@ const FILES_VISIBLE_STORAGE_KEY = "ai-harness.filesVisible";
 let toolsConfigContent = "";
 let systemPrompts = [];
 let skills = [];
+let skillAutoDiscovery = true;
+
+function renderSkillAutoDiscoveryButton() {
+  skillAutoDiscoveryToggle.setAttribute("aria-pressed", String(skillAutoDiscovery));
+  skillAutoDiscoveryToggle.setAttribute("aria-label", `Turn ${skillAutoDiscovery ? "off" : "on"} skill auto-discovery`);
+  skillAutoDiscoveryToggle.replaceChildren(bootstrapIcon("stars"), document.createTextNode(skillAutoDiscovery ? "On" : "Off"));
+}
 let editingSystemPromptKey = null;
 let editingSkillId = null;
 
@@ -443,7 +452,7 @@ function renderSkills() {
 
   const query = skillsSearchInput.value.trim().toLocaleLowerCase();
   const visibleSkills = query
-    ? skills.filter((skill) => [skill.name, summarizeSkillContent(skill.content)]
+    ? skills.filter((skill) => [skill.name, skill.description || summarizeSkillContent(skill.content)]
       .some((value) => String(value || "").toLocaleLowerCase().includes(query)))
     : skills;
   if (visibleSkills.length === 0) {
@@ -471,26 +480,50 @@ function renderSkills() {
 
     const toggleCell = document.createElement("td");
     toggleCell.className = "skillToggleColumn";
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.checked = skill.selected === true;
-    checkbox.dataset.skillId = skill.id;
-    checkbox.setAttribute("aria-label", `Enable skill ${skill.name}`);
-    checkbox.addEventListener("change", () => { skill.selected = checkbox.checked; });
-    toggleCell.append(checkbox);
+    const selectionButton = document.createElement("button");
+    selectionButton.type = "button";
+    selectionButton.className = "skillSelectionButton";
+    selectionButton.dataset.skillId = skill.id;
+    const modeLabel = document.createElement("span");
+    modeLabel.className = "skillModeLabel";
+    const updateMode = () => {
+      const selected = skill.selected === true;
+      const action = `${selected ? "Remove" : "Add"} ${skill.name} ${selected ? "from" : "to"} manual selection`;
+      selectionButton.replaceChildren(bootstrapIcon(selected ? "star-fill" : "star"));
+      selectionButton.setAttribute("aria-pressed", String(selected));
+      selectionButton.setAttribute("aria-label", action);
+      selectionButton.title = action;
+      modeLabel.textContent = selected ? "Manually selected" : skillAutoDiscovery ? "Auto-discovered" : "Not selected";
+      toggleCell.dataset.mode = selected ? "manual" : "auto";
+    };
+    selectionButton.addEventListener("click", () => {
+      skill.selected = !skill.selected;
+      updateMode();
+      skillsStatus.textContent = "Selection changed. Save selection to apply it.";
+      skillsStatus.dataset.state = "";
+    });
+    updateMode();
+    const mode = document.createElement("div");
+    mode.className = "skillMode";
+    mode.append(selectionButton, modeLabel);
+    toggleCell.append(mode);
 
     const actionCell = document.createElement("td");
     actionCell.className = "skillActionColumn";
     const editButton = document.createElement("button");
     editButton.type = "button";
-    editButton.className = "skillEditButton";
+    editButton.className = "skillActionButton";
     setActionIcon(editButton, "pencil-square", `Edit ${skill.name}`);
     editButton.addEventListener("click", () => openSkillEditor(skill.id));
     const testButton = document.createElement("button");
     testButton.type = "button";
+    testButton.className = "skillActionButton";
     setActionIcon(testButton, "check-lg", `Test ${skill.name}`);
     testButton.addEventListener("click", () => testStoredSkill(skill.id));
-    actionCell.append(editButton, testButton);
+    const actionButtons = document.createElement("div");
+    actionButtons.className = "skillRowActions";
+    actionButtons.append(editButton, testButton);
+    actionCell.append(actionButtons);
 
     row.append(nameCell, toggleCell, actionCell);
     skillsTableBody.append(row);
@@ -498,7 +531,10 @@ function renderSkills() {
 }
 
 async function loadSkills() {
-  skills = await fetchSkills();
+  const settings = await fetchSkillSettings();
+  skills = settings.skills || [];
+  skillAutoDiscovery = settings.skillAutoDiscovery !== false;
+  renderSkillAutoDiscoveryButton();
   renderSkills();
 }
 
@@ -576,9 +612,13 @@ async function importSkillFolder() {
   } catch (error) { skillsStatus.textContent = error.message; skillsStatus.dataset.state = "error"; }
 }
 
-function openSkillEditor(skillId = null) {
-  const skill = skillId ? skills.find((entry) => entry.id === skillId) : null;
+async function openSkillEditor(skillId = null) {
+  let skill = skillId ? skills.find((entry) => entry.id === skillId) : null;
   if (skillId && !skill) return;
+  if (skill && !skill.content) {
+    try { skill = await fetchSkill(skillId); }
+    catch (error) { skillsStatus.textContent = error.message; skillsStatus.dataset.state = "error"; return; }
+  }
   editingSkillId = skill?.id || null;
   skillEditorName.value = skill?.name || "";
   skillEditorContent.value = skill?.content || skillDraft();
@@ -590,7 +630,6 @@ function openSkillEditor(skillId = null) {
   skillLibrary.hidden = true;
   skillEditor.hidden = false;
   backToSkillsButton.hidden = false;
-  toggleSkillColumnButton.hidden = true;
   cancelSkillEditButton.hidden = false;
   saveSkillEditButton.hidden = false;
   saveSkillsButton.hidden = true;
@@ -617,12 +656,11 @@ function closeSkillEditor({ preserveStatus = false } = {}) {
   skillLibrary.hidden = false;
   skillEditor.hidden = true;
   backToSkillsButton.hidden = true;
-  toggleSkillColumnButton.hidden = false;
   cancelSkillEditButton.hidden = true;
   saveSkillEditButton.hidden = true;
   saveSkillsButton.hidden = false;
   skillsDialogTitle.textContent = "Skills";
-  skillsDialogDescription.textContent = "Choose which SKILL.md guides are injected into new agent sessions";
+  skillsDialogDescription.textContent = "Choose how skills load for this preset.";
   setSkillEditorPending(false);
   if (skillsDialog.open && !preserveStatus) {
     skillsStatus.textContent = "Skill folders are stored in /skills.";
@@ -672,13 +710,15 @@ function currentSelectedSkillIds() {
 
 async function saveSkills() {
   const selectedSkillIds = currentSelectedSkillIds();
-  const response = await persistSelectedSkills(selectedSkillIds);
+  const response = await persistSelectedSkills(selectedSkillIds, skillAutoDiscovery);
+  skillAutoDiscovery = response.skillAutoDiscovery !== false;
+  renderSkillAutoDiscoveryButton();
   const selectedIds = new Set((response.skills || []).map((skill) => skill.id));
   skills = skills.map((skill) => ({ ...skill, selected: selectedIds.has(skill.id) }));
   renderSkills();
-  updateActivePresetSnapshot({ skillIds: selectedSkillIds });
+  updateActivePresetSnapshot({ skillIds: selectedSkillIds, skillAutoDiscovery });
   send({ type: "reload_skills" });
-  skillsStatus.textContent = `${selectedSkillIds.length} skill${selectedSkillIds.length === 1 ? "" : "s"} selected`;
+  skillsStatus.textContent = `${selectedSkillIds.length} manually selected · Auto-discovery ${skillAutoDiscovery ? "on" : "off"}`;
   skillsStatus.dataset.state = "success";
 }
 
@@ -724,6 +764,7 @@ const PRESET_STATUS_TOOL_LABELS = {
   list_files: "List files",
   read_file: "Read files",
   read_skill_resource: "Skill resources",
+  search_skills: "Search skills",
   write_file: "Write files",
   search_files: "Search files",
   curl: "Curl",
@@ -801,9 +842,9 @@ function renderPresetStatusBar() {
     .filter(([, selected]) => selected !== false)
     .map(([name]) => PRESET_STATUS_WORKFLOW_LABELS[name] || titleCaseIdentifier(name));
 
-  const skillStatus = selectedSkills.length > 0 ? selectedSkills : activeSkillIds.size > 0 ? `${activeSkillIds.size} selected` : [];
+  const skillStatus = [active.skillAutoDiscovery !== false ? "Auto-discovery on" : "Auto-discovery off", ...selectedSkills];
   appendPresetStatusItem("Sys prompts", configuredPrompts, String(configuredPrompts.length), openSystemPromptsModal);
-  appendPresetStatusItem("Skills", skillStatus, String(selectedSkills.length || activeSkillIds.size), openSkillsModal);
+  appendPresetStatusItem("Skills", skillStatus, active.skillAutoDiscovery !== false ? "auto" : String(selectedSkills.length || activeSkillIds.size), openSkillsModal);
   appendPresetStatusItem("Tools", selectedTools, String(selectedTools.length), openToolsModal);
   appendPresetStatusItem("MCP", selectedMcp, selectedMcp.length > 0 ? String(selectedMcp.length) : "None", openMcpModal);
   appendPresetStatusItem("Workflow", selectedWorkflowItems, `${selectedWorkflowItems.length}/4`, openWorkflowSettings);
@@ -865,6 +906,7 @@ const PRESET_TOOL_INPUTS = {
   list_files: "presetToolListFiles",
   read_file: "presetToolReadFile",
   read_skill_resource: "presetToolReadSkillResource",
+  search_skills: "presetToolSearchSkills",
   edit_files: "presetToolEditFiles",
   change_history: "presetToolChangeHistory",
   javascript: "presetToolJavaScript",
@@ -920,7 +962,7 @@ function renderPresetSkills() {
   }
   const query = presetSkillsSearch.value.trim().toLocaleLowerCase();
   const visibleSkills = query
-    ? skills.filter((skill) => [skill.name, summarizeSkillContent(skill.content)]
+    ? skills.filter((skill) => [skill.name, skill.description || summarizeSkillContent(skill.content)]
       .some((value) => String(value || "").toLocaleLowerCase().includes(query)))
     : skills;
   if (visibleSkills.length === 0) {
@@ -1153,6 +1195,16 @@ function renderPresets() {
     const row = document.createElement("article");
     row.className = `presetRow${isActive ? " active" : ""}`;
 
+    const selectButton = document.createElement("button");
+    selectButton.type = "button";
+    selectButton.className = "presetSelectButton";
+    selectButton.append(bootstrapIcon(isActive ? "check-lg" : "chevron-right"));
+    selectButton.setAttribute("aria-pressed", String(isActive));
+    selectButton.setAttribute("aria-label", `${isActive ? "Selected preset" : "Select preset"}: ${configuration.name}`);
+    selectButton.title = `${isActive ? "Selected preset" : "Select preset"}: ${configuration.name}`;
+    selectButton.disabled = presetMutationPending || runActive;
+    if (!isActive) selectButton.addEventListener("click", () => activatePreset(configuration.id));
+
     const identity = document.createElement("div");
     identity.className = "presetIdentity";
     const name = document.createElement("strong");
@@ -1171,20 +1223,6 @@ function renderPresets() {
     editButton.disabled = presetMutationPending || runActive;
     editButton.addEventListener("click", () => openPresetEditor(configuration.id));
 
-    if (isActive) {
-      const badge = document.createElement("span");
-      badge.className = "presetActiveBadge";
-      badge.textContent = "Active";
-      actions.append(badge);
-    } else {
-      const useButton = document.createElement("button");
-      useButton.type = "button";
-      setActionIcon(useButton, "check-lg", `Use ${configuration.name}`);
-      useButton.disabled = presetMutationPending || runActive;
-      useButton.addEventListener("click", () => activatePreset(configuration.id));
-      actions.append(useButton);
-    }
-
     const deleteButton = document.createElement("button");
     deleteButton.type = "button";
     deleteButton.className = "presetDeleteButton";
@@ -1193,7 +1231,7 @@ function renderPresets() {
     deleteButton.addEventListener("click", () => deletePreset(configuration.id));
     actions.prepend(editButton);
     actions.append(deleteButton);
-    row.append(identity, actions);
+    row.append(selectButton, identity, actions);
     presetsList.append(row);
   }
 }
@@ -4145,6 +4183,13 @@ skillsModal.addEventListener("save-skills", async () => {
   try { await saveSkills(); } catch (error) { skillsStatus.textContent = error.message; skillsStatus.dataset.state = "error"; }
 });
 skillsModal.addEventListener("search-skills", renderSkills);
+skillsModal.addEventListener("change-skill-discovery", () => {
+  skillAutoDiscovery = !skillAutoDiscovery;
+  renderSkillAutoDiscoveryButton();
+  renderSkills();
+  skillsStatus.textContent = "Discovery setting changed. Save selection to apply it.";
+  skillsStatus.dataset.state = "";
+});
 skillsModal.addEventListener("create-skill", () => openSkillEditor());
 skillsModal.addEventListener("cancel-skill-edit", closeSkillEditor);
 skillsModal.addEventListener("save-skill-edit", saveSkillEdit);

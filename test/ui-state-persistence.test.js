@@ -206,15 +206,17 @@ test("SQLite skills migrate to /skills folders and presets keep their selections
     });
     assert.equal(updated.skill.name, "renamed-skill");
     assert.match(updated.skill.content, /Updated content/);
-    store.setSelectedSkills([updated.skill.id]);
+    store.setSelectedSkills([updated.skill.id], false);
     const activePreset = store.getRigConfigurations().configurations.find((configuration) => configuration.selected);
     assert.deepEqual(activePreset.skillIds, [updated.skill.id]);
+    assert.equal(activePreset.skillAutoDiscovery, false);
 
     const alternatePreset = {
       ...structuredClone(activePreset),
       id: "alternate-preset",
       name: "Alternate preset",
       skillIds: ["legacy-skill"],
+      skillAutoDiscovery: true,
       subAgents: [{ name: "reviewer", url: "http://localhost:3001/" }],
       selected: true,
     };
@@ -223,6 +225,7 @@ test("SQLite skills migrate to /skills folders and presets keep their selections
       alternatePreset.id,
     );
     assert.deepEqual(store.getSelectedSkills().map((skill) => skill.id), ["legacy-skill"]);
+    assert.equal(store.getSkillAutoDiscovery(), true);
     store.close();
     store = null;
 
@@ -232,6 +235,7 @@ test("SQLite skills migrate to /skills folders and presets keep their selections
       store.getRigConfigurations().configurations.find((configuration) => configuration.selected).skillIds,
       ["legacy-skill"],
     );
+    assert.equal(store.getRigConfigurations().configurations.find((configuration) => configuration.id === activePreset.id).skillAutoDiscovery, false);
     assert.deepEqual(
       store.getRigConfigurations().configurations.find((configuration) => configuration.selected).subAgents,
       [{ name: "reviewer", url: "http://localhost:3001" }],
@@ -258,6 +262,7 @@ test("SQLite skills migrate to /skills folders and presets keep their selections
     assert.deepEqual(columns, ["id", "name", "content", "selected", "updated_at"]);
     assert.equal(activeSkillsTable, undefined);
     assert.ok(presetColumns.includes("skill_ids"));
+    assert.ok(presetColumns.includes("skill_auto_discovery"));
     assert.ok(presetColumns.includes("sub_agents"));
     assert.equal(legacyPresetTable, undefined);
     assert.equal(legacyLayoutTable, undefined);

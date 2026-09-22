@@ -14,8 +14,18 @@ async function loadSkills() {
   return payload.skills || [];
 }
 
-function saveSelectedSkills(selectedSkillIds) {
-  return requestJson("/api/skills", jsonOptions("PUT", { selectedSkillIds }), "Unable to save skills.");
+function loadSkillSettings() {
+  return requestJson("/api/skills", {}, "Unable to load skills.");
+}
+
+async function loadSkill(skillId) {
+  const query = new URLSearchParams({ skillId });
+  const payload = await requestJson(`/api/skills?${query}`, {}, "Unable to load skill.");
+  return payload.skill;
+}
+
+function saveSelectedSkills(selectedSkillIds, skillAutoDiscovery) {
+  return requestJson("/api/skills", jsonOptions("PUT", { selectedSkillIds, ...(typeof skillAutoDiscovery === "boolean" ? { skillAutoDiscovery } : {}) }), "Unable to save skills.");
 }
 
 function saveSkill(skillId, name, content) {
@@ -106,6 +116,8 @@ export {
   loadProviderModels,
   loadRigConfigurations,
   loadSkills,
+  loadSkillSettings,
+  loadSkill,
   loadSkillResource,
   loadSystemPrompts,
   loadTaskRatings,
