@@ -1782,7 +1782,7 @@ textarea:disabled {
 .presetEditorActions .primaryButton { background: var(--accent); color: #1b1a18; }
 
 .workflowDialog { width: min(1040px, calc(100vw - 32px)); }
-.workflowPanel { max-height: calc(100vh - 48px); grid-template-rows: auto minmax(0, 1fr) auto; overflow: hidden; }
+.workflowPanel { max-height: calc(100vh - 48px); grid-template-rows: auto minmax(0, 1fr) auto auto; overflow: hidden; }
 .workflowDiagramPanel { display: grid; min-height: 0; gap: 14px; overflow: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--field); padding: 16px; }
 .workflowDiagramHeading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .workflowDiagramHeading h3 { margin: 0; color: var(--text); font-size: .94rem; }
@@ -1790,6 +1790,18 @@ textarea:disabled {
 .workflowEnabledCount { flex: 0 0 auto; border: 1px solid var(--line); border-radius: 999px; background: var(--raised); padding: 7px 10px; color: var(--muted); font-size: .7rem; font-weight: 750; }
 .workflowDiagramScroll { min-height: 0; overflow-x: auto; }
 .workflowDiagram { display: block; width: 100%; min-width: 780px; height: auto; }
+.workflowSkillPanel { display: grid; gap: 10px; max-height: 240px; min-height: 0; overflow: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--field); padding: 16px; }
+.workflowSkillHeading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.workflowSkillHeading h3 { margin: 0; font-size: .94rem; }
+.workflowSkillHeading p { margin: 5px 0 0; color: var(--muted); font-size: .76rem; }
+.workflowSkillDiscovery { display: flex; align-items: center; gap: 8px; font-size: .82rem; }
+#workflowSkillSearch { width: 100%; min-height: 36px; border: 1px solid var(--line); border-radius: 8px; background: var(--raised); padding: 7px 10px; color: var(--text); }
+.workflowSkillList { display: grid; gap: 4px; max-height: 130px; overflow: auto; }
+.workflowSkillItem { display: flex; align-items: flex-start; gap: 9px; border-radius: 7px; padding: 7px; cursor: pointer; }
+.workflowSkillItem:hover { background: var(--surface-hover); }
+.workflowSkillItem > span { display: grid; gap: 3px; min-width: 0; }
+.workflowSkillItem strong { font-size: .82rem; }
+.workflowSkillItem small { color: var(--muted); font-size: .73rem; }
 .workflowConnector line { stroke: var(--strong-line); stroke-dasharray: 5 5; stroke-width: 2; }
 .workflowConnector path { fill: var(--strong-line); }
 .workflowConnector.enabled line { stroke: #77a982; stroke-dasharray: none; }

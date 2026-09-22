@@ -231,6 +231,7 @@ const modelsPage = appRoot.querySelector("models-page");
 const modelsDialog = appRoot.querySelector("#modelsDialog");
 const providerModelsFilter = appRoot.querySelector("#providerModelsFilter");
 let routeReady = false;
+let systemPromptsLoadPromise = Promise.resolve();
 const refreshAllProviderModelsButton = appRoot.querySelector("#refreshAllProviderModelsButton");
 const allProviderModelsStatus = appRoot.querySelector("#allProviderModelsStatus");
 const providerModelsSortButtons = [...appRoot.querySelectorAll("[data-provider-model-sort]")];
@@ -3242,20 +3243,38 @@ function renderRoute() {
   const routeProviderId = modelsRouteProviderId(window.location.pathname);
   const showModels = routeProviderId !== null;
   const showProviders = /^\/providers\/?$/.test(window.location.pathname);
+  const showTools = /^\/tools\/?$/.test(window.location.pathname);
+  const showSkills = /^\/skills\/?$/.test(window.location.pathname);
+  const showPresets = /^\/presets\/?$/.test(window.location.pathname);
+  const showSystemPrompts = /^\/system-prompts\/?$/.test(window.location.pathname);
+  const showMcp = /^\/mcp\/?$/.test(window.location.pathname);
+  const showWorkflow = /^\/workflow\/?$/.test(window.location.pathname);
   if (showModels) providerModelsProviderId = routeProviderId;
   if (routeReady) {
     if (!showModels && modelsDialog.open) modelsDialog.close();
     if (!showProviders && settingsDialog.open) settingsDialog.close();
+    if (!showTools && toolsDialog.open) toolsDialog.close();
+    if (!showSkills && skillsDialog.open) skillsDialog.close();
+    if (!showPresets && presetsDialog.open) presetsDialog.close();
+    if (!showSystemPrompts && systemPromptsDialog.open) systemPromptsDialog.close();
+    if (!showMcp && mcpDialog.open) mcpDialog.close();
+    if (!showWorkflow && workflowDialog.open) workflowDialog.close();
     if (showModels && !modelsDialog.open) modelsDialog.showModal();
     if (showProviders && !settingsDialog.open) {
       prepareProvidersModal();
       settingsDialog.showModal();
     }
+    if (showTools && !toolsDialog.open) showToolsModal();
+    if (showSkills && !skillsDialog.open) showSkillsModal();
+    if (showPresets && !presetsDialog.open) showPresetsModal();
+    if (showSystemPrompts && !systemPromptsDialog.open) systemPromptsLoadPromise = showSystemPromptsModal();
+    if (showMcp && !mcpDialog.open) showMcpModal();
+    if (showWorkflow && !workflowDialog.open) showWorkflowSettings();
   }
   providerShortcutModel.setAttribute("aria-current", showModels ? "page" : "false");
   appRoot.querySelector("#providerShortcutButton").setAttribute("aria-current", showProviders ? "page" : "false");
   appRoot.querySelector("#collapsedModelsLink").setAttribute("aria-current", showModels ? "page" : "false");
-  document.title = showModels ? "Models · AI Harness" : showProviders ? "Providers · AI Harness" : "AI Harness";
+  document.title = showModels ? "Models · AI Harness" : showProviders ? "Providers · AI Harness" : showTools ? "Tools · AI Harness" : showSkills ? "Skills · AI Harness" : showPresets ? "Presets · AI Harness" : showSystemPrompts ? "System prompts · AI Harness" : showMcp ? "MCP · AI Harness" : showWorkflow ? "Workflow · AI Harness" : "AI Harness";
   if (showModels && routeReady) loadAllProviderModels({ missingOnly: true });
 }
 
@@ -3281,6 +3300,23 @@ settingsDialog.addEventListener("close", () => {
   window.history.replaceState({}, "", "/");
   renderRoute();
 });
+toolsDialog.addEventListener("close", () => {
+  if (!/^\/tools\/?$/.test(window.location.pathname)) return;
+  window.history.replaceState({}, "", "/");
+  renderRoute();
+});
+skillsDialog.addEventListener("close", () => {
+  if (!/^\/skills\/?$/.test(window.location.pathname)) return;
+  window.history.replaceState({}, "", "/");
+  renderRoute();
+});
+for (const [dialog, pathname] of [[presetsDialog, "/presets"], [systemPromptsDialog, "/system-prompts"], [mcpDialog, "/mcp"], [workflowDialog, "/workflow"]]) {
+  dialog.addEventListener("close", () => {
+    if (window.location.pathname !== pathname && window.location.pathname !== `${pathname}/`) return;
+    window.history.replaceState({}, "", "/");
+    renderRoute();
+  });
+}
 renderRoute();
 
 async function loadAllProviderModels({ missingOnly = false } = {}) {
@@ -3941,7 +3977,11 @@ function openProvidersModal() {
   navigateRoute("/providers");
 }
 
-async function openSkillsModal() {
+function openSkillsModal() {
+  navigateRoute("/skills");
+}
+
+async function showSkillsModal() {
   closeSkillEditor();
   skillsSearchInput.value = "";
   if (!skillsDialog.open) skillsDialog.showModal();
@@ -3958,6 +3998,11 @@ async function openSkillsModal() {
 }
 
 async function openSystemPromptsModal() {
+  navigateRoute("/system-prompts");
+  await systemPromptsLoadPromise;
+}
+
+async function showSystemPromptsModal() {
   systemPromptEditor.hidden = true;
   systemPromptsList.hidden = false;
   saveSystemPromptButton.hidden = true;
@@ -3971,6 +4016,10 @@ async function openSystemPromptsModal() {
 }
 
 function openToolsModal() {
+  navigateRoute("/tools");
+}
+
+function showToolsModal() {
   if (!toolsDialog.open) toolsDialog.showModal();
   toolsModal.loadToolDefinitions().then(() => renderToolPermissions()).catch((error) => { toolPermissionsStatus.textContent = error.message; toolPermissionsStatus.dataset.state = 'error'; });
   toolsModal.loadRuntimeSettings().catch((error) => { toolPermissionsStatus.textContent = error.message; toolPermissionsStatus.dataset.state = 'error'; });
@@ -4130,12 +4179,20 @@ async function saveSubAgents() {
 }
 
 async function openMcpModal() {
+  navigateRoute("/mcp");
+}
+
+async function showMcpModal() {
   if (!mcpDialog.open) mcpDialog.showModal();
   closeMcpEditor();
   await loadTools();
 }
 
 async function openPresetsModal() {
+  navigateRoute("/presets");
+}
+
+async function showPresetsModal() {
   if (!presetsDialog.open) presetsDialog.showModal();
   await loadPresets();
 }
@@ -4143,17 +4200,23 @@ async function openPresetsModal() {
 function setWorkflowPending(pending) {
   workflowInputSource.disabled = pending;
   for (const input of workflowEffectInputs) input.disabled = pending;
+  for (const input of workflowModal.querySelectorAll("#workflowSkillAutoDiscovery, #workflowSkillSearch, [data-workflow-skill]")) input.disabled = pending;
   saveWorkflowButton.disabled = pending;
   saveWorkflowButton.textContent = pending ? "Saving…" : "Save workflow";
 }
 
 function openWorkflowSettings() {
+  navigateRoute("/workflow");
+}
+
+function showWorkflowSettings() {
   const active = presetConfigurations.find((configuration) => configuration.id === activePresetId);
   if (!active) return;
   const component = normalizeRigComponentState(active.componentState);
   workflowDialogDescription.textContent = `${active.name} · configure the active preset's processing stages`;
   workflowInputSource.value = component.inputSource;
   for (const input of workflowEffectInputs) input.checked = component.effects[input.dataset.workflowEffect] !== false;
+  workflowModal.renderSkillRouting(skills, active.skillIds || [], active.skillAutoDiscovery !== false);
   workflowModal.syncDiagram();
   workflowStatus.textContent = runActive
     ? "Stop the active run before changing workflow settings."
@@ -4172,7 +4235,7 @@ async function saveWorkflowSettings() {
     inputSource: workflowInputSource.value,
     effects: Object.fromEntries(workflowEffectInputs.map((input) => [input.dataset.workflowEffect, input.checked])),
   });
-  const updated = { ...current, componentState, updatedAt: Date.now() };
+  const updated = { ...current, componentState, ...workflowModal.skillRouting(), updatedAt: Date.now() };
   const configurations = presetConfigurations.map((configuration, configurationIndex) =>
     configurationIndex === index ? updated : configuration
   );
@@ -4444,7 +4507,7 @@ async function initialize() {
   await loadWorkspaceTree();
   routeReady = true;
   renderRoute();
-  const viewingModalRoute = modelsRouteProviderId(window.location.pathname) !== null || /^\/providers\/?$/.test(window.location.pathname);
+  const viewingModalRoute = modelsRouteProviderId(window.location.pathname) !== null || /^\/(?:providers|tools|skills|presets|system-prompts|mcp|workflow)\/?$/.test(window.location.pathname);
   if (!viewingModalRoute && needsDefaultWorkspace) {
     openProvidersAfterWorkspaceSelection = shouldOpenProvidersModal;
     await openDefaultWorkspacePicker();

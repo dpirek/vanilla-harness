@@ -90,6 +90,21 @@ class WorkflowModal extends BaseComponent {
               }),
             ] }),
           ] }),
+          this.createElement("section", { class: "workflowSkillPanel", "aria-labelledby": "workflowSkillHeading", children: [
+            this.createElement("div", { class: "workflowSkillHeading", children: [
+              this.createElement("div", { children: [
+                this.createElement("h3", { id: "workflowSkillHeading", textContent: "Skill routing and selection" }),
+                this.createElement("p", { textContent: "Choose guides the agent always loads and whether it can discover others by relevance." }),
+              ] }),
+              this.createElement("span", { id: "workflowSkillCount", class: "workflowEnabledCount", textContent: "0 selected" }),
+            ] }),
+            this.createElement("label", { class: "workflowSkillDiscovery", children: [
+              this.createElement("input", { id: "workflowSkillAutoDiscovery", type: "checkbox" }),
+              this.createElement("span", { textContent: "Discover relevant skills automatically" }),
+            ] }),
+            this.createElement("input", { id: "workflowSkillSearch", type: "search", placeholder: "Find a skill to load manually", "aria-label": "Find skills" }),
+            this.createElement("div", { id: "workflowSkillList", class: "workflowSkillList", role: "group", "aria-label": "Manually selected skills" }),
+          ] }),
           this.createElement("div", { hidden: "", children: [
             this.createElement("select", { id: "workflowInputSource", children: [
               this.createElement("option", { value: "microphone", textContent: "Microphone" }),
@@ -126,6 +141,8 @@ class WorkflowModal extends BaseComponent {
       });
     }
     this.querySelector("#workflowInputSource").addEventListener("change", () => this.emit("workflow-draft-change"));
+    this.querySelector("#workflowSkillAutoDiscovery").addEventListener("change", () => { this.updateSkillCount(); this.emit("workflow-draft-change"); });
+    this.querySelector("#workflowSkillSearch").addEventListener("input", () => this.renderSkillList());
     for (const group of this.querySelectorAll("[data-workflow-step]")) {
       const toggle = () => this.querySelector(`[data-workflow-effect="${group.dataset.workflowStep}"]`).click();
       group.addEventListener("click", toggle);
@@ -135,6 +152,47 @@ class WorkflowModal extends BaseComponent {
         toggle();
       });
     }
+  }
+
+  renderSkillRouting(catalog = [], selectedIds = [], autoDiscovery = true) {
+    this.skillCatalog = catalog;
+    this.selectedSkillIds = new Set(selectedIds.map(String));
+    this.querySelector("#workflowSkillAutoDiscovery").checked = autoDiscovery;
+    this.querySelector("#workflowSkillSearch").value = "";
+    this.renderSkillList();
+  }
+
+  renderSkillList() {
+    const query = this.querySelector("#workflowSkillSearch").value.trim().toLocaleLowerCase();
+    const list = this.querySelector("#workflowSkillList");
+    const matches = (this.skillCatalog || []).filter((skill) => !query || `${skill.name} ${skill.description || ""}`.toLocaleLowerCase().includes(query));
+    matches.sort((a, b) => Number(this.selectedSkillIds.has(String(b.id))) - Number(this.selectedSkillIds.has(String(a.id))) || a.name.localeCompare(b.name));
+    list.replaceChildren(...matches.slice(0, 60).map((skill) => {
+      const input = this.createElement("input", { type: "checkbox", "data-workflow-skill": String(skill.id) });
+      input.checked = this.selectedSkillIds.has(String(skill.id));
+      input.addEventListener("change", () => {
+        if (input.checked) this.selectedSkillIds.add(String(skill.id));
+        else this.selectedSkillIds.delete(String(skill.id));
+        this.updateSkillCount();
+        this.emit("workflow-draft-change");
+      });
+      return this.createElement("label", { class: "workflowSkillItem", children: [
+        input,
+        this.createElement("span", { children: [this.createElement("strong", { textContent: skill.name }), this.createElement("small", { textContent: skill.description || "" })] }),
+      ] });
+    }));
+    if (!matches.length) list.append(this.createElement("p", { textContent: "No matching skills." }));
+    else if (matches.length > 60) list.append(this.createElement("p", { textContent: `Showing 60 of ${matches.length} skills. Search to narrow the list.` }));
+    this.updateSkillCount();
+  }
+
+  updateSkillCount() {
+    const count = this.selectedSkillIds?.size || 0;
+    this.querySelector("#workflowSkillCount").textContent = `${count} selected · discovery ${this.querySelector("#workflowSkillAutoDiscovery").checked ? "on" : "off"}`;
+  }
+
+  skillRouting() {
+    return { skillIds: [...this.selectedSkillIds], skillAutoDiscovery: this.querySelector("#workflowSkillAutoDiscovery").checked };
   }
 
   syncDiagram() {

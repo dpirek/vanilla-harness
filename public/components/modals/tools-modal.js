@@ -254,11 +254,11 @@ class ToolsModal extends BaseComponent {
             "aria-label": "Local tool permissions",
             children: [
               this.createElement('div', { class: 'toolFileActions', children: [
-                this.createElement('button', { id: 'createModuleTool', type: 'button', textContent: 'New module tool' }),
-                this.createElement('button', { id: 'createTool', type: 'button', textContent: 'New command tool' }),
-                this.createElement('button', { id: 'importTool', type: 'button', textContent: 'Import TOOL.json' }),
+                this.createElement('button', { id: 'createModuleTool', class: 'iconButton', type: 'button', title: 'New module tool', 'aria-label': 'New module tool', children: [bootstrapIcon('filetype-js')] }),
+                this.createElement('button', { id: 'createTool', class: 'iconButton', type: 'button', title: 'New command tool', 'aria-label': 'New command tool', children: [bootstrapIcon('wrench')] }),
+                this.createElement('button', { id: 'importTool', class: 'iconButton', type: 'button', title: 'Import TOOL.json', 'aria-label': 'Import TOOL.json', children: [bootstrapIcon('filetype-json')] }),
                 this.createElement('input', { id: 'toolImportFile', type: 'file', accept: '.json,application/json', hidden: '' }),
-                this.createElement('button', { id: 'importToolFolder', type: 'button', textContent: 'Import tool folder' }),
+                this.createElement('button', { id: 'importToolFolder', class: 'iconButton', type: 'button', title: 'Import tool folder', 'aria-label': 'Import tool folder', children: [bootstrapIcon('folder-plus')] }),
                 this.createElement('input', { id: 'toolImportFolderFiles', type: 'file', webkitdirectory: '', multiple: '', hidden: '' }),
               ] }),
               this.createElement("div", { class: "toolTree", children: toolGroups }),
