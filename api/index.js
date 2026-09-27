@@ -1,3 +1,4 @@
+import { handleLogsApi } from "./logs.js";
 import { createRuntimeApiHandlers } from "./runtime.js";
 import { createSettingsApiHandlers } from "./settings.js";
 import { createSubAgentApiHandlers } from "./sub-agents.js";
@@ -12,6 +13,7 @@ export function createApiRouter(options) {
   }));
 
   return async function handleApiRequest(req, res, url) {
+    if (await handleLogsApi(req, res, url, options)) return true;
     const handler = routes.get(url.pathname);
     if (!handler) return false;
     await handler(req, res, url);

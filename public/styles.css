@@ -3324,3 +3324,37 @@ textarea,
 .skillInstall { display: grid; gap: 10px; padding: 14px 0; }
 .skillInstall > button { justify-self: start; }
 .skillInstall input { width: 100%; min-width: 0; box-sizing: border-box; }
+
+/* Error diagnostics use the main workspace while keeping conversation navigation. */
+logs-page[hidden] { display: none !important; }
+.app.viewingLogs > app-shell-content > .chat,
+.app.viewingLogs > app-shell-content > .filesColumn,
+.app.viewingLogs > app-shell-content > .filesResizeHandle { display: none; }
+logs-page { grid-column: 3 / -1; min-width: 0; overflow: auto; padding: 32px clamp(18px, 4vw, 56px); }
+.logsHeader { display: flex; justify-content: space-between; align-items: start; gap: 20px; margin-bottom: 24px; }
+.logsHeader h1 { margin: 0; font-size: 26px; }
+.logsHeader p, .logListMeta, .logListItem small { color: var(--muted); }
+logs-page a, .stepErrorLogLink { color: var(--text); text-decoration: underline; text-underline-offset: 3px; }
+.logsToolbar, .logsPagination, .logListMeta { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.logsToolbar[hidden], .logsPagination[hidden] { display: none; }
+.logsToolbar input { flex: 1; min-width: 180px; }
+logs-page input, logs-page select, logs-page textarea { padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--text); font: inherit; }
+.logListItem, .logSection { border: 1px solid var(--line); border-radius: 12px; padding: 20px; margin: 16px 0; overflow-wrap: anywhere; }
+.logListItem h2, .logSection h2 { font-size: 18px; margin: 8px 0 12px; }
+.logListItem p { white-space: pre-wrap; }
+.logBadge { border: 1px solid var(--line); padding: 3px 8px; border-radius: 20px; font-size: 12px; }
+.logSection pre { background: var(--sidebar); padding: 16px; border-radius: 8px; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 560px; overflow: auto; font-size: 12px; line-height: 1.6; }
+.logSection label { display: block; margin: 16px 0 8px; }
+.logSection textarea { display: block; width: 100%; resize: vertical; margin-bottom: 12px; }
+.logsPagination { justify-content: center; margin: 24px 0; }
+.logsEmpty { padding: 40px 0; color: var(--muted); }
+#logsFeedback { color: var(--muted); }
+.errorLogsNav { display: flex; align-items: center; gap: 10px; padding: 10px 12px; color: var(--muted); text-decoration: none; border-radius: 8px; }
+.errorLogsNav:hover { background: var(--surface-hover); color: var(--text); }
+.app.sidebar-collapsed .errorLogsNav .navLabel { display: none; }
+.stepErrorLogLink { font-size: 12px; margin-top: 4px; }
+@media (max-width: 900px) {
+  logs-page { grid-column: 1 / -1; padding: 20px 16px; }
+  .logsHeader { flex-direction: column; }
+  .logSection { padding: 14px; }
+}

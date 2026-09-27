@@ -1,3 +1,4 @@
+import { createRunDiagnostics } from "./lib/error-logs.js";
 import { runtimeSettings } from "./lib/runtime-settings.js";
 import { createAuthorizer, protectTools } from "./lib/permissions.js";
 import { ConversationContext } from "./lib/conversation-context.js";
@@ -193,6 +194,13 @@ function startServer({ port = defaultPort, host } = {}) {
 
 const handleWebSocket = createWebSocketHandler({
   createAgentSession,
+  createDiagnostics: (context) => {
+    const rig = uiStateStore.getRigConfigurations();
+    const preset = rig.configurations.find((item) => item.id === rig.activeConfigurationId);
+    return createRunDiagnostics(uiStateStore.errorLogs, { ...context,
+      providerSettings: { ...uiStateStore.getAll().providerSettings, ...context.providerSettings },
+      preset, workspace: context.workspace || defaultWorkspace });
+  },
   resetContext: (sessionId) => {
     const session = uiStateStore.getAll().sessions.find((item) => item.id === sessionId);
     if (session) new ConversationContext({ store: uiStateStore, root: session.workspace, sessionId, settings: () => runtimeSettings(uiStateStore) }).reset();

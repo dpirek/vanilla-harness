@@ -287,6 +287,7 @@ function sessionActivities(events = [], now = Date.now()) {
       const priorArguments = item.details?.find((section) => section.title === "Arguments")?.text;
       item.output = detail.output;
       if (failed) item.failureReason = failureReason(detail.output);
+      item.errorLogId = detail.errorLogId;
       setDetails(item, [
         { title: "Command", text: detail.name === "run_command" ? item.command || detail.args?.command : "" },
         { title: "Arguments", text: priorArguments || detail.args },
@@ -300,6 +301,7 @@ function sessionActivities(events = [], now = Date.now()) {
     } else if (type === "tool_blocked") {
       const item = add(`${humanizeToolName(detail.name)} blocked`, "failed", event, `tool:${detail.name}`);
       item.failureReason = `Tool ${detail.name} is unavailable.`;
+      item.errorLogId = detail.errorLogId;
       setDetails(item, [
         { title: "Arguments", text: detail.args },
         { title: "Failure reason", text: item.failureReason },
@@ -321,6 +323,7 @@ function sessionActivities(events = [], now = Date.now()) {
       const status = detail.status === "passed" ? "completed" : "failed";
       const item = finish((candidate) => candidate.key === "validation", event, status, `Validation ${detail.status}`)
         || add(`Validation ${detail.status}`, status, event, "validation");
+      item.errorLogId = detail.errorLogId;
       if (status === "failed") item.failureReason = failureReason(detail.error || [...items].reverse().find((candidate) => candidate.key === `tool:${detail.tool}`)?.output);
       setDetails(item, [
         { title: "Changed paths", text: detail.paths },
@@ -344,9 +347,10 @@ function sessionActivities(events = [], now = Date.now()) {
       complete = true;
     } else if (event.title === "Error") {
       finishAll(event, "failed");
-      const errorText = printableValue(event.detail) || "The run failed without an error message.";
+      const errorText = printableValue(event.detail?.error || event.detail) || "The run failed without an error message.";
       for (const pending of items.filter((item) => item.status === "failed" && !item.failureReason)) {
         pending.failureReason = errorText;
+        pending.errorLogId = detail.errorLogId;
         setDetails(pending, [...(pending.details || []), { title: "Failure reason", text: errorText }]);
       }
       const commandItem = [...items].reverse().find((item) => item.key === "tool:run_command");
@@ -354,6 +358,7 @@ function sessionActivities(events = [], now = Date.now()) {
       const responseText = printableValue(response);
       const item = add("Run failed", "failed", event, "error");
       item.failureReason = errorText;
+      item.errorLogId = detail.errorLogId;
       item.command = commandItem?.command || "";
       item.response = response;
       setDetails(item, [

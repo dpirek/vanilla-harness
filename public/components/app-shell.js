@@ -1,3 +1,4 @@
+import "./logs-page.js";
 import "./models-page.js";
 import BaseComponent from "./base-component.js";
 import "./modals/workspace-picker-modal.js";
@@ -28,6 +29,7 @@ class AppShellContent extends BaseComponent {
       element("column-resize-handle", { id: "filesResizeHandle", class: "columnResizeHandle filesResizeHandle", label: "Resize workspace files column" }),
       element("workspace-panel", { class: "filesColumn" }),
       element("models-page"),
+      element("logs-page", { hidden: "" }),
       element("workspace-picker-modal"),
       element("create-workspace-modal"),
       element("file-editor-modal"),

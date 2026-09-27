@@ -25,6 +25,14 @@ The application supports:
 
 The project currently has no third-party npm dependencies.
 
+## Error logs
+
+Failed steps automatically create persistent diagnostic records in SQLite. Open **Error logs** in the sidebar or visit `/logs` to search failures and filter by review status. Each failed step in **Step summary** links to its `/logs/:id` record.
+
+Records include the step input and output, command exit details, available exception stack and request retry count, timing, workspace, run and conversation IDs, preset settings, and preceding events. Evidence is bounded and common credential fields and patterns are redacted. Logs remain available after a conversation is cleared. New failures are captured from the server; older conversation failures are not backfilled.
+
+Each record includes possible causes and investigation checks, review notes and status, and a JSON download. **Analyze with model** sends the saved diagnostic evidence to the currently selected provider without tools, then saves the model's analysis. Hypotheses are labeled separately from recorded evidence; analysis never executes commands or changes the workspace.
+
 ## Run locally
 
 Clone the repository, enter its directory, and start the server:

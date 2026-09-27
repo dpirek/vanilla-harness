@@ -2247,6 +2247,14 @@ function updateSessionActivityCard(card, activity, { active = false } = {}) {
     const content = document.createElement("span");
     content.className = "sessionTaskContent";
     content.append(label);
+    if (task.errorLogId) {
+      const logLink = document.createElement("a");
+      logLink.href = `/logs/${encodeURIComponent(task.errorLogId)}`;
+      logLink.dataset.appRoute = "";
+      logLink.className = "stepErrorLogLink";
+      logLink.textContent = "View error log";
+      content.append(logLink);
+    }
     if (task.usage) {
       const tokens = document.createElement("span");
       tokens.className = "sessionTaskTokens";
@@ -3268,6 +3276,11 @@ function formatTokenCost(value) {
 function renderRoute() {
   const routeProviderId = modelsRouteProviderId(window.location.pathname);
   const showModels = routeProviderId !== null;
+  const showLogs = /^\/logs(?:\/[^/]+)?\/?$/.test(window.location.pathname);
+  appShell.classList.toggle("viewingLogs", showLogs);
+  const logsPage = appRoot.querySelector("logs-page");
+  logsPage.hidden = !showLogs;
+  if (showLogs && routeReady) logsPage.load(window.location.pathname);
   const showProviders = /^\/providers\/?$/.test(window.location.pathname);
   const toolsTab = toolsTabFromPath(window.location.pathname);
   const showTools = toolsTab !== null;
@@ -3302,7 +3315,7 @@ function renderRoute() {
   providerShortcutModel.setAttribute("aria-current", showModels ? "page" : "false");
   appRoot.querySelector("#providerShortcutButton").setAttribute("aria-current", showProviders ? "page" : "false");
   appRoot.querySelector("#collapsedModelsLink").setAttribute("aria-current", showModels ? "page" : "false");
-  document.title = showModels ? "Models · AI Harness" : showProviders ? "Providers · AI Harness" : showTools ? "Tools · AI Harness" : showSkills ? "Skills · AI Harness" : showPresets ? "Presets · AI Harness" : showSystemPrompts ? "System prompts · AI Harness" : showMcp ? "MCP · AI Harness" : showWorkflow ? "Workflow · AI Harness" : "AI Harness";
+  document.title = showLogs ? "Error logs · AI Harness" : showModels ? "Models · AI Harness" : showProviders ? "Providers · AI Harness" : showTools ? "Tools · AI Harness" : showSkills ? "Skills · AI Harness" : showPresets ? "Presets · AI Harness" : showSystemPrompts ? "System prompts · AI Harness" : showMcp ? "MCP · AI Harness" : showWorkflow ? "Workflow · AI Harness" : "AI Harness";
   if (showModels && routeReady) loadAllProviderModels({ missingOnly: true });
 }
 
@@ -3827,7 +3840,7 @@ async function handleSocketMessage(payload) {
       const targetSessionId = payload.sessionId || pendingSessionId || activeSessionId;
       addMessageToSession(targetSessionId, "agent", payload.error);
       if (targetSessionId === activeSessionId) renderMessages();
-      addEvent("Error", payload.error);
+      addEvent("Error", { error: payload.error, errorLogId: payload.errorLogId });
       finishStreamingAnswer();
       pendingSessionId = null;
       setBusy(false);
@@ -3896,8 +3909,9 @@ chatComponent.addEventListener("submit-prompt", () => {
     systemPrompts: effectiveSystemPrompts,
     mcpConfig: toolsConfigContent,
   };
+  const runId = randomUuid();
   addEvent("Prompt sent", {
-    runId: randomUuid(),
+    runId,
     messageIndex: session.messages.length - 1,
     prompt: images.length > 0 ? `${displayPrompt} (${images.length} image)` : displayPrompt,
     providerId: matchedProviderId,
@@ -3923,6 +3937,7 @@ chatComponent.addEventListener("submit-prompt", () => {
   pendingSessionId = sessionId;
   send({
     type: "prompt",
+    runId,
     prompt: displayPrompt,
     sessionId,
     history,
@@ -4537,7 +4552,7 @@ async function initialize() {
   await loadWorkspaceTree();
   routeReady = true;
   renderRoute();
-  const viewingModalRoute = modelsRouteProviderId(window.location.pathname) !== null || toolsTabFromPath(window.location.pathname) !== null || /^\/(?:providers|skills|presets|system-prompts|mcp|workflow)\/?$/.test(window.location.pathname);
+  const viewingModalRoute = /^\/logs(?:\/[^/]+)?\/?$/.test(window.location.pathname) || modelsRouteProviderId(window.location.pathname) !== null || toolsTabFromPath(window.location.pathname) !== null || /^\/(?:providers|skills|presets|system-prompts|mcp|workflow)\/?$/.test(window.location.pathname);
   if (!viewingModalRoute && needsDefaultWorkspace) {
     openProvidersAfterWorkspaceSelection = shouldOpenProvidersModal;
     await openDefaultWorkspacePicker();

@@ -54,6 +54,10 @@ class HarnessSidebar extends BaseComponent {
         "aria-label": "Conversations",
         children: [
           this.navButton("newChatButton", "pencil-square", "New chat"),
+          this.createElement("a", { href: "/logs", "data-app-route": "", class: "errorLogsNav", title: "Error logs", "aria-label": "Error logs", children: [
+            this.createElement("span", { class: "navIcon", children: [bootstrapIcon("bug")] }),
+            this.createElement("span", { class: "navLabel", textContent: "Error logs" }),
+          ] }),
           this.createElement("div", { id: "recentsList", class: "recentsList" }),
         ],
       }),
