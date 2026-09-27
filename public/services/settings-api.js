@@ -131,3 +131,7 @@ export {
   testProviderModel,
   testSkill,
 };
+
+export function installSkill(command) {
+  return requestJson("/api/skills", jsonOptions("POST", { action: "install", command }), "Unable to install skill.");
+}

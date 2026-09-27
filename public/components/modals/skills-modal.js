@@ -48,6 +48,14 @@ class SkillsModal extends BaseComponent {
                 element("input", { id: "importSkillInput", type: "file", webkitdirectory: "", multiple: "", hidden: "" }),
               ] }),
             ] }),
+            element("div", { class: "skillInstall", children: [
+              element("label", { class: "skillEditorField", children: [
+                element("span", { children: [text("Install from GitHub")] }),
+                element("input", { id: "skillInstallCommand", type: "text", spellcheck: "false", autocomplete: "off", placeholder: "npx skills add https://github.com/anthropics/skills --skill frontend-design", "aria-describedby": "skillInstallHelp" }),
+                element("small", { id: "skillInstallHelp", children: [text("Paste a skills add command with one skill name. Installed skills are stored in /skills.")] }),
+              ] }),
+              element("button", { id: "installSkillButton", type: "button", children: [text("Install skill")] }),
+            ] }),
             element("div", { class: "skillTableWrap", children: [
               element("table", { class: "skillTable", children: [
                 element("thead", { children: [element("tr", { children: [
@@ -90,7 +98,7 @@ class SkillsModal extends BaseComponent {
             ] }),
           ] }),
           element("footer", { class: "settingsFooter", children: [
-            element("span", { id: "skillsStatus", class: "configStatus", children: [text("Skills are stored in /skills.")] }),
+            element("span", { id: "skillsStatus", role: "status", "aria-live": "polite", class: "configStatus", children: [text("Skills are stored in /skills.")] }),
             element("div", { class: "skillFooterActions", children: [
               element("button", { id: "cancelSkillEditButton", type: "button", hidden: "", children: [text("Cancel")] }),
               element("button", { id: "saveSkillEditButton", class: "primaryButton", type: "submit", hidden: "", children: [text("Create skill")] }),
@@ -105,6 +113,10 @@ class SkillsModal extends BaseComponent {
     this.querySelector("#closeSkillsButton").addEventListener("click", () => dialog.close());
     this.querySelector("#skillsSearchInput").addEventListener("input", () => this.emit("search-skills"));
     this.querySelector("#skillAutoDiscoveryToggle").addEventListener("click", () => this.emit("change-skill-discovery"));
+    this.querySelector("#installSkillButton").addEventListener("click", () => this.emit("install-skill"));
+    this.querySelector("#skillInstallCommand").addEventListener("keydown", (event) => {
+      if (event.key === "Enter") { event.preventDefault(); this.emit("install-skill"); }
+    });
     this.querySelector("#addSkillButton").addEventListener("click", () => this.emit("create-skill"));
     this.querySelector("#importSkillButton").addEventListener("click", () => this.querySelector("#importSkillInput").click());
     this.querySelector("#importSkillInput").addEventListener("change", () => this.emit("import-skill"));

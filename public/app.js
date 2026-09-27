@@ -67,6 +67,7 @@ import {
 import {
   createSkill as persistNewSkill,
   importSkill as persistImportedSkill,
+  installSkill as persistInstalledSkill,
   loadConfig as fetchConfig,
   loadHealth as fetchHealth,
   loadProviderModels as fetchProviderModels,
@@ -447,7 +448,7 @@ function renderSkills() {
     const cell = document.createElement("td");
     cell.colSpan = 3;
     cell.className = "skillEmptyState";
-    cell.textContent = "No skills have been created yet.";
+    cell.textContent = "No skills installed yet. Install a skill from GitHub to get started.";
     row.append(cell);
     skillsTableBody.append(row);
     return;
@@ -593,6 +594,30 @@ async function testStoredSkill(skillId = editingSkillId) {
     skillsStatus.textContent = `${skillId}: ${report.ok ? "validation passed" : "validation failed"}`;
     skillsStatus.dataset.state = report.ok ? "success" : "error";
   } catch (error) { skillsStatus.textContent = error.message; skillsStatus.dataset.state = "error"; }
+}
+
+async function installSkillFromCommand() {
+  const button = skillsModal.querySelector("#installSkillButton");
+  const input = skillsModal.querySelector("#skillInstallCommand");
+  if (button.disabled) return;
+  button.disabled = true;
+  input.disabled = true;
+  button.textContent = "Installing…";
+  skillsStatus.textContent = "Installing skill… This may take a few minutes.";
+  skillsStatus.dataset.state = "";
+  try {
+    const result = await persistInstalledSkill(input.value.trim());
+    const selections = new Map(skills.map((skill) => [skill.id, skill.selected]));
+    skills = result.skills.map((skill) => ({ ...skill, selected: selections.get(skill.id) ?? skill.selected }));
+    skillsSearchInput.value = "";
+    renderSkills();
+    renderPresetSkills();
+    send({ type: "reload_skills" });
+    input.value = "";
+    skillsStatus.textContent = `${result.skill.name} installed to /skills`;
+    skillsStatus.dataset.state = "success";
+  } catch (error) { skillsStatus.textContent = error.message; skillsStatus.dataset.state = "error"; }
+  finally { button.disabled = false; input.disabled = false; button.textContent = "Install skill"; }
 }
 
 async function importSkillFolder() {
@@ -959,7 +984,7 @@ function renderPresetSkills() {
   if (skills.length === 0) {
     const empty = document.createElement("p");
     empty.className = "presetSkillsEmpty";
-    empty.textContent = "No skills have been created yet.";
+    empty.textContent = "No skills installed yet. Install a skill from GitHub to get started.";
     presetSkillsList.append(empty);
     return;
   }
@@ -4308,6 +4333,7 @@ skillsModal.addEventListener("change-skill-discovery", () => {
 skillsModal.addEventListener("create-skill", () => openSkillEditor());
 skillsModal.addEventListener("cancel-skill-edit", closeSkillEditor);
 skillsModal.addEventListener("save-skill-edit", saveSkillEdit);
+skillsModal.addEventListener("install-skill", installSkillFromCommand);
 skillsModal.addEventListener("import-skill", importSkillFolder);
 skillsModal.addEventListener("save-skill-resource", saveCurrentSkillResource);
 skillsModal.addEventListener("test-skill", () => testStoredSkill());

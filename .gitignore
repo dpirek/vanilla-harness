@@ -5,3 +5,6 @@
 
 # Isolated browser verification profiles and temporary runtime databases.
 /.ui-verification/parity-artifacts/run-*/
+
+# Skills are installed locally through the webapp.
+/skills/

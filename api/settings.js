@@ -334,6 +334,10 @@ export function createSettingsApiHandlers({
     if (req.method === "POST") {
       try {
         const body = JSON.parse(await readRequestBody(req, 20_000_000) || "{}");
+        if (body.action === "install") {
+          json(res, 200, { ok: true, ...await uiStateStore.installSkill(body.command) });
+          return;
+        }
         if (body.action === "import") {
           json(res, 200, { ok: true, ...uiStateStore.importSkill(body.files) });
           return;
@@ -402,6 +406,10 @@ export function createSettingsApiHandlers({
         const body = JSON.parse(await readRequestBody(req, 20_000_000) || "{}");
         if (body.action === "system-test") {
           json(res, 200, { ok: true, report: await runToolSystemTest(uiStateStore) });
+          return;
+        }
+        if (body.action === "install") {
+          json(res, 200, { ok: true, ...await uiStateStore.installSkill(body.command) });
           return;
         }
         if (body.action === "import") {
